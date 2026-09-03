@@ -161,8 +161,74 @@
     <!-- ============================================================ Batch -->
     <section id="view-batch" class="usa-section padding-top-4" data-view-panel="batch" hidden>
       <div class="grid-container">
-        <h1 class="margin-top-0">Batch</h1>
-        <p class="usa-intro measure-6">Coming next: drop a folder of label images plus a spreadsheet of application rows, watch results stream in, and export your decisions.</p>
+        <h1 class="margin-top-0">Check a batch of applications</h1>
+        <p class="usa-intro measure-6">For the importer who sends 300 at once. Add all the label images, add a spreadsheet of what each application says, and watch the results come in. Nothing leaves your browser except the images being read, one at a time.</p>
+
+        <div class="sample-bar">
+          <span class="text-bold">Try it:</span>
+          <button type="button" class="usa-button usa-button--outline" id="batch-demo">Load a demo batch (5 applications)</button>
+        </div>
+
+        <div class="grid-row grid-gap-4">
+          <div class="tablet:grid-col-6">
+            <fieldset class="usa-fieldset">
+              <legend class="usa-legend usa-legend--large">1. Label images</legend>
+              <p class="usa-hint" id="batch-drop-hint">Drop many images, or choose a whole folder. Name files with the application reference first, for example <code>COLA-123_front.png</code>, and pairing is automatic.</p>
+              <div id="batch-dropzone" class="dropzone" aria-describedby="batch-drop-hint">
+                <svg class="usa-icon usa-icon--size-4 text-base" aria-hidden="true" role="img"><use href="#folder_open"></use></svg>
+                <p class="margin-y-1">Drag images here, or</p>
+                <label class="usa-button" for="batch-files">Choose images</label>
+                <input id="batch-files" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/tiff,image/bmp" multiple class="usa-sr-only">
+                <label class="usa-button usa-button--outline" for="batch-folder">Choose a folder</label>
+                <input id="batch-folder" type="file" webkitdirectory multiple class="usa-sr-only">
+              </div>
+              <p id="batch-image-count" class="text-bold margin-top-1" aria-live="polite"></p>
+            </fieldset>
+          </div>
+          <div class="tablet:grid-col-6">
+            <fieldset class="usa-fieldset">
+              <legend class="usa-legend usa-legend--large">2. Application spreadsheet (CSV)</legend>
+              <p class="usa-hint">One row per application. <a href="/api/v1/csv/template" download>Download the template</a>. Without a spreadsheet, the tool lists what it can read from each image.</p>
+              <label class="usa-button usa-button--outline margin-top-1" for="batch-csv">Choose CSV</label>
+              <input id="batch-csv" type="file" accept=".csv,text/csv" class="usa-sr-only">
+              <div id="batch-csv-summary" class="margin-top-1" aria-live="polite"></div>
+            </fieldset>
+          </div>
+        </div>
+
+        <div class="submit-row margin-top-4">
+          <button type="button" class="usa-button usa-button--big" id="batch-start" disabled>Start</button>
+          <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-cancel" hidden>Pause</button>
+          <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-export" hidden>Export results (CSV)</button>
+          <span id="batch-status" class="status-line" role="status" aria-live="polite"></span>
+        </div>
+        <div id="batch-error" class="usa-alert usa-alert--error usa-alert--slim margin-top-2" role="alert" hidden>
+          <div class="usa-alert__body"><p class="usa-alert__text"></p></div>
+        </div>
+
+        <div id="batch-progress" class="progress margin-top-3" hidden>
+          <div class="progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Batch progress"><span></span></div>
+          <p class="progress__text"></p>
+        </div>
+
+        <div id="batch-summary" class="summary-grid margin-top-3" hidden></div>
+
+        <div id="batch-results" class="margin-top-3" hidden>
+          <div class="filter-bar" role="group" aria-label="Filter results">
+            <button type="button" class="usa-button usa-button--outline is-on" data-filter="all">All</button>
+            <button type="button" class="usa-button usa-button--outline" data-filter="attention">Needs attention</button>
+            <button type="button" class="usa-button usa-button--outline" data-filter="ready">Ready</button>
+            <button type="button" class="usa-button usa-button--outline" data-filter="undecided">Undecided</button>
+          </div>
+          <div id="batch-table"></div>
+          <nav class="pager" aria-label="Results pages"><button type="button" class="usa-button usa-button--outline" id="pager-prev">Previous</button><span id="pager-text"></span><button type="button" class="usa-button usa-button--outline" id="pager-next">Next</button></nav>
+          <section id="batch-unpaired" class="margin-top-4" hidden>
+            <h2>Images not matched to an application</h2>
+            <p class="usa-hint">Choose the application each image belongs to, or leave it out.</p>
+            <ul id="unpaired-list" class="add-list-reset file-list"></ul>
+          </section>
+        </div>
+        <p class="usa-hint margin-top-4">Refreshing or closing this page clears the batch. Export before you leave.</p>
       </div>
     </section>
 
@@ -203,5 +269,6 @@
 
   <script src="/static/uswds/js/uswds.min.js"></script>
   <script type="module" src="/static/app.js"></script>
+  <script type="module" src="/static/batch.js"></script>
 </body>
 </html>

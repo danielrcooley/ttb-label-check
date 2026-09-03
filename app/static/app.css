@@ -99,6 +99,35 @@ main { flex: 1 0 auto; }
 .ocr-lines { font-family: "Roboto Mono Web", Consolas, monospace; font-size: .85rem; columns: 1; }
 .ocr-lines li { margin-bottom: .15rem; }
 
+/* Batch */
+.progress__bar { height: 1.25rem; background: #dfe1e2; border-radius: .25rem; overflow: hidden; }
+.progress__bar span { display: block; height: 100%; width: 0; background: #005ea2; transition: width .3s; }
+.progress__text { margin: .5rem 0 0; font-weight: 600; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; }
+.summary-tile { border: 1px solid #dfe1e2; border-radius: .25rem; padding: .75rem; background: #fff; }
+.summary-tile .num { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
+.summary-tile .lbl { color: #565c65; font-size: .9rem; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.filter-bar .usa-button { margin: 0; }
+.filter-bar .usa-button.is-on { background: #005ea2; color: #fff; box-shadow: inset 0 0 0 2px #005ea2; }
+.batch-table { width: 100%; border-collapse: collapse; }
+.batch-table th, .batch-table td { text-align: left; vertical-align: top; padding: .6rem .5rem; border-bottom: 1px solid #dfe1e2; }
+.batch-table th { font-size: .9rem; color: #565c65; }
+.batch-table .app-id { font-weight: 700; }
+.batch-table .app-brand { color: #3d4551; }
+.batch-table .issues { font-size: .9rem; }
+.batch-table .issues li { margin: 0; }
+.batch-table .decision-btns { display: flex; flex-wrap: wrap; gap: .25rem; }
+.batch-table .decision-btns .usa-button { margin: 0; padding: .35rem .6rem; font-size: .9rem; }
+.batch-table .decision-btns .usa-button.is-on { background: #1b1b1b; color: #fff; }
+.batch-table .note-input { margin-top: .35rem; width: 100%; max-width: 14rem; font-size: .9rem; padding: .3rem; border: 1px solid #565c65; }
+.batch-table tr.detail-row td { background: #f9f9f9; }
+.batch-table .files { font-size: .85rem; color: #565c65; word-break: break-all; }
+.batch-table tr.is-error td { background: #fdf2f1; }
+.pager { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+.pager .usa-button { margin: 0; }
+.detail-panel .label-stage img { max-height: 40vh; }
+
 /* Forced colors (Windows High Contrast): rely on borders and text, not fills */
 @media (forced-colors: active) {
   .status-tag { border: 2px solid CanvasText; }

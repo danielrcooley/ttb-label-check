@@ -46,7 +46,9 @@ class Settings(BaseSettings):
     max_csv_rows: int = 5000
     max_csv_bytes: int = 2 * 1024 * 1024
     per_client_inflight: int = 4
-    batch_reserved_interactive_slots: int = 1
+    interactive_wait_seconds: float = Field(
+        default=8.0, description="How long an interactive request may wait for a worker slot"
+    )
 
     # --- matching thresholds (tuned against tests/fixtures; see docs/OCR_EVAL.md)
     match_review_threshold: int = Field(

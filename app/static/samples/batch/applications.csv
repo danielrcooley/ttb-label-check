@@ -1,0 +1,6 @@
+application_id,beverage_type,brand_name,class_type,alcohol_content,net_contents,bottler,country_of_origin,imported,images
+APP-001,spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"Distilled and Bottled by Old Tom Distillery, Bardstown, Kentucky",USA,no,APP-001_front.png;APP-001_back.png
+APP-002,spirits,Stone's Throw,Straight Rye Whiskey,47.5% ALC/VOL (95 PROOF),750 mL,"Bottled by Stone's Throw Spirits Co., Denver, Colorado",USA,no,APP-002_front.png;APP-002_back.png
+APP-003,spirits,HARBOR LIGHT,London Dry Gin,Alc. 40% by Vol.,1 L,"Distilled by Harbor Light Distillers, Portland, Maine",USA,no,
+APP-005,wine,Willow Creek Cellars,Cabernet Sauvignon,Alc. 13.5% by Vol.,750 mL,"Produced and Bottled by Willow Creek Cellars, Paso Robles, California",USA,no,
+APP-007,malt,COPPER KETTLE BREWING,India Pale Ale,6.8% ALC/VOL,12 FL OZ (355 mL),"Brewed and Bottled by Copper Kettle Brewing Co., Asheville, North Carolina",USA,no,

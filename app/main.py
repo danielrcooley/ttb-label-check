@@ -16,6 +16,7 @@ from app.config import Settings, get_settings
 from app.ocr.pool import OcrPool
 from app.ocr.rapid import RapidEngine
 from app.routes.api import router as api_router
+from app.routes.csv_routes import router as csv_router
 from app.security import ClientLimiter, SecurityMiddleware, install_error_handlers
 
 logging.basicConfig(
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None, *, warm: bool = True) -> FastAP
     app.add_middleware(SecurityMiddleware, settings=settings)
     install_error_handlers(app)
     app.include_router(api_router)
+    app.include_router(csv_router)
 
     static_dir = settings.static_dir
     if static_dir.exists():
