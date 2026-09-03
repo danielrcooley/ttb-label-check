@@ -18,6 +18,7 @@ Reviewers will push on this prototype, and they should. This page says what happ
 | Batch size in the browser | no hard cap; tested with hundreds of images | Table paginates at 50 rows; thumbnails are created only when a row is expanded |
 
 Health (`/api/v1/health`) never goes through the limiter, so it answers during a flood.
+Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a platform never routes traffic to a cold instance.
 
 ## Measured behavior
 

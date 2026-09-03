@@ -17,7 +17,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY requirements.txt ./
-RUN pip install --require-virtualenv=false -r requirements.txt
+RUN pip install -r requirements.txt
 
 COPY --chown=app:app app ./app
 COPY --chown=app:app README.md LICENSE THIRD_PARTY_NOTICES.md ./

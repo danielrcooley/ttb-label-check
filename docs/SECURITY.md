@@ -11,11 +11,11 @@ deployment where they cost nothing, and it says plainly where it stops.
   results. Batch state (files, results, decisions) lives only in the agent's browser tab.
 - **Nothing sensitive is logged.** Request logs carry method, path, status and timing. Label text,
   filenames, application values and results never reach a log line.
-- **Temporary files.** The web framework spools large multipart uploads to a temporary directory
-  while parsing. In the container that directory should be a memory-backed `tmpfs` mount
-  (`docker run --tmpfs /tmp` or an in-memory volume on the platform), so that spooling never
-  reaches persistent disk. This is disclosed rather than hidden: a "read-only filesystem" claim
-  alone would not be true.
+- **Uploads stay in memory.** The web framework normally spools multipart parts above 1 MB to a
+  temporary directory while parsing; this app raises that threshold above the per-image cap, so
+  images are never written to disk. Total memory is bounded by the request-size cap times the
+  number of concurrent requests. Mounting `/tmp` in memory (`docker run --tmpfs /tmp`) remains good
+  hygiene as a second line of defense.
 - **No outbound calls.** The verification path makes no network connections. OCR models are in
   the repository (hash-pinned in `app/models/MANIFEST.json`); frontend assets are self-hosted. A
   test blocks every socket connection and runs a full verification (`tests/integration/test_no_egress.py`).

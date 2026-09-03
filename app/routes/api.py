@@ -91,6 +91,14 @@ async def health(request: Request) -> HealthResponse:
     )
 
 
+@router.get("/ready", tags=["system"], summary="Readiness probe: 200 once the OCR engines are warm, else 503")
+async def ready(request: Request) -> dict[str, bool]:
+    pool = request.app.state.pool
+    if not pool.ready:
+        raise HTTPException(status_code=503, detail="not_ready", headers={"Retry-After": "3"})
+    return {"ready": True}
+
+
 @router.post(
     "/verify",
     response_model=VerifyResponse,

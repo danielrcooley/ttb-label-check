@@ -149,3 +149,8 @@ def test_health_reports_engine_and_capacity(client):
     body = client.get("/api/v1/health").json()
     assert body["ready"] and body["max_concurrency"] >= 1
     assert "det" in body["engine"]["models"]
+
+
+def test_ready_probe_answers_200_once_warm(client):
+    r = client.get("/api/v1/ready")
+    assert r.status_code == 200 and r.json() == {"ready": True}

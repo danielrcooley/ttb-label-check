@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.formparsers import MultiPartParser
 
 from app import __version__
 from app.config import Settings, get_settings
@@ -27,6 +28,9 @@ log = logging.getLogger("app")
 
 def create_app(settings: Settings | None = None, *, warm: bool = True) -> FastAPI:
     settings = settings or get_settings()
+    # Multipart parts larger than this are spooled to disk by Starlette. Keep every image (per-image cap)
+    # in memory so uploads never touch the filesystem; the request-size cap bounds total memory.
+    MultiPartParser.spool_max_size = settings.max_image_bytes + 1024 * 1024
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
