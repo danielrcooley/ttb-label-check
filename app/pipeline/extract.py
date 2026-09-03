@@ -11,8 +11,8 @@ from .parsers import parse_alcohol, parse_volumes
 from .warning import find_warning
 
 _ORIGIN = re.compile(
-    r"(product of|produce of|imported by|imported from|made in|produced in|distilled in|bottled in|"
-    r"country of origin)",
+    r"\b(product of|produce of|imported by|imported from|made in|produced in|distilled in|bottled in|"
+    r"country of origin)\b",
     re.I,
 )
 _BOTTLER = re.compile(

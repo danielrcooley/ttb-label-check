@@ -9,9 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OMP_NUM_THREADS=1 \
     PORT=8000
 
-# libgomp is needed by onnxruntime; nothing else beyond the slim image.
+# libgomp is needed by onnxruntime, libglib2.0-0 (libgthread) by opencv-python-headless; nothing else.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libgomp1 \
+ && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app
 

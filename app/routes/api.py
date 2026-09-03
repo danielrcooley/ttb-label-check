@@ -81,8 +81,9 @@ async def health(request: Request) -> HealthResponse:
     pool = request.app.state.pool
     s = _settings(request)
     return HealthResponse(
-        status="ok" if pool.ready else "starting",
+        status="ok" if pool.ready else ("failed" if pool.error else "starting"),
         ready=pool.ready,
+        error=pool.error,
         engine=engine_info(pool),
         max_concurrency=pool.workers,
         in_flight=pool.in_flight,
@@ -95,7 +96,8 @@ async def health(request: Request) -> HealthResponse:
 async def ready(request: Request) -> dict[str, bool]:
     pool = request.app.state.pool
     if not pool.ready:
-        raise HTTPException(status_code=503, detail="not_ready", headers={"Retry-After": "3"})
+        detail = f"warm-up failed: {pool.error}" if pool.error else "not_ready"
+        raise HTTPException(status_code=503, detail=detail, headers={"Retry-After": "3"})
     return {"ready": True}
 
 

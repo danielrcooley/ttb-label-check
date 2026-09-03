@@ -49,6 +49,7 @@ class OcrPool:
         self._interactive_waiting = 0
         self._info: dict[str, str] = {}
         self.ready = False
+        self.error: str | None = None
 
     # ------------------------------------------------------------------ engines
     def _engine(self) -> OcrEngine:
@@ -71,9 +72,14 @@ class OcrPool:
             self._engine().recognize(blank)
             barrier.wait(timeout=120)  # hold the thread so every worker gets its own engine
 
-        futures = [self._executor.submit(job) for _ in range(self.workers)]
-        for f in futures:
-            f.result(timeout=180)
+        try:
+            futures = [self._executor.submit(job) for _ in range(self.workers)]
+            for f in futures:
+                f.result(timeout=180)
+        except Exception as exc:  # surfaced through /health and /ready instead of dying silently
+            self.error = f"{type(exc).__name__}: {exc}"
+            log.exception("OCR pool warm-up failed")
+            raise
         self.ready = True
         log.info("OCR pool ready: %d worker(s), %s", self.workers, self._info)
 

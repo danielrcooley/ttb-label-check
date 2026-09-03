@@ -89,3 +89,28 @@ def test_interactive_gives_up_after_the_wait_budget():
         pool.shutdown()
 
     asyncio.run(go())
+
+
+def test_warmup_failure_is_recorded_and_visible_in_health():
+    import time as _time
+
+    from app.main import create_app
+    from fastapi.testclient import TestClient
+
+    class Broken:
+        name = "broken"
+
+        def __init__(self, settings):
+            raise ImportError("libgthread-2.0.so.0: cannot open shared object file")
+
+    app = create_app(Settings(ocr_workers=1), engine_factory=Broken)
+    with TestClient(app) as c:
+        for _ in range(50):
+            body = c.get("/api/v1/health").json()
+            if body["status"] == "failed":
+                break
+            _time.sleep(0.1)
+        assert body["status"] == "failed" and body["ready"] is False
+        assert "libgthread" in body["error"]
+        r = c.get("/api/v1/ready")
+        assert r.status_code == 503 and "libgthread" in r.json()["message"]

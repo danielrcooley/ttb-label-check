@@ -187,6 +187,7 @@ class CompareResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     ready: bool
+    error: str | None = Field(default=None, description="Set when OCR warm-up failed")
     engine: EngineInfo
     max_concurrency: int
     in_flight: int

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +14,7 @@ from starlette.formparsers import MultiPartParser
 
 from app import __version__
 from app.config import Settings, get_settings
+from app.ocr.base import OcrEngine
 from app.ocr.pool import OcrPool
 from app.ocr.rapid import RapidEngine
 from app.routes.api import router as api_router
@@ -26,20 +27,34 @@ logging.basicConfig(
 log = logging.getLogger("app")
 
 
-def create_app(settings: Settings | None = None, *, warm: bool = True) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    warm: bool = True,
+    engine_factory: Callable[[Settings], OcrEngine] | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
+    make_engine = engine_factory or (lambda s: RapidEngine(s))
     # Multipart parts larger than this are spooled to disk by Starlette. Keep every image (per-image cap)
     # in memory so uploads never touch the filesystem; the request-size cap bounds total memory.
     MultiPartParser.spool_max_size = settings.max_image_bytes + 1024 * 1024
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        pool = OcrPool(settings, lambda: RapidEngine(settings))
+        pool = OcrPool(settings, lambda: make_engine(settings))
         app.state.pool = pool
         if warm:
             loop = asyncio.get_running_loop()
             # Warm in the background so health answers immediately with ready=false; verify returns 503 until warm.
-            app.state.warm_task = loop.run_in_executor(None, pool.warmup)
+            warm_task = loop.run_in_executor(None, pool.warmup)
+            warm_task.add_done_callback(
+                lambda fut: (
+                    log.error("OCR warm-up failed; /ready stays 503: %s", fut.exception())
+                    if fut.exception()
+                    else log.info("OCR warm-up complete")
+                )
+            )
+            app.state.warm_task = warm_task
         yield
         pool.shutdown()
 
