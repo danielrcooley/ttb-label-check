@@ -219,7 +219,9 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
         reviews.append(Check(id="warning", label="Government warning", status=Status.needs_review))
     if issues:
         names = ", ".join(c.label.lower() for c in issues)
-        return Verdict.issues_found, f"Issues found: {names}. The agent should review before any decision."
+        also = ", ".join(c.label.lower() for c in reviews if c.id not in {i.id for i in issues})
+        tail = f" Also confirm: {also}." if also else ""
+        return Verdict.issues_found, f"Issues found: {names}.{tail} The agent should review before any decision."
     if reviews:
         names = ", ".join(c.label.lower() for c in reviews)
         return Verdict.needs_review, f"Everything else matches; please confirm: {names}."

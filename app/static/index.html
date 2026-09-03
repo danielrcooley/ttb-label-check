@@ -1,24 +1,207 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Label Check (prototype)</title>
-<style>
-  body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; color: #1b1b1b; background: #fff; }
-  .banner { background: #f0f0f0; border-left: 4px solid #005ea2; padding: .75rem 1rem; }
-  code { background: #f0f0f0; padding: .1rem .3rem; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Label Check (prototype)</title>
+  <meta name="description" content="Prototype: checks alcohol beverage label artwork against COLA application data. The tool recommends; the compliance agent decides.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/uswds/css/uswds.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/uswds/js/uswds-init.min.js"></script>
 </head>
 <body>
-  <p class="banner"><strong>Prototype.</strong> Not an official U.S. Government system. No data is stored.</p>
-  <h1>Label Check</h1>
-  <p>The interface is being built. The API is live:</p>
-  <ul>
-    <li><code>GET /api/v1/health</code></li>
-    <li><code>POST /api/v1/verify</code> (multipart: <code>application</code> JSON + <code>images</code>)</li>
-    <li><code>POST /api/v1/extract</code></li>
-    <li><code>GET /api/v1/openapi.json</code></li>
-  </ul>
+  <a class="usa-skipnav" href="#main-content">Skip to main content</a>
+
+  <section class="usa-site-alert usa-site-alert--info usa-site-alert--slim" aria-label="Prototype notice">
+    <div class="usa-alert">
+      <div class="usa-alert__body">
+        <p class="usa-alert__text"><strong>Prototype.</strong> Not an official U.S. Government system. Nothing you upload is stored.</p>
+      </div>
+    </div>
+  </section>
+
+  <header class="usa-header usa-header--basic">
+    <div class="usa-nav-container">
+      <div class="usa-navbar">
+        <div class="usa-logo">
+          <em class="usa-logo__text"><a href="/" title="Label Check home">Label Check</a></em>
+        </div>
+        <button type="button" class="usa-menu-btn">Menu</button>
+      </div>
+      <nav aria-label="Primary navigation" class="usa-nav">
+        <button type="button" class="usa-nav__close"><img src="/static/uswds/img/usa-icons/close.svg" role="img" alt="Close"></button>
+        <ul class="usa-nav__primary usa-accordion">
+          <li class="usa-nav__primary-item"><a href="#check" class="usa-nav-link usa-current" data-view="check"><span>Check a label</span></a></li>
+          <li class="usa-nav__primary-item"><a href="#batch" class="usa-nav-link" data-view="batch"><span>Batch</span></a></li>
+          <li class="usa-nav__primary-item"><a href="#about" class="usa-nav-link" data-view="about"><span>About this tool</span></a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+
+    <!-- ============================================================ Check a label -->
+    <section id="view-check" class="usa-section padding-top-4" data-view-panel="check">
+      <div class="grid-container">
+        <h1 class="margin-top-0">Check a label against its application</h1>
+        <p class="usa-intro measure-6">Upload the label images, enter what the application says, and get a checklist in a few seconds. The tool points things out. You make the call.</p>
+
+        <div class="sample-bar" role="group" aria-labelledby="sample-bar-label">
+          <span id="sample-bar-label" class="text-bold">Try a sample:</span>
+          <button type="button" class="usa-button usa-button--outline" data-sample="clean">Clean artwork</button>
+          <button type="button" class="usa-button usa-button--outline" data-sample="photo">Phone photo</button>
+          <button type="button" class="usa-button usa-button--outline" data-sample="problem">Problem label</button>
+          <span id="sample-blurb" class="usa-hint display-block margin-top-1"></span>
+        </div>
+
+        <form id="check-form" class="usa-form usa-form--large maxw-none" novalidate>
+          <div class="grid-row grid-gap-4">
+
+            <div class="tablet:grid-col-6">
+              <fieldset class="usa-fieldset">
+                <legend class="usa-legend usa-legend--large">1. Label images</legend>
+                <p class="usa-hint" id="drop-hint">Add every label image for this application: front, back, neck. PNG, JPEG, GIF, WebP, TIFF or BMP, up to 10 MB each.</p>
+                <div id="dropzone" class="dropzone" aria-describedby="drop-hint">
+                  <svg class="usa-icon usa-icon--size-4 text-base" aria-hidden="true" role="img"><use href="#upload_file"></use></svg>
+                  <p class="margin-y-1">Drag images here, or</p>
+                  <label class="usa-button" for="file-input">Choose images</label>
+                  <input id="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/tiff,image/bmp" multiple class="usa-sr-only">
+                </div>
+                <ul id="file-list" class="file-list add-list-reset" aria-label="Selected images"></ul>
+                <button type="button" id="clear-files" class="usa-button usa-button--unstyled margin-top-1" hidden>Remove all images</button>
+              </fieldset>
+            </div>
+
+            <div class="tablet:grid-col-6">
+              <fieldset class="usa-fieldset">
+                <legend class="usa-legend usa-legend--large">2. What the application says</legend>
+
+                <fieldset class="usa-fieldset margin-top-2">
+                  <legend class="usa-legend">Beverage type</legend>
+                  <div class="radio-row">
+                    <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-spirits" type="radio" name="beverage_type" value="spirits" checked><label class="usa-radio__label" for="bt-spirits">Distilled spirits</label></div>
+                    <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-wine" type="radio" name="beverage_type" value="wine"><label class="usa-radio__label" for="bt-wine">Wine</label></div>
+                    <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-malt" type="radio" name="beverage_type" value="malt"><label class="usa-radio__label" for="bt-malt">Beer / malt beverage</label></div>
+                  </div>
+                </fieldset>
+
+                <label class="usa-label" for="brand_name">Brand name <abbr title="required" class="usa-hint usa-hint--required">*</abbr></label>
+                <input class="usa-input" id="brand_name" name="brand_name" type="text" required autocomplete="off" placeholder="OLD TOM DISTILLERY">
+
+                <label class="usa-label" for="class_type">Class / type <abbr title="required" class="usa-hint usa-hint--required">*</abbr></label>
+                <input class="usa-input" id="class_type" name="class_type" type="text" required autocomplete="off" placeholder="Kentucky Straight Bourbon Whiskey">
+
+                <label class="usa-label" for="alcohol_content">Alcohol content</label>
+                <span class="usa-hint" id="alc-hint">As written on the application, for example 45% Alc./Vol. (90 Proof). Optional for beer and table wine.</span>
+                <input class="usa-input" id="alcohol_content" name="alcohol_content" type="text" autocomplete="off" aria-describedby="alc-hint" placeholder="45% Alc./Vol. (90 Proof)">
+
+                <label class="usa-label" for="net_contents">Net contents <abbr title="required" class="usa-hint usa-hint--required">*</abbr></label>
+                <input class="usa-input" id="net_contents" name="net_contents" type="text" required autocomplete="off" placeholder="750 mL">
+
+                <div class="usa-accordion usa-accordion--bordered margin-top-3">
+                  <h3 class="usa-accordion__heading">
+                    <button type="button" class="usa-accordion__button" aria-expanded="false" aria-controls="optional-fields">More fields (optional)</button>
+                  </h3>
+                  <div id="optional-fields" class="usa-accordion__content usa-prose" hidden>
+                    <label class="usa-label margin-top-0" for="bottler">Name and address of bottler / producer</label>
+                    <input class="usa-input" id="bottler" name="bottler" type="text" autocomplete="off">
+
+                    <label class="usa-label" for="country_of_origin">Country of origin</label>
+                    <input class="usa-input" id="country_of_origin" name="country_of_origin" type="text" autocomplete="off" placeholder="USA">
+
+                    <div class="usa-checkbox margin-top-2">
+                      <input class="usa-checkbox__input" id="imported" name="imported" type="checkbox">
+                      <label class="usa-checkbox__label" for="imported">This product is imported</label>
+                    </div>
+
+                    <label class="usa-label" for="application_id">Application reference (for your notes)</label>
+                    <input class="usa-input" id="application_id" name="application_id" type="text" autocomplete="off" placeholder="TTB ID">
+                  </div>
+                </div>
+              </fieldset>
+            </div>
+          </div>
+
+          <div class="submit-row margin-top-4">
+            <button class="usa-button usa-button--big" type="submit" id="check-btn">Check label</button>
+            <span id="status" class="status-line" role="status" aria-live="polite"></span>
+          </div>
+          <div id="form-error" class="usa-alert usa-alert--error usa-alert--slim margin-top-2" role="alert" hidden>
+            <div class="usa-alert__body"><p class="usa-alert__text"></p></div>
+          </div>
+        </form>
+
+        <section id="results" class="results margin-top-6" hidden tabindex="-1" aria-labelledby="results-heading">
+          <h2 id="results-heading" class="usa-sr-only">Results</h2>
+          <div id="verdict"></div>
+          <div class="grid-row grid-gap-4 margin-top-3">
+            <div class="desktop:grid-col-7">
+              <h3 class="margin-top-0">Checklist</h3>
+              <p class="usa-hint">Select a row to highlight where it was found on the label.</p>
+              <div id="checklist"></div>
+              <h3>Government warning statement</h3>
+              <div id="warning-report"></div>
+            </div>
+            <div class="desktop:grid-col-5">
+              <h3 class="margin-top-0">Label images</h3>
+              <div id="figures"></div>
+            </div>
+          </div>
+          <details class="margin-top-4">
+            <summary class="text-bold">Everything the tool read (OCR lines)</summary>
+            <div id="ocr-lines" class="margin-top-1"></div>
+          </details>
+        </section>
+      </div>
+    </section>
+
+    <!-- ============================================================ Batch -->
+    <section id="view-batch" class="usa-section padding-top-4" data-view-panel="batch" hidden>
+      <div class="grid-container">
+        <h1 class="margin-top-0">Batch</h1>
+        <p class="usa-intro measure-6">Coming next: drop a folder of label images plus a spreadsheet of application rows, watch results stream in, and export your decisions.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ About -->
+    <section id="view-about" class="usa-section padding-top-4" data-view-panel="about" hidden>
+      <div class="grid-container usa-prose">
+        <h1 class="margin-top-0">About this tool</h1>
+        <h2>What it does</h2>
+        <p>It reads the text on label images with an on-device text-recognition model, compares what it read with what the application says, checks the government warning statement word for word against 27 CFR 16.21, and shows you exactly where on the label it found each item. It works in a few seconds and makes no calls to outside services.</p>
+        <h2>What it does not do</h2>
+        <ul>
+          <li>It does not approve or reject applications. Every result is a recommendation for a compliance agent.</li>
+          <li>It does not store images, application data, or results. Refreshing the page clears everything.</li>
+          <li>It does not check permits, formulas, class/type validity, age statements or laboratory tolerances.</li>
+          <li>It does not measure physical type size or bold type from a photograph reliably; those items are marked for you to confirm.</li>
+        </ul>
+        <h2>How it decides</h2>
+        <p><strong>Match</strong> means the label says the same thing, allowing for letter case and accents. <strong>Needs review</strong> means it is close but you should look, which is usually OCR noise. <strong>Mismatch</strong> and <strong>Not found</strong> mean the label disagrees or the item could not be read. For the warning statement, only an exact match passes.</p>
+        <h2>Accessibility</h2>
+        <p>Built with the U.S. Web Design System. Target: WCAG 2.1 AA and Section 508. Every status is shown as an icon, a word and a color, never a color alone. The page works with keyboard only, at 200% zoom, and in Windows High Contrast Mode. If something does not work for you, please say so in the project repository.</p>
+        <h2>For engineers</h2>
+        <p>API description: <a href="/api/v1/openapi.json">/api/v1/openapi.json</a>. Health and capacity: <a href="/api/v1/health">/api/v1/health</a>. Source code and documentation: <a id="repo-link" href="#">repository</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="usa-footer usa-footer--slim">
+    <div class="usa-footer__primary-section">
+      <div class="grid-container">
+        <div class="grid-row grid-gap">
+          <div class="mobile-lg:grid-col-8">
+            <p class="margin-y-2 font-body-3xs text-base">Label Check prototype. Not an official U.S. Government system. No data is stored. <span id="build-info"></span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/uswds/js/uswds.min.js"></script>
+  <script type="module" src="/static/app.js"></script>
 </body>
 </html>

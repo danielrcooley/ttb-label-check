@@ -1,0 +1,62 @@
+[
+  {
+    "id": "clean",
+    "title": "Clean artwork",
+    "blurb": "The brief's sample product. Front and back label artwork as submitted. Everything should match.",
+    "application": {
+      "application_id": "COLA-2026-000123",
+      "beverage_type": "spirits",
+      "brand_name": "OLD TOM DISTILLERY",
+      "class_type": "Kentucky Straight Bourbon Whiskey",
+      "alcohol_content": "45% Alc./Vol. (90 Proof)",
+      "net_contents": "750 mL",
+      "bottler": "Distilled and Bottled by Old Tom Distillery, Bardstown, Kentucky",
+      "country_of_origin": "USA",
+      "imported": false
+    },
+    "images": [
+      "clean_front.png",
+      "clean_back.png"
+    ]
+  },
+  {
+    "id": "photo",
+    "title": "Phone photo",
+    "blurb": "Same product, but the images are tilted and blurred the way a phone photo often is. The tool should still read them.",
+    "application": {
+      "application_id": "COLA-2026-000123",
+      "beverage_type": "spirits",
+      "brand_name": "OLD TOM DISTILLERY",
+      "class_type": "Kentucky Straight Bourbon Whiskey",
+      "alcohol_content": "45% Alc./Vol. (90 Proof)",
+      "net_contents": "750 mL",
+      "bottler": "Distilled and Bottled by Old Tom Distillery, Bardstown, Kentucky",
+      "country_of_origin": "USA",
+      "imported": false
+    },
+    "images": [
+      "photo_front.png",
+      "photo_back.png"
+    ]
+  },
+  {
+    "id": "problem",
+    "title": "Problem label",
+    "blurb": "Application says 45% but the label says 47.5%, and the warning heading is in title case. The brand differs only by letter case, which is fine.",
+    "application": {
+      "application_id": "COLA-2026-000456",
+      "beverage_type": "spirits",
+      "brand_name": "Stone's Throw",
+      "class_type": "Straight Rye Whiskey",
+      "alcohol_content": "45% ALC/VOL (90 PROOF)",
+      "net_contents": "750 mL",
+      "bottler": "Bottled by Stone's Throw Spirits Co., Denver, Colorado",
+      "country_of_origin": "USA",
+      "imported": false
+    },
+    "images": [
+      "problem_front.png",
+      "problem_back.png"
+    ]
+  }
+]

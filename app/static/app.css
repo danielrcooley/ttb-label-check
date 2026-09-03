@@ -1,0 +1,112 @@
+/* Label Check: small additions on top of USWDS. No external assets. */
+
+:root {
+  --lc-focus: #2491ff;
+  color-scheme: light; /* USWDS is a light design system; do not let a dark OS theme restyle form controls */
+}
+
+[hidden] { display: none !important; } /* USWDS display rules would otherwise beat the hidden attribute */
+
+body { min-height: 100vh; display: flex; flex-direction: column; background: #fff; color: #1b1b1b; }
+main { flex: 1 0 auto; }
+
+.usa-input, .usa-select, .usa-textarea { background-color: #fff; color: #1b1b1b; }
+.usa-input::placeholder { color: #71767a; }
+
+/* Sample bar */
+.sample-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: 1.5rem 0 1rem; }
+.sample-bar .usa-button { margin: 0; }
+
+/* Drop zone: big target, obvious affordance, works without drag and drop */
+.dropzone {
+  border: 3px dashed #71767a;
+  border-radius: .5rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  background: #f9f9f9;
+  transition: border-color .15s, background .15s;
+}
+.dropzone.is-dragover { border-color: #005ea2; background: #e1f3f8; }
+.dropzone .usa-button { margin-top: .25rem; }
+
+.file-list { margin: 1rem 0 0; padding: 0; display: grid; gap: .75rem; }
+.file-list li { display: grid; grid-template-columns: 4.5rem 1fr auto; gap: .75rem; align-items: center;
+  border: 1px solid #dfe1e2; border-radius: .25rem; padding: .5rem; background: #fff; }
+.file-list img { width: 4.5rem; height: 4.5rem; object-fit: contain; background: #f0f0f0; border-radius: .25rem; }
+.file-list .file-name { font-weight: 600; word-break: break-word; }
+.file-list .file-meta { color: #565c65; font-size: .9rem; }
+
+.radio-row { display: grid; gap: .5rem; }
+@media (min-width: 40em) { .radio-row { grid-template-columns: repeat(3, 1fr); } }
+.radio-row .usa-radio__input--tile + .usa-radio__label { margin-top: 0; }
+
+.submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.status-line { font-weight: 600; color: #005ea2; min-height: 1.5rem; }
+.status-line.is-busy::before {
+  content: ""; display: inline-block; width: 1rem; height: 1rem; margin-right: .5rem; vertical-align: -.15rem;
+  border: 3px solid #d9e8f6; border-top-color: #005ea2; border-radius: 50%; animation: lc-spin .9s linear infinite;
+}
+@keyframes lc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .status-line.is-busy::before { animation: none; } }
+
+/* Results */
+.results:focus { outline: none; }
+.verdict .usa-alert__heading { font-size: 1.5rem; }
+.verdict .timing { font-weight: 600; }
+
+.status-tag { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .6rem; border-radius: 1rem;
+  font-weight: 700; font-size: .85rem; white-space: nowrap; border: 2px solid transparent; }
+.status-tag .usa-icon { width: 1.1rem; height: 1.1rem; }
+.status-match { background: #ecf3ec; color: #0f5b1f; border-color: #4d8055; }
+.status-needs_review { background: #faf3d1; color: #5c4809; border-color: #c2850c; }
+.status-mismatch, .status-not_found { background: #f4e3db; color: #8b0a03; border-color: #d83933; }
+.status-not_checked { background: #f0f0f0; color: #3d4551; border-color: #a9aeb1; }
+.status-info { background: #e7f6f8; color: #07648d; border-color: #00bde3; }
+
+.checklist { width: 100%; border-collapse: collapse; }
+.checklist th, .checklist td { text-align: left; vertical-align: top; padding: .75rem .5rem; border-bottom: 1px solid #dfe1e2; }
+.checklist th { font-size: .9rem; color: #565c65; }
+.checklist tbody tr { cursor: pointer; }
+.checklist tbody tr:hover, .checklist tbody tr:focus-within { background: #f0f0f0; }
+.checklist tbody tr.is-active { background: #e1f3f8; box-shadow: inset 4px 0 0 #005ea2; }
+.checklist .check-label { font-weight: 700; }
+.checklist .check-note { color: #3d4551; font-size: .95rem; margin-top: .25rem; }
+.checklist .rule { color: #71767a; font-size: .8rem; }
+.checklist .crop { display: block; max-width: 100%; height: 2.6rem; width: auto; border: 1px solid #a9aeb1; background: #fff; margin-top: .35rem; }
+.checklist .found { font-family: "Roboto Mono Web", Consolas, monospace; font-size: .9rem; word-break: break-word; }
+.checklist .expected { word-break: break-word; }
+.row-btn { all: unset; cursor: pointer; display: block; width: 100%; }
+.row-btn:focus-visible { outline: .25rem solid var(--lc-focus); outline-offset: 0; }
+
+.warning-card { border: 1px solid #dfe1e2; border-radius: .25rem; padding: 1rem; background: #fff; }
+.warning-head { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.warning-card .found-text { font-family: "Roboto Mono Web", Consolas, monospace; font-size: .9rem; background: #f0f0f0; padding: .75rem; border-radius: .25rem; white-space: pre-wrap; }
+.warning-card .diff { font-family: "Roboto Mono Web", Consolas, monospace; font-size: .9rem; }
+.warning-card .diff .del { background: #f4e3db; color: #8b0a03; text-decoration: line-through; padding: 0 .2rem; }
+.warning-card .diff .ins { background: #ecf3ec; color: #0f5b1f; padding: 0 .2rem; }
+.warning-card ul { margin-top: .5rem; }
+
+/* Image stage with SVG overlay in canonical coordinates */
+.label-figure { margin: 0 0 1.5rem; }
+.label-stage { position: relative; display: inline-block; max-width: 100%; background: #f0f0f0; border: 1px solid #dfe1e2; }
+.label-stage img { display: block; max-width: 100%; height: auto; max-height: 70vh; }
+.label-stage svg.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.overlay polygon { fill: rgba(0, 94, 162, .10); stroke: #005ea2; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.overlay polygon.is-active { fill: rgba(255, 190, 46, .35); stroke: #c2850c; stroke-width: 5; }
+.overlay polygon.is-bad { stroke: #d83933; }
+.label-figure figcaption { font-size: .9rem; color: #565c65; margin-top: .35rem; }
+
+.ocr-lines { font-family: "Roboto Mono Web", Consolas, monospace; font-size: .85rem; columns: 1; }
+.ocr-lines li { margin-bottom: .15rem; }
+
+/* Forced colors (Windows High Contrast): rely on borders and text, not fills */
+@media (forced-colors: active) {
+  .status-tag { border: 2px solid CanvasText; }
+  .overlay polygon { fill: none; stroke: Highlight; }
+  .dropzone { border-color: CanvasText; }
+}
+
+@media print {
+  header, footer, .sample-bar, .submit-row, .usa-site-alert, #dropzone, details { display: none !important; }
+  .results { margin-top: 0; }
+}

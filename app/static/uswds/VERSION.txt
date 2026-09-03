@@ -1,0 +1,3 @@
+U.S. Web Design System (USWDS) 3.14.0, compiled assets vendored from the @uswds/uswds npm package on 2026-09-03.
+Contents: dist/css/uswds.min.css, dist/js/uswds.min.js, dist/js/uswds-init.min.js, dist/img/*, and the woff2 files for Source Sans Pro, Merriweather and Roboto Mono (the families the default theme references). Public Sans is not referenced by the compiled default theme and was omitted.
+License: USWDS is a work of the U.S. Government in the public domain (CC0 1.0); fonts under the SIL Open Font License 1.1; Material Icons under Apache-2.0. See THIRD_PARTY_NOTICES.md.
