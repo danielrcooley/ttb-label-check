@@ -10,7 +10,7 @@
 body { min-height: 100vh; display: flex; flex-direction: column; background: #fff; color: #1b1b1b; }
 main { flex: 1 0 auto; }
 
-.usa-input, .usa-select, .usa-textarea { background-color: #fff; color: #1b1b1b; }
+.usa-input, .usa-select, .usa-textarea, input[type=text], input[type=search], select, textarea { background-color: #fff; color: #1b1b1b; }
 .usa-input::placeholder { color: #71767a; }
 
 /* Sample bar */

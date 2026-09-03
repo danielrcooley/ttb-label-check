@@ -54,12 +54,12 @@ async function setCsv(file) {
     if (!resp.ok) throw new ApiError(resp.status, body);
     state.csv = body;
     const bad = body.rows.filter((r) => r.errors.length);
-    box.replaceChildren(
+    box.replaceChildren(...[
       el("p", { class: "text-bold margin-0", text: `${file.name}: ${body.rows.length} row${body.rows.length === 1 ? "" : "s"}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
       body.warnings.length ? el("ul", { class: "usa-list usa-list--unstyled text-secondary-dark" }, body.warnings.map((w) => el("li", { text: w }))) : null,
       bad.length ? el("details", {}, [el("summary", { text: "Rows with problems (they will be skipped)" }),
         el("ul", { class: "usa-list" }, bad.slice(0, 20).map((r) => el("li", { text: `Row ${r.row_number}: ${r.errors.join("; ")}` })))]) : null,
-    );
+    ].filter(Boolean));
   } catch (e) {
     state.csv = null;
     box.replaceChildren(el("p", { class: "text-secondary-dark text-bold", text: e.message || "Could not read the CSV." }));
@@ -263,7 +263,7 @@ function renderSummary() {
   $("#batch-summary").replaceChildren(
     tile(c.ready, "Ready for approval"), tile(c.review, "Need review"), tile(c.issues + c.unreadable, "Issues / unreadable"),
     tile(c.errors, "Errors"), tile(state.unpaired.length, "Images not matched"), tile(`${c.decided}/${c.total}`, "Decided"),
-    el("div", { class: "summary-tile" }, [el("div", { class: "num", text: perImage.split(" · ")[0] }), el("div", { class: "lbl", text: `per image (${perImage.split(" · ")[1] || "p95 —"})` })]),
+    el("div", { class: "summary-tile" }, [el("div", { class: "num", text: perImage.split(" · ")[0].replace(" median", "") }), el("div", { class: "lbl", text: state.times.length ? `per image, median (p95 ${perImage.split(" · ")[1].replace(" p95", "")})` : "per image" })]),
   );
 }
 

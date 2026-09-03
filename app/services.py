@@ -119,12 +119,17 @@ async def process_image(
 async def process_images(
     uploads: list[Upload], settings: Settings, pool: OcrPool, *, interactive: bool
 ) -> list[ProcessedImage]:
-    # Images of one application fan out across workers so a front+back pair costs one image-time.
-    return list(
-        await asyncio.gather(
-            *(process_image(u, i, settings, pool, interactive=interactive) for i, u in enumerate(uploads))
+    """Interactive: the images of one application fan out across workers (a person is waiting, and
+    a front+back pair then costs one image-time). Batch: images are read one at a time, because a
+    batch request is refused rather than queued when no slot is free, and a multi-image request must
+    never be refused halfway through while already holding a slot."""
+    if interactive:
+        return list(
+            await asyncio.gather(
+                *(process_image(u, i, settings, pool, interactive=True) for i, u in enumerate(uploads))
+            )
         )
-    )
+    return [await process_image(u, i, settings, pool, interactive=False) for i, u in enumerate(uploads)]
 
 
 def engine_info(pool: OcrPool) -> EngineInfo:

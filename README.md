@@ -1,0 +1,205 @@
+# Label Check
+
+**A prototype that reads alcohol beverage label artwork, compares it with what the COLA application
+says, checks the government warning word for word, and shows a compliance agent exactly where on the
+label each answer came from. In a few seconds. The tool recommends; the agent decides. Nothing is stored.**
+
+> Prototype for the Treasury take-home exercise. Not an official U.S. Government system.
+> Built and documented by Daniel R. Cooley, directing AI coding agents (see [Tools](#tools-and-how-this-was-built)).
+
+- **Live prototype:** _DEPLOY_URL_ (Azure Container Apps, always on)
+- **Approach in two pages:** [docs/APPROACH.md](docs/APPROACH.md)
+- **Where each requirement is met:** [docs/REQUIREMENTS_TRACE.md](docs/REQUIREMENTS_TRACE.md)
+
+![Home screen: two numbered steps, one button, three samples](docs/img/home.png)
+
+## Try it in 60 seconds
+
+1. Open the live prototype.
+2. Press **Clean artwork**. In about two to three seconds you get a checklist: every field matches,
+   the warning is exact, and each row shows the label pixels it was read from.
+3. Press **Problem label**. The alcohol content mismatches (45% claimed, 47.5% on the label) and the
+   warning heading is in title case. The brand differs only by letter case and is correctly treated
+   as a match with a note, which is Dave's "STONE'S THROW" example from the brief.
+4. Open **Batch** and press **Load a demo batch**. Five applications and ten images stream in;
+   filter to "Needs attention", record a decision, export the CSV.
+
+Then upload your own images. Anything the tool cannot read tells you why and what to do.
+
+![Result for the problem label: verdict, checklist with evidence crops, highlighted label](docs/img/result-problem-label.png)
+
+## The four things the brief's authors emphasized
+
+The interviews in the brief carry the real requirements, and four phrases are bolded in the original.
+Each one is met by design and checked by a test or a measurement, not by a claim.
+
+| Emphasized in the brief | What this prototype does | Evidence |
+|---|---|---|
+| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median _EVAL_P50_ ms. Deployed: _DEPLOY_P95_ (see [Measured](#measured)) |
+| "something **my mother could figure out**" | One screen, two numbered steps, one big button, three one-click samples, U.S. Web Design System, statuses as icon + word + color, keyboard and screen-reader friendly. | Observed usability test: _USABILITY_RESULT_ |
+| "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | Load test to hundreds of images: [docs/LOADTEST.md](docs/LOADTEST.md) |
+| The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes; OCR noise is "Needs review" with a diff; a changed or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
+
+And the constraint behind the architecture: Marcus's network "blocks outbound traffic to a lot of
+domains". The verification path makes **no network calls**. Models are in the repository, the page
+loads no CDN assets, and a test blocks every socket and runs a full verification
+(`tests/integration/test_no_egress.py`). You can run the container with networking disabled.
+
+## How it works
+
+```mermaid
+flowchart LR
+  A[Label images<br/>PNG JPEG GIF WebP TIFF BMP] --> B[Intake<br/>signature sniff, bomb guard,<br/>EXIF orientation, downscale]
+  B --> C[OCR pool<br/>PP-OCR on ONNX Runtime<br/>one engine per worker]
+  C --> D[Lines with boxes<br/>mapped back to the original image]
+  D --> E[Pure pipeline<br/>normalize, parse, match,<br/>warning comparator, verdict]
+  F[Application fields<br/>as written] --> E
+  E --> G[Checks + evidence + verdict]
+  G --> H[Browser<br/>checklist, crops, highlights,<br/>batch triage and export]
+```
+
+- **Matching has three outcomes.** Match (same after case, accents, quotes, spacing), Needs review
+  (close, usually OCR noise, look at the crop), Mismatch or Not found. Heuristic findings are never
+  failures; only clear text or numeric differences are.
+- **Numbers are compared as numbers.** "45% Alc./Vol. (90 Proof)" in the application and
+  "45% ALC/VOL" on the label agree; proof is cross-checked against percent; "12 FL OZ (355 mL)"
+  agrees with "355 mL".
+- **The warning check is literal.** The canonical text, the format rules (capitals, bold, contrast,
+  minimum type size) and the container-size lists are documented with their sources in
+  [docs/REGULATIONS.md](docs/REGULATIONS.md). Items the tool cannot assess from an image say
+  "Not checked" instead of pretending.
+- **Batch is orchestrated by the browser.** Each image is read once; applications are compared in
+  bulk; the server keeps no state, refuses rather than queues when it is full (HTTP 429 with
+  Retry-After), and gives a waiting person priority over a batch.
+
+## Run it
+
+**With Docker (recommended):**
+
+```bash
+docker build -t label-check .
+docker run --rm -p 8000:8000 --tmpfs /tmp --network none label-check
+# open http://localhost:8000
+```
+
+`--network none` is optional and proves the point: the app needs no outside services.
+
+**Without Docker (Python 3.12 or newer):**
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt          # Windows: .venv\Scripts\pip
+.venv/bin/uvicorn app.main:app --port 8000
+```
+
+The first request after start waits for the models to load (a few seconds);
+`GET /api/v1/health` reports `ready: true` when they have.
+
+**API (for integration, or for a script):**
+
+```bash
+curl -F 'application={"beverage_type":"spirits","brand_name":"OLD TOM DISTILLERY","class_type":"Kentucky Straight Bourbon Whiskey","alcohol_content":"45% Alc./Vol. (90 Proof)","net_contents":"750 mL"}' \
+     -F images=@app/static/samples/clean_front.png -F images=@app/static/samples/clean_back.png \
+     http://localhost:8000/api/v1/verify
+```
+
+Endpoints: `POST /api/v1/verify`, `POST /api/v1/extract`, `POST /api/v1/compare`,
+`POST /api/v1/csv/parse`, `GET /api/v1/csv/template`, `GET /api/v1/health`,
+`GET /api/v1/openapi.json`. Batch clients send `X-Batch: 1` and honor `Retry-After`.
+
+**Tests and tools:**
+
+```bash
+pip install -r requirements-dev.txt
+pytest -m "not integration"        # 82 fast unit tests, no OCR
+pytest                              # + 13 integration tests through the API with the real engine
+ruff check . && mypy                # lint and strict typing
+python tools/evaluate.py            # accuracy and latency table -> docs/EVAL.md
+python tools/loadtest.py --url http://localhost:8000 --mode burst --concurrency 16
+python tools/make_labels.py --out tests/fixtures/labels --seed 42 --degraded --problems
+```
+
+## Measured
+
+Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they write are committed.
+
+| What | Result | Where |
+|---|---|---|
+| Field match rate on clean artwork (recall) | _EVAL_ARTWORK_ | [docs/EVAL.md](docs/EVAL.md) |
+| False-alarm rate on clean artwork | _EVAL_FA_ | [docs/EVAL.md](docs/EVAL.md) |
+| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | _EVAL_DEGRADED_ | [docs/EVAL.md](docs/EVAL.md) |
+| Planted defects detected | _EVAL_PROBLEMS_ | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, local (two images, 2 workers) | median _EVAL_P50_ ms, p95 _EVAL_P95_ ms | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, deployed | _DEPLOY_LATENCY_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| Batch throughput, deployed | _DEPLOY_THROUGHPUT_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |
+
+Engine selection and thread scaling are in [docs/BAKEOFF.md](docs/BAKEOFF.md) and
+[docs/OCR_EVAL.md](docs/OCR_EVAL.md). Enforced limits and known weaknesses, stated plainly, are in
+[docs/LIMITS.md](docs/LIMITS.md).
+
+## For reviewers with a scoring sheet
+
+| Criterion | Where to look |
+|---|---|
+| Correctness and completeness of core requirements | The three samples; [docs/REQUIREMENTS_TRACE.md](docs/REQUIREMENTS_TRACE.md); `tests/integration/test_verify_api.py` |
+| Code quality and organization | `app/pipeline/` (pure functions, unit tested), `app/ocr/pool.py` (admission policy with tests), `app/static/*.js` (no build step, readable in one sitting); ruff + mypy strict in CI |
+| Appropriate technical choices for the scope | [docs/APPROACH.md](docs/APPROACH.md), [docs/DECISIONS.md](docs/DECISIONS.md) (including where the first plan was wrong), [docs/OCR_EVAL.md](docs/OCR_EVAL.md) |
+| User experience and error handling | Upload a PDF, a 50 MB image, an empty file, or a sideways photo; try the page at 200% zoom, keyboard only, or on a phone |
+| Attention to requirements | [docs/REQUIREMENTS_TRACE.md](docs/REQUIREMENTS_TRACE.md), one row per stakeholder statement |
+| Creative problem-solving | Evidence crops next to every value; noise-versus-wording classification for the warning; browser-orchestrated batch that keeps the server stateless; measured admission control; the no-egress test; the label generator with exact ground truth |
+
+## Security and data handling
+
+No storage, no logging of label content, no outside calls, signature-based file checks, size and
+pixel guards, a strict Content-Security-Policy, a non-root container, per-client and global capacity
+limits with honest 429s. No sign-in, deliberately: a fake login proves nothing, and the production
+path (Entra ID with PIV in front of the ingress, an audit record with a retention policy) is
+described in [docs/SECURITY.md](docs/SECURITY.md).
+
+## Tools, and how this was built
+
+Python 3.12, FastAPI, Pydantic, NumPy, Pillow, RapidFuzz, RapidOCR with PP-OCR models on ONNX
+Runtime (vendored, hash-pinned), U.S. Web Design System 3.14 (vendored), pytest, ruff, mypy,
+Playwright, Docker, Azure Container Apps. Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+This was built by directing AI coding agents: Claude Code wrote code under my direction and Codex
+served as an independent reviewer. The requirements analysis, the architecture, the five review
+passes, and every entry in [docs/DECISIONS.md](docs/DECISIONS.md) are mine, including the places
+where the agent's first proposal was wrong and how it was caught. The design review and its
+point-by-point dispositions are in [docs/reviews/](docs/reviews/). Conventions for the agents are in
+[AGENTS.md](AGENTS.md). Commits carry the agent trailer.
+
+## From the author
+
+_AUTHOR_SECTION_
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TTB_OCR_WORKERS` | CPU count (max 8) | OCR engines, one per worker thread; also the capacity limit |
+| `TTB_OCR_MAX_SIDE` | 1280 | Images are downscaled to this longest side before OCR |
+| `TTB_MAX_IMAGE_BYTES` | 10 MB | Per-image cap |
+| `TTB_MAX_REQUEST_BYTES` | 40 MB | Per-request cap |
+| `TTB_MAX_IMAGE_PIXELS` | 40,000,000 | Decompression-bomb guard |
+| `TTB_MAX_IMAGES_PER_APPLICATION` | 6 | Images per verify call |
+| `TTB_PER_CLIENT_INFLIGHT` | 4 | Concurrent requests per client |
+| `TTB_INTERACTIVE_WAIT_SECONDS` | 8 | How long an interactive request waits for a worker |
+| `TTB_TRUST_PROXY` | false | Take the client address from `X-Forwarded-For` (set true behind a platform proxy) |
+| `TTB_AGENCY_NAME` | unset | Optional agency name for internal branding (no seals in the public prototype) |
+| `GIT_SHA` | dev | Shown in the footer and in `/api/v1/health` |
+
+## Repository layout
+
+```
+app/            FastAPI application: routes/, ocr/ (engine + pool), pipeline/ (pure logic), static/ (UI), models/ (vendored OCR models)
+tests/          unit/ (fast), integration/ (real engine through the API), fixtures/labels (46 committed images + manifest)
+tools/          make_labels.py, evaluate.py, loadtest.py, vendor_models.py, ocr_eval2.py
+docs/           APPROACH, REQUIREMENTS_TRACE, LIMITS, SECURITY, REGULATIONS (+ regs/ XML), DECISIONS, EVAL, LOADTEST, OCR_EVAL, BAKEOFF, reviews/
+Dockerfile      python:3.12-slim, non-root, health check
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE). Sample labels are fictional and generated.

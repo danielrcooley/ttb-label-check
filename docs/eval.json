@@ -1,0 +1,808 @@
+{
+ "summary": {
+  "artwork": {
+   "cases": 10,
+   "p50_ms": 2357.0,
+   "p95_ms": 2535,
+   "rates": {
+    "brand_name": 1.0,
+    "class_type": 1.0,
+    "alcohol_content": 1.0,
+    "net_contents": 1.0,
+    "bottler": 1.0,
+    "country_of_origin": 1.0
+   }
+  },
+  "false_alarm_rate": 0.0,
+  "degraded": {
+   "cases": 20,
+   "p50_ms": 2227.5,
+   "p95_ms": 6041,
+   "rates": {
+    "brand_name": 0.95,
+    "class_type": 1.0,
+    "alcohol_content": 1.0,
+    "net_contents": 1.0,
+    "bottler": 1.0,
+    "country_of_origin": 0.95
+   }
+  },
+  "problem": {
+   "cases": 6,
+   "p50_ms": 2329.0,
+   "p95_ms": 2386
+  },
+  "problem_detection": 1.0
+ },
+ "tiers": {
+  "artwork": [
+   {
+    "app": "APP-001",
+    "variant": "clean",
+    "files": [
+     "APP-001_front_clean.png",
+     "APP-001_back_clean.png"
+    ],
+    "ms": 2664,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-002",
+    "variant": "clean",
+    "files": [
+     "APP-002_front_clean.png",
+     "APP-002_back_clean.png"
+    ],
+    "ms": 2339,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-003",
+    "variant": "clean",
+    "files": [
+     "APP-003_front_clean.png",
+     "APP-003_back_clean.png"
+    ],
+    "ms": 2297,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-004",
+    "variant": "clean",
+    "files": [
+     "APP-004_front_clean.png",
+     "APP-004_back_clean.png"
+    ],
+    "ms": 2375,
+    "verdict": "needs_review",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-005",
+    "variant": "clean",
+    "files": [
+     "APP-005_front_clean.png",
+     "APP-005_back_clean.png"
+    ],
+    "ms": 2535,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-006",
+    "variant": "clean",
+    "files": [
+     "APP-006_front_clean.png",
+     "APP-006_back_clean.png"
+    ],
+    "ms": 2446,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-007",
+    "variant": "clean",
+    "files": [
+     "APP-007_front_clean.png",
+     "APP-007_back_clean.png"
+    ],
+    "ms": 2509,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-008",
+    "variant": "clean",
+    "files": [
+     "APP-008_front_clean.png",
+     "APP-008_back_clean.png"
+    ],
+    "ms": 2329,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-009",
+    "variant": "clean",
+    "files": [
+     "APP-009_front_clean.png",
+     "APP-009_back_clean.png"
+    ],
+    "ms": 2328,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-010",
+    "variant": "clean",
+    "files": [
+     "APP-010_front_clean.png",
+     "APP-010_back_clean.png"
+    ],
+    "ms": 2189,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   }
+  ],
+  "degraded": [
+   {
+    "app": "APP-001",
+    "variant": "rotate7",
+    "files": [
+     "APP-001_front_rotate7.png",
+     "APP-001_back_clean.png"
+    ],
+    "ms": 2392,
+    "verdict": "needs_review",
+    "checks": {
+     "brand_name": "needs_review",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-001",
+    "variant": "blur",
+    "files": [
+     "APP-001_front_clean.png",
+     "APP-001_back_blur.png"
+    ],
+    "ms": 2266,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-002",
+    "variant": "glare",
+    "files": [
+     "APP-002_front_glare.png",
+     "APP-002_back_clean.png"
+    ],
+    "ms": 2142,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-002",
+    "variant": "lowcontrast",
+    "files": [
+     "APP-002_front_clean.png",
+     "APP-002_back_lowcontrast.png"
+    ],
+    "ms": 2423,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-003",
+    "variant": "perspective",
+    "files": [
+     "APP-003_front_perspective.png",
+     "APP-003_back_clean.png"
+    ],
+    "ms": 2137,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-003",
+    "variant": "small",
+    "files": [
+     "APP-003_front_clean.png",
+     "APP-003_back_small.png"
+    ],
+    "ms": 2076,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-004",
+    "variant": "jpeg",
+    "files": [
+     "APP-004_front_jpeg.png",
+     "APP-004_back_clean.png"
+    ],
+    "ms": 2197,
+    "verdict": "needs_review",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-004",
+    "variant": "rotate90",
+    "files": [
+     "APP-004_front_clean.png",
+     "APP-004_back_rotate90.png"
+    ],
+    "ms": 6530,
+    "verdict": "needs_review",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-005",
+    "variant": "rotate7",
+    "files": [
+     "APP-005_front_rotate7.png",
+     "APP-005_back_clean.png"
+    ],
+    "ms": 2402,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-005",
+    "variant": "blur",
+    "files": [
+     "APP-005_front_clean.png",
+     "APP-005_back_blur.png"
+    ],
+    "ms": 2476,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-006",
+    "variant": "glare",
+    "files": [
+     "APP-006_front_glare.png",
+     "APP-006_back_clean.png"
+    ],
+    "ms": 2209,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-006",
+    "variant": "lowcontrast",
+    "files": [
+     "APP-006_front_clean.png",
+     "APP-006_back_lowcontrast.png"
+    ],
+    "ms": 2120,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-007",
+    "variant": "perspective",
+    "files": [
+     "APP-007_front_perspective.png",
+     "APP-007_back_clean.png"
+    ],
+    "ms": 2246,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-007",
+    "variant": "small",
+    "files": [
+     "APP-007_front_clean.png",
+     "APP-007_back_small.png"
+    ],
+    "ms": 2122,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "needs_review"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-008",
+    "variant": "jpeg",
+    "files": [
+     "APP-008_front_jpeg.png",
+     "APP-008_back_clean.png"
+    ],
+    "ms": 1974,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-008",
+    "variant": "rotate90",
+    "files": [
+     "APP-008_front_clean.png",
+     "APP-008_back_rotate90.png"
+    ],
+    "ms": 6041,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-009",
+    "variant": "rotate7",
+    "files": [
+     "APP-009_front_rotate7.png",
+     "APP-009_back_clean.png"
+    ],
+    "ms": 2423,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-009",
+    "variant": "blur",
+    "files": [
+     "APP-009_front_clean.png",
+     "APP-009_back_blur.png"
+    ],
+    "ms": 2326,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-010",
+    "variant": "glare",
+    "files": [
+     "APP-010_front_glare.png",
+     "APP-010_back_clean.png"
+    ],
+    "ms": 2108,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   },
+   {
+    "app": "APP-010",
+    "variant": "lowcontrast",
+    "files": [
+     "APP-010_front_clean.png",
+     "APP-010_back_lowcontrast.png"
+    ],
+    "ms": 2196,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": null
+   }
+  ],
+  "problem": [
+   {
+    "app": "APP-001",
+    "variant": "wrong_abv",
+    "files": [
+     "APP-001_front_wrong_abv.png",
+     "APP-001_back_clean.png"
+    ],
+    "ms": 2301,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "mismatch",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": true
+   },
+   {
+    "app": "APP-002",
+    "variant": "titlecase",
+    "files": [
+     "APP-002_front_clean.png",
+     "APP-002_back_titlecase.png"
+    ],
+    "ms": 2386,
+    "verdict": "needs_review",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": true
+   },
+   {
+    "app": "APP-003",
+    "variant": "allbold",
+    "files": [
+     "APP-003_front_clean.png",
+     "APP-003_back_allbold.png"
+    ],
+    "ms": 2357,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": true
+   },
+   {
+    "app": "APP-004",
+    "variant": "altered",
+    "files": [
+     "APP-004_front_clean.png",
+     "APP-004_back_altered.png"
+    ],
+    "ms": 2124,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": true,
+    "detected": true
+   },
+   {
+    "app": "APP-005",
+    "variant": "tiny",
+    "files": [
+     "APP-005_front_clean.png",
+     "APP-005_back_tiny.png"
+    ],
+    "ms": 2891,
+    "verdict": "ready_for_approval",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": true,
+    "warning_present": true,
+    "detected": true
+   },
+   {
+    "app": "APP-006",
+    "variant": "missing",
+    "files": [
+     "APP-006_front_clean.png",
+     "APP-006_back_missing.png"
+    ],
+    "ms": 1823,
+    "verdict": "issues_found",
+    "checks": {
+     "brand_name": "match",
+     "class_type": "match",
+     "alcohol_content": "match",
+     "net_contents": "match",
+     "bottler": "match",
+     "country_of_origin": "match"
+    },
+    "warning_exact": false,
+    "warning_present": false,
+    "detected": true
+   }
+  ]
+ },
+ "engine": {
+  "engine": "rapidocr 3.9.2 / onnxruntime 1.29.0",
+  "det": "PP-OCRv6_det_small.onnx (sha256 090f04abcd9d)",
+  "rec": "PP-OCRv6_rec_small.onnx (sha256 6f327246b503)",
+  "cls": "ch_ppocr_mobile_v2.0_cls_mobile.onnx (sha256 e47acedf6632)"
+ },
+ "workers": 2
+}
