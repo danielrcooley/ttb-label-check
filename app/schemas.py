@@ -84,6 +84,9 @@ class Check(BaseModel):
 class WarningReport(BaseModel):
     present: bool
     exact: bool
+    assessment: str = Field(
+        default="absent", description="exact | case | noise | wording | absent (how the read text relates to 16.21)"
+    )
     similarity: float
     found_text: str | None = None
     diff: str | None = Field(default=None, description="Compact word diff: -expected +found")

@@ -35,7 +35,7 @@ Each one is met by design and checked by a test or a measurement, not by a claim
 
 | Emphasized in the brief | What this prototype does | Evidence |
 |---|---|---|
-| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median _EVAL_P50_ ms. Deployed: _DEPLOY_P95_ (see [Measured](#measured)) |
+| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.3 s, p95 2.6 s on two workers. Deployed: _DEPLOY_P95_ (see [Measured](#measured)) |
 | "something **my mother could figure out**" | One screen, two numbered steps, one big button, three one-click samples, U.S. Web Design System, statuses as icon + word + color, keyboard and screen-reader friendly. | Observed usability test: _USABILITY_RESULT_ |
 | "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | Load test to hundreds of images: [docs/LOADTEST.md](docs/LOADTEST.md) |
 | The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes; OCR noise is "Needs review" with a diff; a changed or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
@@ -111,7 +111,7 @@ Endpoints: `POST /api/v1/verify`, `POST /api/v1/extract`, `POST /api/v1/compare`
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -m "not integration"        # 82 fast unit tests, no OCR
+pytest -m "not integration"        # 86 fast unit tests, no OCR
 pytest                              # + 13 integration tests through the API with the real engine
 ruff check . && mypy                # lint and strict typing
 python tools/evaluate.py            # accuracy and latency table -> docs/EVAL.md
@@ -125,11 +125,11 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 
 | What | Result | Where |
 |---|---|---|
-| Field match rate on clean artwork (recall) | _EVAL_ARTWORK_ | [docs/EVAL.md](docs/EVAL.md) |
-| False-alarm rate on clean artwork | _EVAL_FA_ | [docs/EVAL.md](docs/EVAL.md) |
-| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | _EVAL_DEGRADED_ | [docs/EVAL.md](docs/EVAL.md) |
-| Planted defects detected | _EVAL_PROBLEMS_ | [docs/EVAL.md](docs/EVAL.md) |
-| Per-application latency, local (two images, 2 workers) | median _EVAL_P50_ ms, p95 _EVAL_P95_ ms | [docs/EVAL.md](docs/EVAL.md) |
+| Field match rate on clean artwork (recall) | 100% on all six fields (60 of 60 checks); warning exact on 10 of 10 | [docs/EVAL.md](docs/EVAL.md) |
+| False-alarm rate on clean artwork | 0.0% (0 of 60 field checks) | [docs/EVAL.md](docs/EVAL.md) |
+| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 18 of 20; 17 of 20 cases ready, 2 need review, 1 issue (a label shrunk to a third of its size) | [docs/EVAL.md](docs/EVAL.md) |
+| Planted defects detected | 6 of 6 (wrong ABV, title-case heading, altered wording, missing statement; tiny and all-bold read as exact text, since size and bold are not assessed) | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, local (two images, 2 workers) | median 2,335 ms, p95 2,644 ms | [docs/EVAL.md](docs/EVAL.md) |
 | Per-application latency, deployed | _DEPLOY_LATENCY_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Batch throughput, deployed | _DEPLOY_THROUGHPUT_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |

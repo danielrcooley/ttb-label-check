@@ -40,20 +40,31 @@ def _height(ln: OcrLine) -> float:
 
 
 def reading_order(lines: list[OcrLine]) -> dict[int, list[OcrLine]]:
-    """Lines grouped by image, sorted top-to-bottom then left-to-right.
+    """Lines grouped by image, in reading order: rows top-to-bottom, left-to-right within a row.
 
-    Lines whose vertical centers fall within ~0.7 of the image's median line height are treated
-    as one visual row and ordered by x; everything else is ordered by y. A common unit (the
-    median height) is essential: dividing by each line's own height scrambles mixed-size text.
+    Two consecutive lines (by vertical center) belong to the same row when their vertical extents
+    overlap by at least half of the shorter line's height. This handles mixed sizes (a huge brand
+    next to small body text) and tight line spacing, where fixed-height buckets fail.
     """
     by_image: dict[int, list[OcrLine]] = {}
     for ln in lines:
         by_image.setdefault(ln.image_index, []).append(ln)
     for idx, group in by_image.items():
-        med_h = statistics.median(_height(ln) for ln in group) or 1.0
-        row_unit = max(0.7 * med_h, 1.0)
-        by_image[idx] = sorted(group, key=lambda ln: (round(_center_y(ln) / row_unit), min(p[0] for p in ln.box)))
+        ordered = sorted(group, key=_center_y)
+        rows: list[list[OcrLine]] = []
+        for ln in ordered:
+            if rows and _vertical_overlap(rows[-1][-1], ln) >= 0.5 * min(_height(rows[-1][-1]), _height(ln)):
+                rows[-1].append(ln)
+            else:
+                rows.append([ln])
+        by_image[idx] = [ln for row in rows for ln in sorted(row, key=lambda x: min(p[0] for p in x.box))]
     return by_image
+
+
+def _vertical_overlap(a: OcrLine, b: OcrLine) -> float:
+    a0, a1 = min(p[1] for p in a.box), max(p[1] for p in a.box)
+    b0, b1 = min(p[1] for p in b.box), max(p[1] for p in b.box)
+    return max(0.0, min(a1, b1) - max(a0, b0))
 
 
 def _spans(lines: list[OcrLine], max_join: int) -> list[tuple[OcrLine, ...]]:

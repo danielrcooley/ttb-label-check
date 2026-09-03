@@ -74,3 +74,14 @@ def test_score_prefers_full_match_over_partial():
 def test_empty_lines_gives_not_found():
     (st, _), cand = _status("OLD TOM DISTILLERY", [])
     assert st is Status.not_found and cand is None
+
+
+def test_reading_order_uses_vertical_overlap_not_height_buckets():
+    from app.pipeline.match import reading_order
+
+    big = make_line("OLD TOM", y=100, h=120)  # huge brand line
+    small1 = make_line("KENTUCKY STRAIGHT", y=240, h=30)
+    small2 = make_line("BOURBON WHISKEY", y=276, h=30)  # tight spacing
+    right = make_line("EST. 1991", y=245, h=30, x=900)  # same row as small1, to the right
+    order = reading_order([small2, right, big, small1])[0]
+    assert [ln.text for ln in order] == ["OLD TOM", "KENTUCKY STRAIGHT", "EST. 1991", "BOURBON WHISKEY"]

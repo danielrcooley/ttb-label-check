@@ -126,7 +126,7 @@ def main() -> None:
     ap.add_argument("--mode", choices=["steady", "burst"], default="steady")
     ap.add_argument("--endpoint", choices=["extract", "verify"], default="extract")
     ap.add_argument("--n", type=int, default=50)
-    ap.add_argument("--concurrency", type=int, default=4)
+    ap.add_argument("--concurrency", type=int, default=0, help="0 = the server's max_concurrency from /health")
     ap.add_argument("--images", nargs="*", default=None, help="image paths; default: bundled clean sample")
     ap.add_argument("--report", default="docs/LOADTEST.md")
     args = ap.parse_args()
@@ -140,6 +140,8 @@ def main() -> None:
         )
     )
     files = [(p.name, p.read_bytes()) for p in paths]
+    if args.concurrency <= 0:
+        args.concurrency = int(httpx.get(f"{args.url}/api/v1/health", timeout=10).json().get("max_concurrency", 2))
     block = asyncio.run(steady(args, files) if args.mode == "steady" else burst(args, files))
     print(block)
     rp = Path(args.report)

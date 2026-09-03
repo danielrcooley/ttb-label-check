@@ -120,8 +120,8 @@ function renderDiff(diff) {
 }
 
 export function renderWarning(container, w, onSelect) {
-  const overall = !w.present ? "not_found" : w.exact && w.anchor_caps === "match" ? "match"
-    : (w.similarity >= 0.97 || w.anchor_caps === "needs_review") ? "needs_review" : "mismatch";
+  const overall = !w.present ? "not_found" : w.assessment === "exact" && w.anchor_caps === "match" ? "match"
+    : w.assessment === "wording" ? "mismatch" : "needs_review";
   const card = el("div", { class: "warning-card" }, [
     el("div", { class: "warning-head" }, [
       statusTag(overall),

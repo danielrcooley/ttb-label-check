@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import difflib
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from rapidfuzz import fuzz
+from rapidfuzz.distance import Levenshtein
 
 from app.schemas import Evidence, OcrLine, Status, WarningReport
 
 from .match import reading_order
-from .normalize import collapse_ws, fold, join_hyphenated, unify_punctuation
+from .normalize import collapse_ws, fold, join_hyphenated, strip_diacritics, unify_punctuation
 
 # Verbatim text of 27 CFR 16.21, verified against the eCFR API on 2026-09-03 (docs/REGULATIONS.md).
 CANONICAL = (
@@ -77,7 +79,9 @@ def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
 
 
 def _canon_form(s: str) -> str:
-    return collapse_ws(unify_punctuation(s))
+    # The required text has no accented letters, so an accent in the OCR read ("alcoholič") is
+    # recognition noise by definition and is removed before the literal comparison.
+    return collapse_ws(unify_punctuation(strip_diacritics(s)))
 
 
 def word_diff(expected: str, found: str) -> str | None:
@@ -105,17 +109,23 @@ def compare_warning(found: str) -> tuple[bool, bool, float]:
 
 _PUNCT_ONLY = re.compile(r"^[^\w]+$")
 _STRIP = re.compile(r"[^\w]")
-_CONFUSABLE = str.maketrans({"0": "o", "1": "l", "5": "s", "8": "b", "2": "z", "6": "g", "|": "l", "!": "l"})
+# OCR confusables folded to one canonical letter: 0/o, 1/l/i/|/!, 5/s, 8/b, 2/z, 6/g
+_CONFUSABLE = str.maketrans({"0": "o", "1": "l", "i": "l", "|": "l", "!": "l", "5": "s", "8": "b", "2": "z", "6": "g"})
+
+
+def _canon_word(w: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", w)
+    letters = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return _STRIP.sub("", letters).casefold().translate(_CONFUSABLE)
 
 
 def _same_word_modulo_noise(a: str, b: str) -> bool:
-    """True when two tokens differ only by punctuation, case, or OCR confusable characters."""
-    ka = _STRIP.sub("", a).casefold().translate(_CONFUSABLE)
-    kb = _STRIP.sub("", b).casefold().translate(_CONFUSABLE)
+    """True when two tokens differ only by punctuation, case, accents, OCR confusables, or a single
+    character in a word of five or more letters (a real wording change replaces whole words)."""
+    ka, kb = _canon_word(a), _canon_word(b)
     if ka == kb:
         return True
-    # a single dropped or inserted character inside a word of 5+ letters is OCR noise, not wording
-    return len(ka) >= 5 and len(kb) >= 5 and fuzz.ratio(ka, kb) >= 85
+    return len(ka) >= 5 and len(kb) >= 5 and Levenshtein.distance(ka, kb) <= 1
 
 
 def classify_difference(expected: str, found: str) -> str:
@@ -137,7 +147,7 @@ def classify_difference(expected: str, found: str) -> str:
             return "wording"
         if tag == "replace":
             # e.g. "Surgeon General," read as "SurgeonGeneral," (merged) or split words
-            if _STRIP.sub("", "".join(left)).casefold() == _STRIP.sub("", "".join(right)).casefold():
+            if _canon_word("".join(left)) == _canon_word("".join(right)):
                 continue
             return "wording"
         # pure insert or delete: punctuation-only tokens are noise; anything with a letter or digit
@@ -161,11 +171,14 @@ def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
 
 
 def build_report(lines: list[OcrLine], *, review_similarity: float, mismatch_similarity: float) -> WarningReport:
+    """Assess the warning statement. ``assessment`` drives the verdict:
+    exact -> pass; case/noise -> Needs review; wording/absent -> issue."""
     span = find_warning(lines)
     if span is None:
         return WarningReport(
             present=False,
             exact=False,
+            assessment="absent",
             similarity=0.0,
             found_text=None,
             diff=None,
@@ -173,39 +186,37 @@ def build_report(lines: list[OcrLine], *, review_similarity: float, mismatch_sim
             anchor_bold=Status.not_checked,
             body_not_bold=Status.not_checked,
             notes=[
-                "No GOVERNMENT WARNING statement was found on any image. It is mandatory on all "
-                "alcoholic beverages of 0.5% alcohol or more (27 CFR 16.21). If the warning is on a "
-                "label image not uploaded, add that image."
+                "No GOVERNMENT WARNING statement was found on any image. It is mandatory on all alcoholic "
+                "beverages of 0.5% alcohol or more (27 CFR 16.21). If the warning is on a label image not "
+                "uploaded, add that image."
             ],
         )
     exact, case_only, similarity = compare_warning(span.text)
     caps_status, caps_note = anchor_caps_status(span.anchor_text)
-    kind = classify_difference(CANONICAL, span.text)
-    notes: list[str] = []
     if exact:
-        notes.append("Wording is exact (27 CFR 16.21).")
+        assessment = "exact"
     elif case_only:
-        notes.append("Wording matches except for letter case. Confirm the statement's capitalization on the image.")
-    elif kind == "noise":
-        notes.append(
-            "Wording matches apart from punctuation or single characters as read, which is usually "
-            "OCR noise (a dropped colon or comma). Compare the diff with the image."
-        )
+        assessment = "case"
     else:
-        notes.append(
+        assessment = classify_difference(CANONICAL, span.text)
+        if assessment == "noise" and similarity < mismatch_similarity:
+            assessment = "wording"  # too many differences to call it noise
+    notes = {
+        "exact": "Wording is exact (27 CFR 16.21).",
+        "case": "Wording matches except for letter case. Confirm the statement's capitalization on the image.",
+        "noise": (
+            "Wording matches apart from punctuation or single characters as read, which is usually OCR noise "
+            "(a dropped colon, a '1' read as 'i'). Compare the diff with the image."
+        ),
+        "wording": (
             "Wording differs from the required text: a word is missing, added or changed. "
             "The statement must be word for word (27 CFR 16.21)."
-        )
-        # a wording change is a defect even when similarity is high; make the number reflect it
-        similarity = min(similarity, mismatch_similarity - 0.01) if similarity >= review_similarity else similarity
-    notes.append(caps_note)
-    notes.append(
-        "Bold type (anchor bold, remainder not bold) is not assessed automatically in this build; "
-        "check it on the image (27 CFR 16.22(a)(2))."
-    )
+        ),
+    }
     return WarningReport(
         present=True,
         exact=exact,
+        assessment=assessment,
         similarity=round(similarity, 4),
         found_text=span.text,
         diff=None if exact else word_diff(CANONICAL, span.text),
@@ -213,5 +224,10 @@ def build_report(lines: list[OcrLine], *, review_similarity: float, mismatch_sim
         anchor_bold=Status.not_checked,
         body_not_bold=Status.not_checked,
         evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],
-        notes=notes,
+        notes=[
+            notes[assessment],
+            caps_note,
+            "Bold type (anchor bold, remainder not bold) is not assessed automatically in this build; "
+            "check it on the image (27 CFR 16.22(a)(2)).",
+        ],
     )

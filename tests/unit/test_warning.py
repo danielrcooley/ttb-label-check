@@ -58,7 +58,7 @@ def test_one_word_substitution_is_a_wording_change_not_noise():
     assert classify_difference(CANONICAL, text) == "wording"
     r = report(make_lines(wrapped(text)))
     assert r.present and not r.exact
-    assert r.similarity < REVIEW  # verdict logic treats this as an issue, not a review item
+    assert r.assessment == "wording"  # the verdict treats this as an issue, not a review item
     assert "-may" in r.diff and "+can" in r.diff
 
 
@@ -72,7 +72,7 @@ def test_dropped_colon_or_comma_is_noise():
     assert classify_difference(CANONICAL, CANONICAL.replace("General,", "General")) == "noise"
     r = report(make_lines(wrapped(CANONICAL.replace("WARNING:", "WARNING"))))
     assert r.present and not r.exact
-    assert r.similarity >= REVIEW
+    assert r.assessment == "noise"
 
 
 def test_ocr_confusable_inside_a_word_is_noise():
@@ -97,3 +97,21 @@ def test_word_diff_is_compact():
     assert word_diff(CANONICAL, CANONICAL) is None
     d = word_diff("a b c", "a x c")
     assert d == "-b | +x"
+
+
+def test_small_text_misreads_are_noise_not_wording():
+    """Seen on real OCR output: '(1)' read as '(i)', 'drive' read with one wrong letter."""
+    text = CANONICAL.replace("(1)", "(i)").replace("drive", "driv\u010d")
+    assert classify_difference(CANONICAL, text) == "noise"
+    r = report(make_lines(wrapped(text)))
+    assert r.assessment == "noise" and not r.exact
+
+
+def test_accented_letter_in_the_read_does_not_break_exactness():
+    """The regulation text has no accents; 'alcoholi\u010d' is a recognition artifact."""
+    r = report(make_lines(wrapped(CANONICAL.replace("alcoholic beverages during", "alcoholi\u010d beverages during"))))
+    assert r.exact and r.assessment == "exact"
+
+
+def test_missing_warning_has_absent_assessment():
+    assert report(make_lines(["OLD TOM DISTILLERY"])).assessment == "absent"

@@ -211,11 +211,9 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
     statuses = [c.status for c in checks if c.id != "standard_of_fill"]
     issues = [c for c in checks if c.status in hard]
     reviews = [c for c in checks if c.status in soft]
-    if not warning.present or (
-        warning.present and not warning.exact and warning.similarity < s.warning_review_similarity
-    ):
+    if warning.assessment in ("absent", "wording"):
         issues.append(Check(id="warning", label="Government warning", status=Status.mismatch))
-    elif warning.present and (not warning.exact or warning.anchor_caps is Status.needs_review):
+    elif warning.assessment in ("case", "noise") or warning.anchor_caps is Status.needs_review:
         reviews.append(Check(id="warning", label="Government warning", status=Status.needs_review))
     if issues:
         names = ", ".join(c.label.lower() for c in issues)

@@ -2,8 +2,8 @@
  "summary": {
   "artwork": {
    "cases": 10,
-   "p50_ms": 2357.0,
-   "p95_ms": 2535,
+   "p50_ms": 2335.0,
+   "p95_ms": 2644,
    "rates": {
     "brand_name": 1.0,
     "class_type": 1.0,
@@ -16,8 +16,8 @@
   "false_alarm_rate": 0.0,
   "degraded": {
    "cases": 20,
-   "p50_ms": 2227.5,
-   "p95_ms": 6041,
+   "p50_ms": 2212.5,
+   "p95_ms": 6286,
    "rates": {
     "brand_name": 0.95,
     "class_type": 1.0,
@@ -29,8 +29,8 @@
   },
   "problem": {
    "cases": 6,
-   "p50_ms": 2329.0,
-   "p95_ms": 2386
+   "p50_ms": 2357.0,
+   "p95_ms": 2515
   },
   "problem_detection": 1.0
  },
@@ -43,7 +43,7 @@
      "APP-001_front_clean.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2664,
+    "ms": 2943,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -64,7 +64,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_clean.png"
     ],
-    "ms": 2339,
+    "ms": 2234,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -85,7 +85,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_clean.png"
     ],
-    "ms": 2297,
+    "ms": 2253,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -106,8 +106,8 @@
      "APP-004_front_clean.png",
      "APP-004_back_clean.png"
     ],
-    "ms": 2375,
-    "verdict": "needs_review",
+    "ms": 2365,
+    "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -116,7 +116,7 @@
      "bottler": "match",
      "country_of_origin": "match"
     },
-    "warning_exact": false,
+    "warning_exact": true,
     "warning_present": true,
     "detected": null
    },
@@ -127,7 +127,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_clean.png"
     ],
-    "ms": 2535,
+    "ms": 2644,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -148,7 +148,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_clean.png"
     ],
-    "ms": 2446,
+    "ms": 2305,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -169,7 +169,7 @@
      "APP-007_front_clean.png",
      "APP-007_back_clean.png"
     ],
-    "ms": 2509,
+    "ms": 2548,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -190,8 +190,8 @@
      "APP-008_front_clean.png",
      "APP-008_back_clean.png"
     ],
-    "ms": 2329,
-    "verdict": "issues_found",
+    "ms": 2270,
+    "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -200,7 +200,7 @@
      "bottler": "match",
      "country_of_origin": "match"
     },
-    "warning_exact": false,
+    "warning_exact": true,
     "warning_present": true,
     "detected": null
    },
@@ -211,7 +211,7 @@
      "APP-009_front_clean.png",
      "APP-009_back_clean.png"
     ],
-    "ms": 2328,
+    "ms": 2428,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -232,7 +232,7 @@
      "APP-010_front_clean.png",
      "APP-010_back_clean.png"
     ],
-    "ms": 2189,
+    "ms": 2204,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -255,7 +255,7 @@
      "APP-001_front_rotate7.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2392,
+    "ms": 2416,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "needs_review",
@@ -276,7 +276,7 @@
      "APP-001_front_clean.png",
      "APP-001_back_blur.png"
     ],
-    "ms": 2266,
+    "ms": 2277,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -297,7 +297,7 @@
      "APP-002_front_glare.png",
      "APP-002_back_clean.png"
     ],
-    "ms": 2142,
+    "ms": 2077,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -318,7 +318,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_lowcontrast.png"
     ],
-    "ms": 2423,
+    "ms": 2466,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -339,7 +339,7 @@
      "APP-003_front_perspective.png",
      "APP-003_back_clean.png"
     ],
-    "ms": 2137,
+    "ms": 2142,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -360,7 +360,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_small.png"
     ],
-    "ms": 2076,
+    "ms": 2096,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -381,8 +381,8 @@
      "APP-004_front_jpeg.png",
      "APP-004_back_clean.png"
     ],
-    "ms": 2197,
-    "verdict": "needs_review",
+    "ms": 2187,
+    "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -391,7 +391,7 @@
      "bottler": "match",
      "country_of_origin": "match"
     },
-    "warning_exact": false,
+    "warning_exact": true,
     "warning_present": true,
     "detected": null
    },
@@ -402,8 +402,8 @@
      "APP-004_front_clean.png",
      "APP-004_back_rotate90.png"
     ],
-    "ms": 6530,
-    "verdict": "needs_review",
+    "ms": 6571,
+    "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -412,7 +412,7 @@
      "bottler": "match",
      "country_of_origin": "match"
     },
-    "warning_exact": false,
+    "warning_exact": true,
     "warning_present": true,
     "detected": null
    },
@@ -423,7 +423,7 @@
      "APP-005_front_rotate7.png",
      "APP-005_back_clean.png"
     ],
-    "ms": 2402,
+    "ms": 2353,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -444,7 +444,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_blur.png"
     ],
-    "ms": 2476,
+    "ms": 2529,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -465,7 +465,7 @@
      "APP-006_front_glare.png",
      "APP-006_back_clean.png"
     ],
-    "ms": 2209,
+    "ms": 2189,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -486,7 +486,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_lowcontrast.png"
     ],
-    "ms": 2120,
+    "ms": 2236,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -507,7 +507,7 @@
      "APP-007_front_perspective.png",
      "APP-007_back_clean.png"
     ],
-    "ms": 2246,
+    "ms": 2128,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -528,8 +528,8 @@
      "APP-007_front_clean.png",
      "APP-007_back_small.png"
     ],
-    "ms": 2122,
-    "verdict": "issues_found",
+    "ms": 2029,
+    "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -549,8 +549,8 @@
      "APP-008_front_jpeg.png",
      "APP-008_back_clean.png"
     ],
-    "ms": 1974,
-    "verdict": "issues_found",
+    "ms": 2010,
+    "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -559,7 +559,7 @@
      "bottler": "match",
      "country_of_origin": "match"
     },
-    "warning_exact": false,
+    "warning_exact": true,
     "warning_present": true,
     "detected": null
    },
@@ -570,8 +570,8 @@
      "APP-008_front_clean.png",
      "APP-008_back_rotate90.png"
     ],
-    "ms": 6041,
-    "verdict": "issues_found",
+    "ms": 6286,
+    "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
      "class_type": "match",
@@ -580,7 +580,7 @@
      "bottler": "match",
      "country_of_origin": "match"
     },
-    "warning_exact": false,
+    "warning_exact": true,
     "warning_present": true,
     "detected": null
    },
@@ -591,7 +591,7 @@
      "APP-009_front_rotate7.png",
      "APP-009_back_clean.png"
     ],
-    "ms": 2423,
+    "ms": 2400,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -612,7 +612,7 @@
      "APP-009_front_clean.png",
      "APP-009_back_blur.png"
     ],
-    "ms": 2326,
+    "ms": 2357,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -633,7 +633,7 @@
      "APP-010_front_glare.png",
      "APP-010_back_clean.png"
     ],
-    "ms": 2108,
+    "ms": 2100,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -654,7 +654,7 @@
      "APP-010_front_clean.png",
      "APP-010_back_lowcontrast.png"
     ],
-    "ms": 2196,
+    "ms": 2069,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -677,7 +677,7 @@
      "APP-001_front_wrong_abv.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2301,
+    "ms": 2336,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -698,7 +698,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_titlecase.png"
     ],
-    "ms": 2386,
+    "ms": 2378,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -719,7 +719,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_allbold.png"
     ],
-    "ms": 2357,
+    "ms": 2515,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -740,7 +740,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_altered.png"
     ],
-    "ms": 2124,
+    "ms": 1998,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -761,7 +761,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_tiny.png"
     ],
-    "ms": 2891,
+    "ms": 2767,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -782,7 +782,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_missing.png"
     ],
-    "ms": 1823,
+    "ms": 1767,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
