@@ -1,0 +1,504 @@
+{
+  "seed": 42,
+  "warning_text": "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.",
+  "applications": [
+    {
+      "id": "APP-001",
+      "beverage_type": "spirits",
+      "brand": "OLD TOM DISTILLERY",
+      "class_type": "Kentucky Straight Bourbon Whiskey",
+      "alcohol_content": "45% Alc./Vol. (90 Proof)",
+      "net_contents": "750 mL",
+      "bottler": "Distilled and Bottled by Old Tom Distillery, Bardstown, Kentucky",
+      "origin": "Product of USA",
+      "theme": 0,
+      "images": [
+        {
+          "file": "APP-001_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-001_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-001_front_rotate7.png",
+          "side": "front",
+          "variant": "rotate7",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-001_back_blur.png",
+          "side": "back",
+          "variant": "blur",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-001_front_wrong_abv.png",
+          "side": "front",
+          "variant": "wrong_abv",
+          "expected_findings": {
+            "label_abv": "40% Alc./Vol. (80 Proof)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-002",
+      "beverage_type": "spirits",
+      "brand": "STONE'S THROW",
+      "class_type": "Straight Rye Whiskey",
+      "alcohol_content": "47.5% ALC/VOL (95 PROOF)",
+      "net_contents": "750 mL",
+      "bottler": "Bottled by Stone's Throw Spirits Co., Denver, Colorado",
+      "origin": "Product of USA",
+      "theme": 1,
+      "images": [
+        {
+          "file": "APP-002_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-002_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-002_front_glare.png",
+          "side": "front",
+          "variant": "glare",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-002_back_lowcontrast.png",
+          "side": "back",
+          "variant": "lowcontrast",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-002_back_titlecase.png",
+          "side": "back",
+          "variant": "titlecase",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-003",
+      "beverage_type": "spirits",
+      "brand": "HARBOR LIGHT",
+      "class_type": "London Dry Gin",
+      "alcohol_content": "Alc. 40% by Vol.",
+      "net_contents": "1 L",
+      "bottler": "Distilled by Harbor Light Distillers, Portland, Maine",
+      "origin": "Product of USA",
+      "theme": 2,
+      "images": [
+        {
+          "file": "APP-003_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-003_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-003_front_perspective.png",
+          "side": "front",
+          "variant": "perspective",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-003_back_small.png",
+          "side": "back",
+          "variant": "small",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-003_back_allbold.png",
+          "side": "back",
+          "variant": "allbold",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-004",
+      "beverage_type": "spirits",
+      "brand": "SABLE RIDGE",
+      "class_type": "Vodka",
+      "alcohol_content": "40% Alc./Vol. (80 Proof)",
+      "net_contents": "1.75 L",
+      "bottler": "Produced and Bottled by Sable Ridge Spirits, Austin, Texas",
+      "origin": "Product of USA",
+      "theme": 3,
+      "images": [
+        {
+          "file": "APP-004_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-004_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-004_front_jpeg.png",
+          "side": "front",
+          "variant": "jpeg",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-004_back_rotate90.png",
+          "side": "back",
+          "variant": "rotate90",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-004_back_altered.png",
+          "side": "back",
+          "variant": "altered",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-005",
+      "beverage_type": "wine",
+      "brand": "Willow Creek Cellars",
+      "class_type": "Cabernet Sauvignon",
+      "alcohol_content": "Alc. 13.5% by Vol.",
+      "net_contents": "750 mL",
+      "bottler": "Produced and Bottled by Willow Creek Cellars, Paso Robles, California",
+      "origin": "Product of USA",
+      "theme": 4,
+      "images": [
+        {
+          "file": "APP-005_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-005_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-005_front_rotate7.png",
+          "side": "front",
+          "variant": "rotate7",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-005_back_blur.png",
+          "side": "back",
+          "variant": "blur",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-005_back_tiny.png",
+          "side": "back",
+          "variant": "tiny",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-006",
+      "beverage_type": "wine",
+      "brand": "Blue Heron Vineyards",
+      "class_type": "Chardonnay",
+      "alcohol_content": "14.1% Alc./Vol.",
+      "net_contents": "750 mL",
+      "bottler": "Vinted and Bottled by Blue Heron Vineyards, Walla Walla, Washington",
+      "origin": "Product of USA",
+      "theme": 0,
+      "images": [
+        {
+          "file": "APP-006_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-006_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-006_front_glare.png",
+          "side": "front",
+          "variant": "glare",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-006_back_lowcontrast.png",
+          "side": "back",
+          "variant": "lowcontrast",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-006_back_missing.png",
+          "side": "back",
+          "variant": "missing",
+          "expected_findings": {
+            "warning_present": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-007",
+      "beverage_type": "malt",
+      "brand": "COPPER KETTLE BREWING",
+      "class_type": "India Pale Ale",
+      "alcohol_content": "6.8% ALC/VOL",
+      "net_contents": "12 FL OZ (355 mL)",
+      "bottler": "Brewed and Bottled by Copper Kettle Brewing Co., Asheville, North Carolina",
+      "origin": "Product of USA",
+      "theme": 1,
+      "images": [
+        {
+          "file": "APP-007_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-007_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-007_front_perspective.png",
+          "side": "front",
+          "variant": "perspective",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-007_back_small.png",
+          "side": "back",
+          "variant": "small",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-008",
+      "beverage_type": "malt",
+      "brand": "IRON ANVIL",
+      "class_type": "Stout",
+      "alcohol_content": "ABV 5.2%",
+      "net_contents": "16 FL. OZ.",
+      "bottler": "Brewed by Iron Anvil Brewery, Duluth, Minnesota",
+      "origin": "Product of USA",
+      "theme": 2,
+      "images": [
+        {
+          "file": "APP-008_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-008_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-008_front_jpeg.png",
+          "side": "front",
+          "variant": "jpeg",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-008_back_rotate90.png",
+          "side": "back",
+          "variant": "rotate90",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-009",
+      "beverage_type": "spirits",
+      "brand": "CHATEAU BELMONT",
+      "class_type": "Blended Scotch Whisky",
+      "alcohol_content": "43% Alc./Vol. (86 Proof)",
+      "net_contents": "700 mL",
+      "bottler": "Imported by Belmont Imports LLC, Newark, New Jersey",
+      "origin": "Product of Scotland",
+      "theme": 3,
+      "images": [
+        {
+          "file": "APP-009_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-009_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-009_front_rotate7.png",
+          "side": "front",
+          "variant": "rotate7",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-009_back_blur.png",
+          "side": "back",
+          "variant": "blur",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "APP-010",
+      "beverage_type": "spirits",
+      "brand": "RIDGEBACK",
+      "class_type": "Tequila Blanco",
+      "alcohol_content": "40% Alc./Vol.",
+      "net_contents": "375 mL",
+      "bottler": "Imported by Ridgeback Spirits, El Paso, Texas",
+      "origin": "Product of Mexico",
+      "theme": 4,
+      "images": [
+        {
+          "file": "APP-010_front_clean.png",
+          "side": "front",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-010_back_clean.png",
+          "side": "back",
+          "variant": "clean",
+          "expected_findings": {
+            "warning_present": true
+          }
+        },
+        {
+          "file": "APP-010_front_glare.png",
+          "side": "front",
+          "variant": "glare",
+          "expected_findings": {
+            "warning_present": false
+          }
+        },
+        {
+          "file": "APP-010_back_lowcontrast.png",
+          "side": "back",
+          "variant": "lowcontrast",
+          "expected_findings": {
+            "warning_present": true
+          }
+        }
+      ]
+    }
+  ]
+}

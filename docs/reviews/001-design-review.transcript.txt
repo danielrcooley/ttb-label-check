@@ -1,0 +1,1141 @@
+Reading additional input from stdin...
+OpenAI Codex v0.153.1
+--------
+workdir: C:\Users\dcwes\AppData\Local\Temp\claude\C--Projects\c9c0f080-f2e8-4108-9668-168ed686c1c6\scratchpad\codex_review_001
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a0693d-545f-75a0-a2a4-3f9f8a456f45
+--------
+user
+You are the independent reviewer in a two-agent workflow. The four documents you need are provided in full in the stdin block appended to this message (they are also on disk in the working directory, but you do not need to read them). Carry out request 001 exactly as written in the request document: answer its seven numbered questions in order, terse numbered lists, no preamble, quoting the brief where relevant and naming ARCHITECTURE.md section numbers. Do not modify or create any file. Your final message must be the complete review in Markdown.
+
+<stdin>
+===== FILE: 001-design-review.request.md =====
+---
+id: 001
+type: design-review
+status: open
+requested_by: Claude (builder)
+reviewer: Codex (reviewer)
+date: 2026-09-03
+inputs:
+  - ../../../BRIEF.md            (the assignment, verbatim from the authors; bold is theirs)
+  - ../../../ARCHITECTURE.md     (the plan under review, sections 0-14)
+  - ../../../PLAN.md             (earlier plan; ARCHITECTURE.md supersedes where they differ)
+---
+
+# Request 001: independent design review before any code is written
+
+## Context
+This is a one-week take-home for a Treasury AI engineering role. The deliverables are a repo
+and a deployed URL; there may be no follow-up interview, so the repo and the running app are
+the whole evaluation. The role is AI-directed engineering: a human directs Claude (builder) and
+Codex (reviewer). Reviewers have seen ~50 submissions to the same brief, so "adequate" is known
+to them.
+
+The builder has done five review passes of its own. You are the first independent reader.
+Assume the builder is wrong somewhere and find it.
+
+## What we need from you
+Answer these in order, each as a numbered list, terse, no preamble:
+
+1. **Missed requirements.** Anything in BRIEF.md (including the five phrases the authors
+   bolded) that ARCHITECTURE.md does not address, or addresses weakly. Quote the brief.
+2. **Wrong calls.** Decisions in ARCHITECTURE.md you would reverse, with the reason and the
+   alternative. Be specific about section numbers.
+3. **Over-scope.** What you would cut to protect the core given six working days, and in what
+   order. Compare against the Definition of Done in section 12.
+4. **Technical risks the plan underestimates.** OCR accuracy on decorative label fonts,
+   Python 3.13 wheel availability, ONNX Runtime threading under a semaphore, coordinate
+   mapping, USWDS vendoring without a build step, Azure Container Apps specifics, anything else.
+5. **Reviewer's-eye check.** Put yourself in the seat of an engineer at Treasury opening the
+   repo and the URL for 20 minutes with a scoring sheet for the six evaluation criteria.
+   What would cost points? What would earn them that the plan does not yet do?
+6. **Domain check.** Anything wrong or missing about TTB labeling rules as described
+   (27 CFR Parts 4, 5, 7, 16; health warning text and format; standards of fill). Flag
+   anything the plan should verify on eCFR before coding.
+7. **Top five.** If the builder can only act on five of your points, which five.
+
+## Rules
+- Read-only. Do not modify any file.
+- Do not propose adding an LLM to the core verification path; the brief's firewall and
+  5-second constraints rule it out and section 12 explains why. Optional providers are fine.
+- Prefer concrete over general: name the section, the file, the rule, the number.
+- If you agree with something, say so in one line and move on. Disagreement is the value here.
+
+===== FILE: BRIEF.md =====
+<!-- Verbatim copy of https://github.com/treasurytakehome-rgb/instructions README.md (main @ 62bd63c, authored 2026-06-09). Captured 2026-09-03. Bold/italic emphasis is the AUTHORS' own and marks what they grade first. Due Thu 2026-09-10. -->
+
+# **Take-Home Project: AI-Powered Alcohol Label Verification App**
+
+## **Project Background & Stakeholder Context**
+
+*The following document contains notes from our discovery sessions with the Compliance Division, along with technical requirements for the prototype. We've included stakeholder feedback to give you context on how this tool will be used.*
+
+### **Interview Notes: Sarah Chen, Deputy Director of Label Compliance**
+
+*Conducted Tuesday, 3:15 PM — Sarah was running late from her daughter's school play rehearsal*
+
+"Thanks for meeting with me. Sorry about the delay—my daughter's playing the lead in her school's production of *Annie*next week and rehearsals have been crazy. Anyway, let me tell you about what we're dealing with here.
+
+So the TTB reviews about 150,000 label applications a year. Our team of 47 agents handles all of them. Back in the 80s—before my time—they actually had over 100 agents, but budget cuts, you know how it goes. We've been doing things basically the same way since the COLA system went online in 2003. That was a big upgrade from paper forms, believe it or not.
+
+The actual review process is pretty straightforward. An agent pulls up an application, looks at the label artwork, and checks that what's on the label matches what's in the application. Brand name matches? Check. ABV is correct? Check. Government warning is there? Check. It takes maybe 5-10 minutes per application for a simple one, longer if there are issues.
+
+Here's the thing though—and this is what got leadership interested in AI—a lot of what we do is just... matching. Like literally just making sure the number on the form is the same as the number on the label. My agents spend half their day doing what's essentially data entry verification. It's not that they can't do more complex analysis, it's that they're drowning in routine stuff.
+
+Oh, I should mention—we tried a pilot with the scanning vendor last year. Disaster. The system would take 30, 40 seconds sometimes to process a single label. Our agents just went back to doing it by eye because they could do five labels in the time it took the machine to do one. **If we can't get results back in about 5 seconds, nobody's going to use it.** We learned that the hard way.
+
+What else... The agents really vary in their tech comfort level. Dave's been here since the Clinton administration and still prints his emails. Meanwhile, Jenny's fresh out of college and probably could have built this tool herself. We need something **my mother could figure out**—she's 73 and just learned to video call her grandkids last year, if that gives you a benchmark. Half our team is over 50. Clean, obvious, no hunting for buttons.
+
+One more thing that came up in our last team meeting—during peak season, we get these big importers who dump 200, 300 label applications on us at once. Right now we literally have to process them one at a time. If there was some way to **handle batch uploads**, that would be huge. Janet from our Seattle office has been asking about this for years."
+
+### **Interview Notes: Marcus Williams, IT Systems Administrator**
+
+*Coffee chat, Thursday morning*
+
+"Sarah probably gave you the business side. Let me fill you in on some of the technical landscape.
+
+Our current infrastructure is... well, it's government infrastructure, let's leave it at that. We're on Azure now after the migration in 2019. That was a whole thing—don't get me started on the FedRAMP certification process. Took 18 months just for the paperwork.
+
+The COLA system is built on .NET, though there's been talk about modernizing it for years. We had a contractor come in last summer to do an assessment and they quoted us $4.2 million for a full rebuild. That went nowhere, obviously.
+
+For this prototype, we're not looking to integrate with COLA directly—that's a whole different beast with its own authorization requirements. Think of this as a standalone proof-of-concept that could potentially inform future procurement decisions. If it works well, maybe we look at how to incorporate it into the workflow. But that's years away, realistically.
+
+Security-wise, we'd need to be careful with any production deployment—there's PII considerations, document retention policies, the usual federal compliance stuff. But for a prototype? Just don't do anything crazy. We're not storing anything sensitive for this exercise.
+
+Oh, and our network blocks outbound traffic to a lot of domains, so keep that in mind if you're thinking about cloud APIs. During the scanning vendor pilot, half their features didn't work because our firewall blocked connections to their ML endpoints. Classic."
+
+### **Interview Notes: Dave Morrison, Senior Compliance Agent (28 years)**
+
+*Brief hallway conversation*
+
+"Look, I'll be honest, I've seen a lot of these 'modernization' projects come and go. Remember the automated phone system they put in back in 2008? Supposed to reduce call volume. We ended up with more calls because nobody could figure out how to navigate it.
+
+The thing about label review is there's nuance. You can't just pattern match everything. Like, I had one last week where the brand name was 'STONE'S THROW' on the label but 'Stone's Throw' in the application. Technically a mismatch? Sure. But it's obviously the same thing. You need judgment.
+
+That said, I'm not against new tools. If something can help me get through my queue faster, great. Just don't make my life harder in the process. I spend enough time fighting with COLA as it is."
+
+### **Interview Notes: Jenny Park, Junior Compliance Agent (8 months)**
+
+*Teams call, Friday afternoon*
+
+"I'm so excited you're working on this! When I started here, I was kind of shocked at how manual everything is. Like, I literally have a printed checklist on my desk that I go through for every label. Brand name—check with my eyes. ABV—check with my eyes. Warning statement—check with my eyes. It's 2024!
+
+The one thing I'd say is the warning statement check is actually trickier than it sounds. It has to be **exact**. Like, word-for-word, and the 'GOVERNMENT WARNING:' part has to be in all caps and bold. Sarah probably mentioned this but people try to get creative with the warning all the time. Smaller font, different wording, burying it in tiny text. I caught one last month where they used 'Government Warning' in title case instead of all caps. Rejected.
+
+Also—and this is maybe out of scope for a prototype—but it would be amazing if the tool could handle images that aren't perfectly shot. I've seen labels that are photographed at weird angles, or the lighting is bad, or there's glare on the bottle. Right now if an agent can't read the label they just reject it and ask for a better image. But if AI could handle some of that..."
+
+## **Technical Requirements**
+
+You are free to use any programming languages, frameworks, or libraries you prefer. We want to see what kind of engineering, design, and integration decisions you make.
+
+## **Additional Context**
+
+### **About TTB Label Requirements**
+
+For reference, TTB requires specific information on alcohol beverage labels. The exact requirements vary by beverage type (beer, wine, distilled spirits) but common elements include:
+
+- Brand name
+- Class/type designation
+- Alcohol content (with some exceptions for certain wine/beer)
+- Net contents
+- Name and address of bottler/producer
+- Country of origin for imports
+- **Government Health Warning Statement** (mandatory on all alcohol beverages)
+
+We encourage you to review TTB's guidelines at ttb.gov for additional context on label requirements.
+
+### **Sample Label**
+
+Your app should handle labels containing information like the example below:
+
+**Example Distilled Spirits Label Fields:**
+
+- Brand Name: "OLD TOM DISTILLERY"
+- Class/Type: "Kentucky Straight Bourbon Whiskey"
+- Alcohol Content: "45% Alc./Vol. (90 Proof)"
+- Net Contents: "750 mL"
+- Government Warning: \[Standard government warning text\]
+
+*We encourage you to create or source additional test labels—AI image generation tools work well for this.*
+
+## **Deliverables**
+
+1. **Source Code Repository** (GitHub or similar)
+   - All source code
+   - README with setup and run instructions
+   - Brief documentation of approach, tools used, assumptions made
+2. **Deployed Application URL**
+   - Working prototype we can access and test
+
+## **Evaluation Criteria**
+
+- Correctness and completeness of core requirements
+- Code quality and organization
+- Appropriate technical choices for the scope
+- User experience and error handling
+- Attention to requirements
+- Creative problem-solving
+
+We understand this is time-constrained. A working core application with clean code is preferred over ambitious but incomplete features. Document any trade-offs or limitations.
+
+*Questions? Reach out for clarification—though we also value how you fill in gaps independently.*
+
+Good luck!
+```
+
+===== FILE: ARCHITECTURE.md =====
+# Architecture v2: built to survive a hostile reviewer
+_2026-09-03. Supersedes the architecture section of PLAN.md where they differ._
+
+## 0. Two corrections from re-reading the brief
+
+1. **A COLA application is a set of images, not one.** The government warning is almost always on
+   the BACK label. Brand, class/type, ABV and net contents are on the FRONT. A tool that accepts
+   one image per application will report "warning missing" on every front label and get laughed
+   out of the room by Dave. So the unit of work is an *application* with one or more images
+   (front, back, neck, strip). OCR lines are merged across images before any check runs, and
+   every finding says which image it came from.
+2. **Pairing is many-to-one, not one-to-one.** In a 300-image importer dump, several photos belong
+   to the same application. So pairing is "each image goes to its best-scoring application row
+   above a threshold", not a one-to-one assignment. Greedy with a threshold is both simpler and
+   more correct here than the Hungarian algorithm.
+
+## 1. The invariant: OCR once, reason many times
+
+Three separable operations, each its own endpoint, each independently testable:
+
+| Step | Endpoint | Cost | Input | Output |
+|---|---|---|---|---|
+| Extract | `POST /api/extract` | heavy (OCR) | one image | OCR lines with boxes + confidence, extracted candidate fields, image quality score, timing |
+| Pair | `POST /api/pair` | light (CPU, ms) | N extractions + M application rows (JSON) | image -> row assignment with confidence, unpaired lists |
+| Compare | `POST /api/compare` | light (ms) | one application row + its extractions | per-field checks, warning checks, verdict, recommendation |
+| Verify | `POST /api/verify` | heavy | image(s) + row in one call | extract + compare, for the single-label screen |
+
+Why this matters at scale: the expensive step is idempotent and stateless per image. The reasoning
+steps operate on small JSON and can be re-run instantly when the agent edits a field or re-pairs
+an image. A 1000-image batch does 1000 extracts, one pair call, and up to 1000 compare calls
+that each take under a millisecond and can be sent in one bulk request.
+
+## 2. Batch execution model: client orchestrates, server stays stateless
+
+**Decision: the browser drives the batch.** It holds the File handles (lazy, not in memory), sends
+images to `/api/extract` through a small promise pool (concurrency 3), and renders results as they
+stream back. The server never holds more than a handful of images in RAM and never writes one to
+disk.
+
+Rejected alternative: server-side job queue (upload everything, poll a job id). It needs state
+(in-memory dies on restart, multi-replica needs Redis), holds up to several GB of images
+server-side, contradicts "we're not storing anything", and turns a one-week prototype into an
+infrastructure project. It is the correct production evolution (Azure Blob + Queue + scale-out
+workers) and is documented as such, not built.
+
+Consequences we get for free:
+- Backpressure is natural. The client only has 3 requests in flight.
+- Cancel is trivial (AbortController). Resume is trivial (files are still in the browser).
+- Progress and ETA are exact (moving average of per-image times).
+- Horizontal scaling is trivial: no shared state, so two containers double throughput.
+- A closed tab costs the server nothing.
+
+## 3. What happens when someone throws 1000 at it
+
+Design targets, to be measured and PUBLISHED in the README under "Limits and load test":
+
+| Vector | Design response |
+|---|---|
+| 1000 images through the UI | Streams results, pagination at 50 rows, thumbnails only for visible rows (object URLs revoked on page change), ETA shown, cancel/resume, warn on tab close. Expected on 2 vCPU: ~2 labels/s, so 1000 in about 8-10 minutes with the agent reviewing finished rows the whole time. |
+| A script firing 1000 concurrent requests at the API | Global OCR semaphore = vCPU count. Per-client in-flight cap (4). Beyond that: immediate `429` with `Retry-After`, never a queue that grows without bound. `/api/health` bypasses the semaphore so it always answers. The client retries 429/503 with backoff. |
+| Batch starving an interactive user | Two semaphores: interactive `/api/verify` gets full CPU; `/api/extract` (batch) gets CPU minus one, minimum one. Batch can never take the last core. |
+| One 80 MB, 12000x12000 image | Content-Length checked before reading. Chunked-read cap at 10 MB. Pillow decompression-bomb guard at 40 MP. Clear message: "Image too large, resize below 10 MB / 40 MP." Then downscale to 1600 px longest side and drop the original immediately. |
+| Non-image files, corrupt files, zero bytes, SVG, PDF, HEIC | File-signature sniffing (not extension). Accept PNG, JPEG, WebP, TIFF, BMP. Reject SVG (script risk), PDF and HEIC with a specific "convert to JPG or PNG" message. Client pre-checks size and type so bad files never leave the browser. Every rejection is per-file and non-fatal to the batch. |
+| Filenames: unicode, path separators, duplicates, `<script>` | Filenames are display-only, rendered with `textContent`, never used as paths. Duplicates get a stable per-batch id. |
+| Huge CSV, malformed rows, formula injection | Server parses with Python `csv`, max 5000 rows / 2 MB, per-row validation errors returned (not a whole-file failure). Flexible header matching (`brand`, `Brand Name`, `brand_name`). On export, cells starting with `= + - @` are prefixed with `'` so Excel cannot execute them. |
+| Slow image that takes forever | Every request carries a deadline (6 s soft). Preprocessing variants are attempted only while budget remains and confidence is still low. Response includes a `timing` breakdown and a `Server-Timing` header. |
+| Native-code crash on a pathological image | OCR runs in a bounded thread pool with per-thread engine instances. Documented hardening step for production: process pool for crash isolation. |
+| Refresh mid-batch | Nothing is stored server-side by design. UI warns before unload and offers "export decisions now". Documented as intentional. |
+| Adversarial matching inputs | Unicode NFKC (fullwidth letters), casefold, apostrophe/quote family unification, whitespace collapse, punctuation strip. ABV: `45%`, `45.0%`, `45 % ALC/VOL`, `ALC. 45% BY VOL.`, proof-only labels (`90 PROOF` -> 45%). Net contents: mL, ml, cL, L, fl oz (29.5735 mL) with 1% rounding tolerance. OCR confusables (0/O, 1/I/l, 5/S) folded before scoring, never before display. |
+
+Throughput is published as a measured number from `tools/loadtest.py` (httpx + asyncio, prints
+p50/p95/max, error histogram, labels/minute) run against the deployed host. When the reviewer
+stress-tests, the numbers they get should match the numbers we wrote down.
+
+## 4. Concurrency model inside the container
+
+- Single uvicorn process. asyncio event loop for I/O, a `ThreadPoolExecutor` sized to vCPUs
+  for OCR. ONNX Runtime and OpenCV release the GIL during inference, so threads use all cores.
+- One OCR engine instance per worker thread (thread-local), ORT `intra_op_num_threads=1` and
+  `OMP_NUM_THREADS=1` so N sessions do not oversubscribe N cores.
+- Models loaded at startup (baked into the image at build time, no download at runtime, which
+  also satisfies the firewall constraint). First request is warm. Health reports `warm: true`.
+- Memory budget: ~150-250 MB per engine instance + ~60 MB per in-flight image after downscale.
+  2 vCPU / 2 GB is comfortable. 1 vCPU / 1 GB works.
+
+## 5. Domain rules encoded (with citations for the README)
+
+- Health warning text and format: 27 CFR Part 16 (16.21 text; 16.22 type size and legibility).
+  Checks: present, exact wording (OCR-tolerant similarity with diff shown), `GOVERNMENT WARNING:`
+  all caps, bold (stroke-width heuristic vs body text), relative size (warning text height vs
+  brand text height, flagged if suspiciously small; physical mm cannot be measured from a photo
+  without scale, and we say so).
+- Beverage-type-aware requiredness: spirits (27 CFR Part 5) ABV required; wine (Part 4) ABV may
+  be replaced by "Table Wine"/"Light Wine" for 7-14%; malt beverages (Part 7) ABV optional
+  federally. Simplified deliberately; documented.
+- The check is "label says what the application says", exact. Lab tolerance rules for actual
+  alcohol content vs stated (5.65 / 4.36 / 7.65) are out of scope and documented as such.
+- Case-only differences (STONE'S THROW vs Stone's Throw) are a Match with a note, never a
+  Mismatch. Anything the fuzzy layer accepted is "Needs review", shown with a word diff.
+- The tool recommends. The agent decides. Three states per check, three verdicts per
+  application, decision buttons per row, exported decisions CSV. No auto-approval anywhere.
+
+## 6. Security posture (real, cheap, documented)
+
+- Access gate: `ACCESS_CODE` env. Set -> USWDS sign-in page, signed HttpOnly cookie. Unset ->
+  open, header shows "Demo mode: sign-in disabled. No data is stored." Production path documented:
+  Entra ID SSO with PIV/CAC. Not faked.
+- Headers: CSP `default-src 'self'; img-src 'self' blob: data:; frame-ancestors 'none'`,
+  `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS behind TLS.
+- Container: non-root user, read-only root filesystem with a writable `/tmp`, no shell tools
+  needed at runtime, pinned dependencies, `pip-audit` and `ruff` in CI.
+- Logging: request id, sizes, timings, status codes. Never label text, never filenames.
+- No persistence of any kind. Verified by the read-only filesystem.
+
+## 7. Frontend
+
+- USWDS 3 (self-hosted CSS, Public Sans, icon sprite). No CDN, no external requests at all.
+- Vanilla ES modules with a tiny store. No build step. Small enough for a reviewer to read in
+  one sitting, which is a feature.
+- Screens: **Check a label** (drop one or more images for one application, fields form,
+  "Load sample" button that fills the Old Tom Distillery example with bundled images, results
+  checklist, click a finding to see the highlight on the image) and **Batch** (drop many images
+  or pick a folder, optional CSV with downloadable template, live table, filters "Needs
+  attention / Ready / Unpaired", pagination, per-row decision buttons, export).
+- Accessibility: USWDS components, 44 px targets, visible focus, `aria-live` for results and
+  batch progress, icon + word + color for every status, honors reduced motion and high contrast.
+  Section 508 named explicitly in the README.
+- Banner: "PROTOTYPE. Not an official U.S. Government system. No data is stored." No seals.
+
+## 8. Repository layout (revised)
+```
+ttb-label-check/
+  app/
+    main.py              FastAPI app factory, routers, static, lifespan (engine warmup)
+    config.py            Settings (env): limits, concurrency, access code, engine choice
+    security.py          access gate, headers middleware, body-size middleware, per-client cap
+    limits.py            semaphores, deadline/Budget, 429 helpers
+    schemas.py           Pydantic models (Extraction, ApplicationRow, Check, Verdict, ...)
+    routes/
+      extract.py  pair.py  compare.py  verify.py  csv.py  health.py
+    ocr/
+      base.py            OcrEngine protocol, OcrLine
+      rapid.py           RapidOCR (ONNX Runtime) implementation
+      tesseract.py       kept only if the bake-off says so
+    pipeline/
+      images.py          decode, sniff, EXIF transpose, bomb guard, downscale
+      preprocess.py      variants: gray, CLAHE+denoise, deskew
+      extract.py         fields from lines (ABV, net contents, warning span, brand/class candidates)
+      normalize.py       NFKC/casefold/quotes/whitespace/confusables
+      match.py           fuzzy scoring, status thresholds, word diff
+      warning.py         27 CFR 16 checks incl. caps, bold heuristic, relative size
+      pairing.py         many-to-one assignment
+      verdict.py         checks -> verdict -> recommendation
+    static/              index.html app.css app.js batch.js store.js uswds/ fonts/ samples/
+  tests/  unit/  integration/  fixtures/   (synthetic labels committed as PNG)
+  tools/  make_labels.py  loadtest.py  vendor_uswds.py
+  docs/   APPROACH.md  REQUIREMENTS_TRACE.md  LIMITS.md  SECURITY.md
+  Dockerfile  fly.toml  requirements.txt  requirements-dev.txt  README.md  .github/workflows/ci.yml
+```
+
+## 9. Revised schedule (same dates, sharper cuts)
+
+| Day | Date | Deliverable |
+|---|---|---|
+| 0 | Thu 9/3 | OCR bake-off with numbers. Label generator v1 (front + back label pairs). Repo skeleton. |
+| 1 | Fri 9/4 | `images -> preprocess -> extract -> normalize/match -> warning -> verdict`. Unit tests. `/api/verify` and `/api/extract` working. Deadline/Budget in place. |
+| 2 | Sat 9/5 | USWDS shell. "Check a label" screen with multi-image, highlights, Load sample. Error states. Dockerfile. First deploy attempt (host TBD). |
+| 3 | Sun 9/6 | Batch: pool, streaming table, CSV parse, `/api/pair`, `/api/compare` bulk, triage buttons, export. Semaphores + per-client cap + 429 path. Host decision final, deploy. |
+| 4 | Mon 9/7 | Load test to 1000 locally and remotely, publish numbers. Bold/size heuristics. Degraded-image tests. Access gate. Security headers. CI. |
+| 5 | Tue 9/8 | Docs (README, APPROACH, REQUIREMENTS_TRACE, LIMITS, SECURITY), screenshots, sample corpus incl. a few AI-generated photo labels. Fresh-browser + phone QA (hard gate). |
+| 6 | Wed 9/9 | Buffer. Uptime check. Submit. |
+
+Cut order if time runs short (last to first): AI-generated photo labels -> relative-size
+heuristic -> access gate -> folder picker -> bold heuristic. Never cut: batch streaming,
+limits/429 path, load-test numbers, docs, Load sample button.
+
+## 10. Re-review additions (second pass over the brief, 2026-09-03)
+
+Product and UX
+- **Jenny's printed checklist is the results UI.** Same order she recites: brand, ABV, warning,
+  then the rest. Say so in the README; it is the most literal form of "attention to requirements".
+- **Print view.** Dave prints his emails. A clean print stylesheet and a "Print report" button
+  give agents a review record for the file. Cheap, real, and a wink the reviewers will catch.
+- **Branding slot, no seal.** `AGENCY_NAME` / `AGENCY_LOGO` config renders in the header when set;
+  empty in the public demo. One line in docs: official marks omitted from a public prototype
+  (31 U.S.C. 333); the agency drops its mark in at internal deployment. README acknowledges
+  "prepared for the DO A.I. Engineering Coordination Division take-home" in plain text.
+- **Explicit pairing beats fuzzy pairing.** CSV template gets an optional `images` column
+  (filenames, `;`-separated). If present, pair by filename; otherwise fuzzy. Each row shows
+  which method paired it and the confidence.
+- **Keyboard triage** (A approve, R reject, F flag, J/K move) for Jenny-type power users.
+  Discoverable via a "?" hint, never required. Day 5 if time allows.
+- **First-run path is sacred.** Open URL -> "Load sample" -> result in under 3 s, with the
+  highlight overlay visible. This is the reviewer's first 10 seconds.
+
+Integration (the brief says "integration decisions" explicitly)
+- **OpenAPI at `/api/docs`, self-hosted.** FastAPI's default Swagger UI pulls from a CDN, which
+  breaks behind Marcus's firewall and violates our no-external-assets rule. Vendor the Swagger
+  UI bundle (or serve `openapi.json` + a short API.md if size becomes a concern). The API is
+  how a .NET COLA would consume this; say that next to the docs link.
+- **Plain HTTPS request/response only.** No WebSockets, no Server-Sent Events. Restrictive
+  government proxies drop both. Batch streaming is achieved by many small requests, which is
+  also what keeps the server stateless. State this as a deliberate choice.
+- **Locked-down reviewer machines.** Assume Edge on a managed Windows box. ES2020 only, no
+  Chromium-only file-system APIs (`webkitdirectory` input for folders, not `showDirectoryPicker`),
+  no WebGL, works with third-party cookies blocked, works on a phone.
+- **Path to production section** in the README (Marcus: "inform future procurement decisions"):
+  Entra ID + PIV auth, Azure Government hosting, Blob + Queue for true async batch, retention
+  policy, audit logging, model versioning and evaluation gates, VPAT/Section 508 conformance,
+  COLA integration through the same API. Half a page, no more.
+
+Domain and accuracy
+- **27 CFR 16.22 also says the REST of the warning may NOT be bold.** (Verify on eCFR before
+  coding.) That turns the stroke-width heuristic into a two-sided check: anchor bold, body not
+  bold. An all-bold warning is itself a finding. Also in 16.22: separate and apart from other
+  text, readily legible, contrasting background, minimum type size by container size, max
+  characters per inch. We check size relatively and contrast cheaply (luminance of text vs
+  background inside the warning box); the rest is listed as "not checked" in LIMITS.md.
+- **Diacritics.** NFKD + strip combining marks before comparison (Château vs Chateau), never
+  before display.
+- **Orientation.** EXIF transpose first. If mean confidence is low, try 90/180/270 rotations
+  inside the budget. RapidOCR's angle classifier handles upside-down lines, not sideways images.
+- **Zoom pass for small labels in big photos.** If detected text is tiny relative to the frame
+  (bottle photographed from across the room), crop to the text cluster's bounding box and
+  re-run OCR on the crop at higher resolution, within budget. This is the single most
+  effective answer to Jenny's "not perfectly shot" images.
+- **Class/type wraps across lines** as often as brand does ("KENTUCKY STRAIGHT" / "BOURBON
+  WHISKEY"). Line-joining candidates apply to every text field, not just brand.
+- **Net contents dual statements** ("12 FL. OZ. (355 mL)"): parse all candidates, match any,
+  report the one used.
+
+AI credibility (this is an AI role and there may be no follow-up interview)
+- **Say where the AI is.** Neural text detection + recognition (PP-OCRv4 models via ONNX Runtime),
+  in-process, versions pinned. Then a deterministic rules + fuzzy layer. Same input, same
+  output, every finding traceable to pixels. That determinism and auditability is the
+  argument for not putting an LLM in the core path, alongside firewall and latency. The
+  provider interface shows how one would be added.
+- **Ship an evaluation.** `tools/evaluate.py` runs the committed synthetic corpus (clean +
+  degraded, known ground truth) and writes a table: per-field accuracy, warning-check accuracy,
+  p50/p95 latency, by degradation type. Numbers go in the README. Reviewers of an AI hire
+  expect to see an eval, and almost no take-home includes one.
+- **Model and dependency pinning** with exact versions; the Docker build is reproducible
+  (models baked at build, no runtime downloads).
+
+Hygiene
+- LICENSE (MIT). `.github/workflows/ci.yml`: ruff, pytest, pip-audit, docker build.
+- Footer shows build SHA from `GIT_SHA` env. `/api/health` returns engine, model versions,
+  warm state, in-flight count.
+- Accessibility QA on Day 5: automated axe scan via Playwright (already installed in the
+  StoreXray venv), keyboard-only pass, Windows Magnifier + high-contrast pass done by Daniel
+  himself, Narrator or NVDA pass on the two screens.
+- APPROACH.md stays BRIEF as the brief literally asks: two pages max. Depth lives in
+  LIMITS.md, SECURITY.md and REQUIREMENTS_TRACE.md and is linked, not inlined.
+- No clarification emails. Every gap filled with a stated assumption in APPROACH.md.
+- Still needed from Daniel: the exact fields on the submission form, so the docs answer them.
+
+## 11. Third-pass additions (fresh read from disk, 2026-09-03)
+
+A misread, corrected
+- **The primary input is label ARTWORK, not photos.** Sarah: "looks at the label artwork."
+  Applicants submit digital label designs to COLA. Photographs at weird angles are Jenny's
+  "maybe out of scope" secondary case. Consequences: (1) OCR accuracy on the primary path will
+  be high and we should say so; (2) the eval reports two tiers, "artwork" (clean renders) and
+  "photos" (degraded), separately; (3) accept GIF (static, first frame), since artwork arrives
+  as JPG/GIF/PNG; (4) PDF artwork is common from designers: accept PDF via `pypdfium2` (pure
+  wheel, no system deps), render page 1-N at 200 DPI, cap pages at 10. PDF sits low in the cut
+  order but is cheap and a reviewer may well try one.
+- **Application fields are strings, not numbers.** The sample shows Alcohol Content as
+  `"45% Alc./Vol. (90 Proof)"` and Net Contents as `"750 mL"`. The form and CSV accept the
+  field exactly as it appears in the application; the same parser runs on BOTH sides and the
+  comparison is numeric (ABV, proof, mL). Supersedes "abv (float)" in PLAN.md.
+
+Metrics that come from Dave's phone-system story
+- **False-alarm rate is a first-class metric.** The 2008 phone system created more work. If we
+  flag too many clean labels as "Needs review", agents will ignore the tool like they ignored the
+  vendor. The eval reports false-alarm rate on the clean artwork tier and thresholds are tuned to
+  keep it near zero there. Say this plainly in APPROACH.md.
+- **Confidence is bucketed, not quoted.** OCR confidence is not a probability. UI shows High /
+  Medium / Low with a one-line meaning. No raw decimals for Sarah's mother.
+
+Reviewer's first minute
+- **Three one-click samples, not one.** "Clean artwork" (Old Tom front + back, all pass),
+  "Phone photo" (rotated, glare, still reads), "Problem label" (ABV 40 vs 45, title-case
+  warning, all-bold warning). The whole product demonstrates itself in three clicks. Include one
+  wine and one beer sample in the batch demo set so beverage-type rules are visible.
+- **"What this tool does not do" box in the UI**, not only in docs: does not approve or reject,
+  does not check permits or formulas, does not store anything, reads the label and compares.
+  Sets Dave's expectations before he clicks anything.
+- **Actionable "unreadable" diagnosis.** When quality is too low, name the reason from cheap
+  measurements (blur via Laplacian variance, low contrast via histogram spread, text too small
+  via box heights) so the message matches the agent's existing action: "Request a clearer image:
+  text is too small to read reliably."
+
+Proof, not claims
+- **No-egress test.** `tests/test_no_egress.py` monkeypatches `socket.connect` to raise and runs
+  the full verify pipeline. Green means the core path makes no network calls. README also shows
+  `docker run --network none ...` as a runnable demonstration of the firewall claim.
+- **Sizing math from their own numbers.** 150,000 applications/yr is ~600 per working day. At a
+  measured ~2 labels/s, one 2-vCPU container clears a full year in about 21 hours of compute;
+  the peak-season 300-label dump takes under 3 minutes. The demo runs on a ~$10/month
+  container (a quiet counterpoint to the $4.2M rebuild quote). All figures replaced by measured
+  values before submission.
+- **Client sizes its pool from the server.** `/api/health` advertises `max_concurrency`; the
+  batch client sets its in-flight pool to that value (capped at 4). Bulk `/api/compare` is sent
+  in chunks of 100 rows to keep request bodies small.
+
+Data and privacy details
+- **CSV template excludes applicant PII by design.** Columns: `application_id` (free text, the
+  agent's reference, e.g. a TTB ID), `beverage_type`, `brand_name`, `class_type`,
+  `alcohol_content`, `net_contents`, `bottler` (optional), `country_of_origin` (optional),
+  `images` (optional filenames). No permit numbers, no contact names, no addresses of people.
+- **Per-row note field** in triage, included in the decisions export, so an agent can record
+  why they overrode the recommendation. Session-only like everything else.
+- **Consistent error envelope** `{code, message, hint, request_id}`; UI shows message + hint.
+- Behind a proxy, client identity for the in-flight cap comes only from the proxy's own header
+  (`Fly-Client-IP` on Fly), never from arbitrary `X-Forwarded-For`.
+
+Writing for two audiences
+- README has a plain-English "How the AI reads a label" for Sarah and a technical section for
+  Marcus. Plain-language rules (Plain Writing Act) for all UI text: "Needs review", never
+  "Ambiguous match". Cite TTB's Beverage Alcohol Manuals (BAM) alongside the CFR parts.
+
+Repository presentation (the repo IS the interview)
+- Meaningful commit history: small, conventional, descriptive commits. No "wip". Reviewers read
+  history.
+- Repo private during the build, flipped to public at submission.
+- Hostname/repo name `ttb-label-check` is descriptive use of the acronym, like any
+  "irs-calculator" project, and the banner says unofficial. Acceptable; flagged for awareness.
+- **DECISION FOR DANIEL: AI-assistance disclosure.** The brief does not restrict AI tools.
+  Commits I create carry a "Co-Authored-By: Claude" trailer by policy, which discloses AI
+  assistance in the public history. Options: (a) keep the trailer and add a confident one-line
+  disclosure in the README ("built with an AI pair programmer; the requirements analysis,
+  architecture and every decision here are mine, and I can defend any line"), which for an AI
+  engineering role reads as fluency, not weakness; (b) Daniel runs the commit commands himself
+  so the history is his own work product with no trailer, and the README says whatever he
+  chooses. Either is honest. Not my call.
+
+Schedule tweaks
+- Semaphores, per-client cap, 429 path and error envelope move to Day 1 (small, foundational).
+- CSV parsing moves fully to Day 3. PDF input and keyboard triage sit at the bottom of the cut
+  order, below AI-generated photo labels.
+
+## 12. Fourth pass: the role is "engineering through Claude and Codex" (2026-09-03)
+
+Daniel confirmed the position is AI-directed engineering and the panel knows Claude is building
+this under his direction. So the evaluation is really: how well does he direct, verify, and
+correct an AI engineer. The repo must show the direction, not hide it.
+
+Show the direction (new repo artifacts)
+- **`docs/DECISIONS.md`**: dated decision log, ADR style. Includes the two places the AI's first
+  proposal was wrong and got corrected (one image per application; photos vs artwork). Catching
+  those is the skill being hired.
+- **`docs/PROCESS.md`**: half a page on how the build was run: brief -> requirements trace ->
+  architecture -> four adversarial review passes -> spike with measurements -> build in
+  verified increments -> eval + load test -> cross-model review -> freeze. Links to the docs.
+- **`AGENTS.md` and `CLAUDE.md`** at the repo root: conventions for continued AI-driven
+  development (layout, commands, testing rules, no-egress rule, no-storage rule, style). A
+  codebase set up for agents is a direct signal for this role. One file, the other points to it.
+- **Cross-model review on Day 5** (if Daniel has Codex access): Codex reviews the Claude-built
+  code; findings and resolutions recorded in `docs/REVIEWS.md` with commit references.
+- **"Tools used" (a literal deliverable line)** lists Claude Code as the engineering agent
+  alongside the libraries, plainly. Disclosure question is settled: keep the commit trailer.
+- README gets a short "From the author" section in Daniel's own voice: what he asked for,
+  where he overruled the plan, what he would do next. He writes it; I edit.
+- Task runner (`Makefile` or `tasks.py`): `make run test eval loadtest labels docker`. Humans
+  and agents both benefit; it is also documentation.
+
+Hosting decision changed: deploy to two hosts
+- **Primary: Azure Container Apps.** New reason beyond "their cloud": if a reviewer tests from a
+  government network, `*.azurecontainerapps.io` has far better odds of being allowlisted than
+  `*.fly.dev`. **Mirror: Fly.io.** Stateless container, so the second deploy is a config file.
+  Both URLs in the README; the form gets the primary. Redundancy against an outage or a blocked
+  domain during the review window for about $10 extra.
+- **Local run is the safety net** if both are unreachable from their network: one `docker run`
+  line at the top of the README, tested on a clean machine.
+- **Freeze after submission.** Tag `v1.0-submitted`; footer shows the SHA so reviewers can match
+  the running build to the tag. No deploys after submitting. Health monitor pings both URLs
+  every 5 minutes and alerts Daniel. Keep both hosts up for at least 4 weeks (ask the nephew how
+  long the call took to come).
+
+Domain depth (verify each on eCFR before coding)
+- **Standards of fill.** Spirits (27 CFR 5.203) and wine (4.72) may only be sold in authorized
+  container sizes; malt beverages have none. TTB expanded both lists in 2020 and again recently.
+  Check parsed net contents against the list for the beverage type; report "Non-standard
+  container size, verify" (never "fail", because the list changes). Real agents check this.
+- Confusable folding is contextual: in numeric context map letters to digits (O->0, S->5,
+  I/l->1, B->8); in alphabetic context the reverse. Never fold globally.
+- Caps check applies to the letters of "GOVERNMENT WARNING"; the colon is part of the required
+  text (16.21) and is checked as presence, not case.
+- Beverage type inferred from class/type text when not supplied (whiskey/vodka/gin/rum/tequila/
+  brandy -> spirits; wine/cider -> wine; beer/ale/lager/stout/malt -> malt beverage), shown as
+  "inferred" and editable.
+- Out of scope and said so in LIMITS.md: validity of the class/type designation itself, age
+  statements, name-and-address phrasing rules, ABV statement wording rules, lab tolerances.
+
+UX additions with outsized trust value
+- **Evidence crops.** Next to every check, a small crop of the label pixels where the value was
+  found, cut client-side from the image using the returned box. The agent compares expected
+  text to actual pixels without hunting on the image. This is the feature that makes Dave
+  trust it in five seconds.
+- Click-to-zoom on the label image with highlights preserved (labels are dense; magnification is
+  basic legibility, not a luxury).
+- Paste from clipboard (Ctrl+V) and a mobile camera `capture` attribute: two one-line features
+  that match how agents and applicants actually get images.
+- Undo on triage decisions. Duplicate-image detection in batch (SHA-256 in the browser via
+  SubtleCrypto): "duplicate of #12".
+- Batch summary shows per-label time average and p95, tying Sarah's 5-second rule to the batch
+  view, not just the single view.
+- Accessibility statement in the footer (conformance target WCAG 2.1 AA / Section 508, known
+  issues, how to report). Federal sites carry one; ours should too.
+
+Code-quality signals reviewers grep for
+- `pyproject.toml` as the single config source (ruff, pytest, mypy). Type hints everywhere;
+  mypy in CI. JSON structured logging. Settings validated at startup. Engine pool injected via
+  FastAPI dependencies, no module-level mutable state elsewhere.
+- Frontend: JS modules with JSDoc types; pure logic (promise pool, CSV escaping, normalizers
+  mirrored for client-side pre-checks) unit-tested with Node's built-in test runner in CI.
+- `THIRD_PARTY_NOTICES.md`: RapidOCR and PP-OCR models (Apache-2.0), ONNX Runtime (MIT), OpenCV
+  (Apache-2.0), Pillow (MIT-CMU), rapidfuzz (MIT), FastAPI (MIT), USWDS (public domain; Public
+  Sans OFL), pypdfium2/PDFium (Apache/BSD), Swagger UI (Apache-2.0). Bundled OFL fonts for the
+  label generator with their license files. Procurement people read this file.
+- `.dockerignore`, `HEALTHCHECK`, image size reported in README, `docker compose up` for local.
+
+Definition of Done for v1 (protects the core against this growing list)
+1. One application with N images: five field checks + warning sub-checks, evidence crops,
+   highlights, timing, three one-click samples.
+2. Batch: streaming table, CSV or fuzzy pairing, triage with notes, export, summary.
+3. Limits: 429 path, size and type guards, deadline; published load-test numbers.
+4. Proof: unit + integration + no-egress tests green in CI; eval table in README.
+5. Docs: README (60-second try), APPROACH (brief), REQUIREMENTS_TRACE, LIMITS, SECURITY,
+   DECISIONS, PROCESS, AGENTS/CLAUDE, THIRD_PARTY_NOTICES.
+6. Deployed on two hosts, SHA in footer, monitor running, tagged and frozen.
+Everything not in this list is backlog, ordered by the cut list, and only starts after all six
+are green.
+
+Risk register
+| Risk | Mitigation |
+|---|---|
+| OCR weak on decorative brand fonts | Measure Day 0. If needed, ensemble: RapidOCR + Tesseract vote on brand line only, within budget. |
+| Azure signup friction | Fly first if Azure stalls more than 1 hour; Azure retried Day 4. Hetzner as last resort. |
+| Windows dev vs Linux prod drift | Remote Docker build and deploy by Day 2, not Day 3. Fixtures committed as PNG so tests do not depend on local fonts. |
+| eCFR verification changes a rule | Verify 16.21/16.22/5.203/4.72 on Day 1 before the warning and fill code is written. |
+| Scope creep from these passes | Definition of Done above; cut list; daily "does the deployed URL still work" check. |
+| Reviewer network blocks both hosts | One-line local `docker run` at the top of the README. |
+
+## 13. Fifth pass: implementation traps and federal-reviewer signals (2026-09-03)
+
+Traps that would produce a visible bug
+- **Coordinate mapping.** Preprocessing variants (downscale, deskew rotation, zoom crop, PDF
+  render) change the pixel space. Every variant carries an affine transform back to the
+  ORIGINAL image; OCR boxes are mapped back before they leave the server. Otherwise highlights
+  and evidence crops land in the wrong place exactly when the harder variant wins, which is the
+  moment a reviewer is watching most closely. Unit-tested with synthetic transforms.
+- **Dark labels.** Many spirits labels are black or dark with light or gold text. Add an
+  inverted-polarity variant to the preprocessing set (tried when confidence is low). The contrast
+  heuristic must be polarity-agnostic.
+- **Hyphenated line breaks** in the warning ("preg-" / "nancy"): join a trailing hyphen with a
+  lowercase continuation before comparison. Missing-space anchors ("GOVERNMENTWARNING:") are
+  matched by fuzzy anchor detection on normalized text.
+- **Uncertain heuristics never say "Fail".** Caps, bold, size, contrast, standards of fill,
+  beverage-type inference: any heuristic finding is "Needs review" with the evidence crop and
+  the rule cited. Only clear text and numeric mismatches are "Mismatch". Title-case detection
+  says "Appears to be title case (rejection criterion, 27 CFR 16.22). Confirm." The agent
+  resolves it in one glance at the crop. This is the rule that keeps the false-alarm rate low
+  and Dave's trust high.
+- **Client backoff on 429** is global, not per request: shrink the pool by one on a 429, grow it
+  back slowly. Prevents a 429 storm from a 1000-item batch. Per-item retry with jitter, max 3,
+  then a visible "Retry" button on the row.
+- **CSV from Excel**: handle UTF-8 BOM, fall back to cp1252, sniff `;` delimiters, accept
+  decimal commas in numbers ("0,75 L"). Net contents parser also accepts pint/quart/gallon.
+- **Readiness gating.** Models load at startup; the health endpoint reports `ready: false` until
+  warm and the platform's startup probe waits for it. No cold requests hit a half-loaded engine.
+  Azure Container Apps needs `minReplicas: 1` (default is 0 and would reintroduce cold starts).
+- **Versioned API** (`/api/v1/...`) and every response carries `engine`, `model_version`,
+  `request_id`. Auditability for free.
+
+Federal-reviewer signals (cheap, on theme)
+- **SBOM in CI** (CycloneDX via `cyclonedx-bom`) published as a build artifact, plus `pip-audit`.
+  Executive Order 14028 made SBOMs a federal procurement expectation; one CI step earns the line.
+- **Hash-pinned lockfile** (`pip-compile --generate-hashes`) used by the Dockerfile with
+  `--require-hashes`; plain `requirements.txt` kept for humans. Day 4, optional.
+- **Access gate brute-force protection**: constant-time compare, 5 attempts per minute per client.
+- **Forced-colors and 200% zoom.** Windows High Contrast Mode strips colors; status icons are
+  inline SVG using `currentColor` so they survive. Layout tested at 200% browser zoom (WCAG 1.4.4).
+  Evidence crops carry alt text naming the value found.
+- **Server-rendered report page** (`/report`, Jinja2): doubles as the print view, the no-JavaScript
+  fallback for the single-label path (progressive enhancement, the 18F/USWDS norm), and a
+  shareable summary. One template, three uses. Optional, mid cut list.
+- **Sample labels are fictional and say so.** Generated brands only; a note in `samples/README`.
+  Vary fonts (serif, sans, condensed, one arched brand) so the eval is not tuned to easy inputs;
+  include one arched sample and report it honestly as the known weak case.
+- **Snapshot tests** on the three bundled samples: full JSON result frozen, so any regression in
+  extraction or verdict fails CI.
+
+Reviewer navigation
+- README gets an **"Evaluation criteria -> where to look"** table: the six criteria from the brief,
+  each pointing to the file, test, or screen that evidences it. Reviewers with a scoring sheet
+  will thank us.
+- App footer links to the repo; README links to both deployments. OpenAPI schemas carry
+  `examples` so "Try it out" works with the bundled sample.
+- **Submission note drafted Day 5**: both URLs, the 60-second path, one sentence on AI-directed
+  build. Ready to paste if the form has a notes box.
+- **GitHub profile tidy on Day 5**: pinned repos (this one, StoreXray), repo "About" text and
+  topics. Reviewers click the profile. RPWalk stays private.
+
+Process
+- **Codex design review now, not only code review later.** Daniel is reinstalling Codex. Have it
+  review BRIEF.md + ARCHITECTURE.md independently before the spike: "what did this plan miss,
+  what is over-scoped, what would you cut." Record findings and dispositions in
+  `docs/REVIEWS.md` as review #1; the Day 5 code review becomes review #2. A design review by a
+  second model, before a line of code, is the single most on-theme process artifact for a role
+  defined as engineering through Claude and Codex.
+- **Talking points sheet for Daniel** (outside the repo): the architecture at whiteboard level,
+  the five decisions he would defend, the three limitations he would name first.
+
+## 14. Source intelligence: the assignment repo and the form (2026-09-03)
+
+The form (forms.osi.office365.us) has five fields: Name, Phone, Email, repository URL, deployed
+URL. Plain text boxes, one Submit. No notes box, so everything we want to say must be in the
+README and the app. Submit once, when final.
+
+The assignment lives at github.com/treasurytakehome-rgb/instructions (public). Pulled with `gh`:
+- README is byte-for-byte the text Daniel pasted. A Word version was uploaded and deleted the
+  same day; it is still in history and is the same text with no images. Nothing hidden.
+- Created 2026-06-09, unchanged since. **51 forks, 22 stars.** The same test has gone to many
+  candidates for three months. Reviewers have a baseline and a rubric; "adequate" is well known
+  to them. Differentiation is worth more than we assumed.
+- **The authors bolded exactly five phrases in the body.** Formatting the paste had lost:
+  1. "**If we can't get results back in about 5 seconds, nobody's going to use it.**" (whole sentence)
+  2. "**my mother could figure out**"
+  3. "**handle batch uploads**"
+  4. warning must be "**exact**"
+  5. "**Government Health Warning Statement**" in the required-elements list
+  Italics mark context only (interview settings, the AI-image-generation tip, the "questions"
+  line). So the authors' own priority order is: speed, simplicity, batch, exact warning.
+
+Consequences
+- README leads with those four, in that order, each with its evidence (measured p95, the
+  three-click demo, the 1000-image batch numbers, the warning golden tests). The requirements
+  trace marks them "emphasized by the authors".
+- Each becomes an executable acceptance test, not just a feature: (1) CI asserts p95 under
+  5 s on the sample set and the README reports the deployed p95; (2) a written "mother test"
+  usability checklist in docs and a first-run flow with zero reading required; (3) the batch
+  load test to 1000 with published numbers; (4) golden tests for the warning: exact pass,
+  one-word change fails, title-case anchor flagged, all-bold flagged, missing "(2)" fails.
+- BRIEF.md replaced with the verbatim README so future sessions see the emphasis.
+- Forks are public. Reading other candidates' work is possible but adds nothing we would use
+  and could only invite imitation; not doing it. Daniel's call if he disagrees.
+
+===== FILE: PLAN.md =====
+# Plan: TTB Label Verification Prototype
+_Drafted 2026-09-03. Deadline Thu 2026-09-10. Target submission Wed 2026-09-09._
+
+## 1. What they are really grading
+
+The requirements list is short. The grading rubric is hidden in the interview quotes.
+Every quote below maps to a feature or a documented decision. "Attention to
+requirements" is an explicit criterion, so the README will carry this table too.
+
+| Who said it | The hidden requirement | What we build |
+|---|---|---|
+| Sarah: vendor pilot took 30-40 s, "about 5 seconds or nobody uses it" | Hard latency budget | Local OCR, image downscale, parallel preprocessing variants. Show elapsed time on every result. |
+| Sarah: "my mother could figure it out", half the team over 50, Dave prints emails | Extreme simplicity + accessibility | One screen. Big drop zone, big fields, one button. Status shown with icon + word + color, never color alone. Large type, high contrast, keyboard and screen-reader friendly. |
+| Sarah: importers dump 200-300 applications at once; Janet in Seattle has asked for years | Batch mode | Multi-image upload + CSV of application data. Progress bar, results table, filter to "needs attention", CSV export. |
+| Dave: STONE'S THROW vs Stone's Throw, "you need judgment" | Normalization + fuzzy match + human in the loop | Case/punctuation/whitespace-insensitive compare. Three states: Match, Needs review, Mismatch. Always show what the label actually says. Tool advises, agent decides. |
+| Dave: "don't make my life harder" | Zero-friction failure modes | Clear messages: "Could not read this image, request a clearer photo." Never a stack trace, never a spinner with no end. |
+| Jenny: warning must be word-for-word, GOVERNMENT WARNING: in all caps AND bold | Exact-text check + caps check + bold check | Compare against 27 CFR 16.21 text. Caps check on the anchor. Bold estimated by stroke-width ratio vs. body text (documented heuristic, reports "verify" when unsure). |
+| Jenny: angled photos, glare, bad lighting | Robustness | Deskew, contrast normalization, glare suppression. Try 2-3 variants, keep the highest-confidence read. Report confidence honestly. |
+| Marcus: firewall blocks outbound to ML endpoints | No cloud dependency in the core path | OCR runs in-process. No CDN fonts or scripts. Optional cloud "second opinion" provider behind a flag, OFF by default, documented with an Azure Government path. |
+| Marcus: on Azure, FedRAMP, .NET COLA, standalone PoC, no COLA integration | Scope discipline + deployment story | Standalone container. Document how it would sit next to COLA later. Mention Azure Container Apps / Azure Gov as the production path. |
+| Marcus: PII, retention, "don't store anything sensitive" | Stateless | Images processed in memory and discarded. No database, no uploads directory, no logging of label content. |
+| Brief: sample bourbon label, spirits/wine/beer differ | Field coverage | Core fields: brand, class/type, ABV, net contents, warning. Optional: bottler name/address, country of origin. Beverage-type selector adjusts which fields are required. |
+| Brief: "AI image generation tools work well" for test labels | Test corpus | Programmatic label generator (deterministic, exact warning text) plus a handful of AI-generated photo-realistic labels for the demo. |
+| Brief: "working core with clean code beats ambitious and incomplete" | Scope discipline | Core single-label flow finished and deployed by Day 3. Everything after is additive. |
+
+## 2. Architecture (recommended)
+
+**Stack: Python 3.12 + FastAPI backend, local OCR, vanilla HTML/CSS/JS frontend, one Docker container.**
+
+Why Python: it is Daniel's primary language (StoreXray), it is the expected language for an
+AI engineering role, and the OCR/image ecosystem is strongest there.
+
+Why one container with a static frontend: one URL, no build step, no CDN, works behind a
+strict firewall, trivially deployable anywhere including Azure.
+
+### OCR engine decision (spike on Day 0)
+- **Primary candidate: RapidOCR (ONNX Runtime port of PaddleOCR).** Pure pip install, ~15 MB
+  of models, strong on scene text (angles, decorative fonts, glare), returns text boxes with
+  confidence. Identical behavior on Windows dev and Linux container. Typical CPU time 0.5-2 s.
+- **Fallback: Tesseract 5 via pytesseract.** Battle-tested, but weaker on stylized brand
+  fonts and photos, and needs a system binary.
+- Decision rule: run both on the same 10 synthetic + 5 photo labels, compare accuracy and
+  wall time. Pick one. Keep an `OcrEngine` interface so the choice is a one-line swap and
+  so the optional cloud provider slots in cleanly.
+
+### Pipeline (per image)
+1. Validate upload (type, size cap ~10 MB, decode). Downscale longest side to ~1600 px.
+2. Preprocess variants: (a) as-is grayscale, (b) CLAHE contrast + denoise, (c) deskewed.
+   Run OCR on variants in a small thread pool; keep the read with the best mean confidence.
+   Budget guard: stop early if the first variant is already high-confidence.
+3. Field extraction from OCR lines:
+   - ABV: regex for `NN% Alc./Vol.`, `NN% ABV`, `ALC. NN% BY VOL.`, proof. Parse to float.
+     Cross-check proof = 2 x ABV when both present.
+   - Net contents: regex for mL / ml / L / cL / fl oz; normalize to mL.
+   - Government warning: find the `GOVERNMENT WARNING` anchor, gather following lines until
+     "health problems." Reassemble, compare to canonical text.
+   - Brand and class/type: fuzzy search of the application value against OCR lines and
+     line-pairs (brand names often wrap). Return the best-matching span and its score.
+4. Matching with three outcomes per field:
+   - **Match**: exact after normalization (NFKC, casefold, apostrophe/quote unification,
+     whitespace collapse, trailing punctuation strip). Note when only case differed.
+   - **Needs review**: fuzzy score above threshold (rapidfuzz, ~88-92) but not exact. Show a
+     word-level diff. Common cause is OCR noise, so we say that.
+   - **Mismatch** or **Not found**: below threshold or no candidate.
+5. Warning checks: present / exact wording / anchor all-caps / anchor bold (heuristic) /
+   relative size vs body text (flag if the warning is suspiciously tiny).
+6. Overall verdict: "All checks passed", "Needs agent review", "Issues found". Plus elapsed ms.
+7. Response includes OCR bounding boxes so the UI can highlight where each field was found
+   on the image. This is the single biggest trust feature for agents.
+
+### Bold heuristic (creative, explainable)
+Crop the anchor box and 2-3 body-text boxes, binarize (Otsu), compute median stroke width
+via distance transform on the ink skeleton, normalize by box height. If anchor ratio is
+>= ~1.25x the body ratio, report "Bold: yes". If in the gray zone, "Bold: verify manually".
+Documented as a heuristic with its failure modes (all-bold labels, extreme fonts).
+
+### Frontend
+- Single page. Left: image drop zone + preview with highlight overlays. Right: application
+  fields form (beverage type, brand, class/type, ABV, net contents, optional bottler and
+  origin). One big "Check label" button.
+- Results as a checklist, one row per field: icon + status word + expected + found + note.
+- "Batch" tab: drop many images + a CSV (template downloadable). Client orchestrates
+  requests with concurrency ~3, table fills in live, filter and export.
+- Accessibility: WCAG 2.1 AA targets, 18 px base type, 44 px hit targets, visible focus,
+  aria-live results, respects prefers-reduced-motion and prefers-contrast. No color-only
+  meaning. This is also where Daniel's lived low-vision experience shows without being said.
+- No external assets. System font stack. Everything self-hosted.
+
+### Backend API
+- `POST /api/verify` (multipart: image + JSON fields) -> result JSON.
+- `POST /api/extract` (image only) -> fields the OCR found, for the "I have no application
+  data yet" case and for batch without CSV.
+- `GET /api/health` -> engine name, version, warm status.
+- `GET /` static app. `GET /api/csv-template`.
+- Pydantic models throughout, structured errors, request size limits, timeouts.
+
+### Testing and CI
+- pytest unit tests: normalization, fuzzy matcher, ABV/net-contents parsers, warning
+  comparator, verdict logic. No OCR needed, fast.
+- Integration tests: synthetic labels rendered with Pillow (exact known ground truth),
+  plus degraded variants (rotate 7 deg, blur, glare gradient, low contrast). Assert field
+  accuracy thresholds and per-image time under budget.
+- GitHub Actions: lint (ruff), tests, Docker build on every push.
+
+### Deployment
+- Dockerfile (python:3.12-slim, non-root user, models baked in at build so first request
+  is warm). Health check. `PORT` env.
+- Host options (decision needed by Sun 9/7):
+  - **Fly.io** (recommended for reliability): `fly deploy --remote-only` builds in the cloud so
+    no local Docker is needed. `min_machines_running = 1` so reviewers never hit a cold
+    start. ~$5-7/month for a 1 GB machine. Needs an account + card.
+  - **Azure Container Apps**: thematically on-point (they are on Azure). New accounts get
+    $200 credit for 30 days. More setup steps and signup can be finicky.
+  - **Existing Hetzner VPS**: zero new accounts. Needs a hostname + TLS (Caddy or Cloudflare
+    Tunnel) and shares the box with StoreXray.
+- Whatever host: no cold starts, HTTPS, a memorable URL, uptime checked daily until review.
+
+### Optional (only if core is done and polished): cloud second opinion
+An `OcrEngine` implementation that sends the image to a vision LLM for a structured read,
+behind `SECOND_OPINION_PROVIDER` env, off by default, visible in the UI as a disabled toggle
+with the reason ("requires outbound access to an approved endpoint"). README notes Azure
+OpenAI in Azure Government as the FedRAMP-aligned path. Demonstrates awareness without
+violating Marcus's constraint.
+
+## 3. Repository layout
+```
+ttb-label-check/
+  app/
+    main.py            FastAPI app, routes, static mount
+    config.py          settings via env
+    models.py          Pydantic request/response schemas
+    ocr/
+      base.py          OcrEngine interface + OcrLine dataclass
+      rapid.py         RapidOCR implementation
+      tesseract.py     Tesseract implementation (if kept)
+    pipeline/
+      preprocess.py    resize, CLAHE, deskew, variants
+      extract.py       field extraction from OCR lines
+      normalize.py     text normalization
+      match.py         fuzzy matching + statuses
+      warning.py       government warning checks incl. bold heuristic
+      verdict.py       overall verdict
+    static/            index.html, app.css, app.js, batch.js
+  tests/
+    unit/  integration/  fixtures/
+  tools/
+    make_labels.py     synthetic label generator
+  samples/             demo labels + sample CSV
+  docs/
+    APPROACH.md        decisions, tools, assumptions, trade-offs, limitations
+    REQUIREMENTS_TRACE.md   stakeholder quote -> feature table
+  Dockerfile  fly.toml (or azure files)  requirements.txt  README.md  .github/workflows/ci.yml
+```
+
+## 4. Day-by-day
+
+| Day | Date | Goal | Done when |
+|---|---|---|---|
+| 0 | Thu 9/3 | Plan approved. Repo created. OCR spike: RapidOCR vs Tesseract on 15 labels for accuracy and speed. Synthetic label generator v1. | Engine chosen with numbers written down. |
+| 1 | Fri 9/4 | Core pipeline: preprocess -> OCR -> extract -> match -> verdict. Unit tests green. `POST /api/verify` works via curl. | Bourbon sample verifies end to end under 5 s locally. |
+| 2 | Sat 9/5 | Single-label UI with highlights, error handling, accessibility pass 1. Dockerfile builds. | A stranger can use it without instructions. |
+| 3 | Sun 9/6 | Deploy v1 to the chosen host. Batch mode (images + CSV, progress, export). | Public URL live, batch of 20 runs cleanly. |
+| 4 | Mon 9/7 | Warning bold + size heuristics. Image robustness (deskew, glare). Degraded-image integration tests. CI. | Degraded variants pass thresholds; timing still under budget. |
+| 5 | Tue 9/8 | Docs: README, APPROACH, REQUIREMENTS_TRACE, screenshots, sample corpus. Fresh-eyes QA in a clean browser and on a phone. Optional cloud toggle only if everything else is done. | Someone reading only the README could run and judge it. |
+| 6 | Wed 9/9 | Buffer. Final uptime check. Submit via the Forms link. Interview talking-points sheet. | Submitted. |
+| 7 | Thu 9/10 | Hard deadline. Nothing planned. | |
+
+## 5. Rules for the build
+- Core flow first, always deployable. No feature starts until the previous one is finished,
+  tested, and documented.
+- Every design choice gets one sentence in APPROACH.md the day it is made, not at the end.
+- Daniel must be able to explain every file. End of each day: a 5-minute walkthrough.
+- Truth in docs: known limitations stated plainly. Reviewers respect that more than gloss.
+- No em-dashes in the English docs (house rule from the resume work).
+- Never store or log label images or application data.
+
+## 6. Open items
+- Hosting account decision by Sun 9/7. Ranking: Fly.io (reliability, US region, clean URL),
+  then Azure Container Apps (bonus: their cloud; note Azure Government as production path),
+  then existing Hetzner VPS (fallback: shares the box with StoreXray, needs domain + TLS).
+  Not required to be Azure. Not required to be .NET: the brief allows any stack, and a REST
+  API is how a .NET COLA would consume this later anyway.
+- Repo name and visibility (public under danielrcooley, suggested `ttb-label-check`).
+- What fields the submission form asks for (repo URL, deployed URL, notes?) so the final
+  docs answer them directly.
+- Confirm the canonical warning text against ttb.gov / 27 CFR 16.21 before coding the check.
+- Nephew data point: he did this take-home, deployed on Vercel, received no feedback, and was
+  hired on a phone call afterward. Implication: there may be NO technical follow-up. The repo
+  and the URL are the whole interview. Therefore: README must explain every decision, the
+  deployed app must work on the first click, sample labels must be loadable inside the UI
+  with one click, and the README gets a screenshot walkthrough. Fresh-browser QA on Tue is a
+  hard gate, not a nice-to-have.
+
+## 7. Additions agreed 2026-09-03 (after discussion)
+
+1. **Real access gate, off in the demo.** `ACCESS_CODE` env var. When set, a USWDS-styled
+   sign-in page issues a signed cookie; when unset, the app is open and the header shows
+   "Demo mode: sign-in disabled. No data is stored." Docs state the production path
+   (Entra ID SSO with PIV/CAC, since Treasury is on Azure) and that we chose not to fake it.
+   Plus the free hardening: HTTPS, security headers, file-signature validation of uploads,
+   size limits, rate limiting, non-root container, pinned deps + `pip-audit` in CI.
+   Not a fake login page.
+2. **Out-of-order batch pairing.** Images and application rows may arrive unmatched.
+   OCR every image, score every image against every row (brand, ABV, net contents), solve
+   the assignment (greedy by score, Hungarian if cheap), and show pairing confidence.
+   Unpaired items are listed plainly for the agent.
+3. **Triage workflow, human decides.** The tool recommends: "Ready for approval",
+   "Needs review", "Issues found". The agent confirms per row with one click (Approve /
+   Reject / Flag), problem labels sort to the top with evidence, and the session exports a
+   decisions CSV. Nothing is stored server-side. The tool never approves on its own.
+   Rationale in docs: Dave's "you need judgment" + OMB guidance requiring human oversight
+   for rights-impacting government AI.
+4. **U.S. Web Design System (USWDS) look and feel.** Self-hosted CSS and fonts (Public Sans),
+   no CDN. Section 508 compliant components. A "PROTOTYPE: not an official U.S. Government
+   system" banner in place of the official gov banner. **No Treasury or TTB seals** (31 U.S.C.
+   333 restricts use of Treasury names and symbols; a public prototype URL should not carry
+   them). Explain both choices in one line each in the README.
+5. **LLM second opinion stays optional and off by default.** The core path is in-process
+   neural OCR (text detection + recognition models via ONNX Runtime), which is honestly
+   "AI" and passes the firewall and 5-second constraints.
+
+Schedule impact: pairing and triage land on Day 3-4 with batch mode; USWDS replaces the
+hand-rolled CSS on Day 2 (net time saved); access gate is ~1 hour on Day 4.
+</stdin>
+codex
+I’ll validate the cited labeling provisions against current eCFR text, then return only the seven-part Markdown review.
+web search: 
+web search: site:ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16 16.21 16.22 health warning statement ...
+web search: 
+web search: https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16/section-16.21
+web search: 
+web search: site:ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16/section-16.21 "GOVERNMENT WARNING" ...
+web search: 
+web search: 27 CFR 16.21 exact health warning statement ...
+web search: 
+web search: 27 CFR 16.21 "According to the Surgeon General" exact text continuous paragraph ...
+web search: 
+web search: 27 CFR 16.20 applicability alcoholic beverage 0.5 percent intended for human consumption ...
+codex
+## 1. Missed requirements
+
+1. “**If we can't get results back in about 5 seconds, nobody's going to use it.**” Sections 3 and 14 measure throughput, but §3 permits a 6-second soft deadline and §12 does not require deployed, end-to-end p95 under five seconds. Test the common two-image application through the UI/API, including upload and preprocessing.
+2. “**my mother could figure out**” is addressed with accessibility features, not demonstrated simplicity. Sections 7, 10, and 12 add two screens, pairing confidence, filters, shortcuts, evidence controls, and many statuses. Require an observed, unprompted usability test with older/nontechnical users and record completion time and errors.
+3. “**handle batch uploads**” is addressed strongly in §§2–3, 7, and 12. Preserve streaming progress, per-file failures, cancel, and export; the speculative fuzzy pairing is not required by the brief.
+4. The warning must be “**exact**.” Section 5’s “OCR-tolerant similarity” is too permissive unless every textual or punctuation deviation remains a mismatch or review—not a pass. Use a warning-specific comparator preserving the colon, `(1)`, `(2)`, commas, and periods.
+5. The “**Government Health Warning Statement**” is covered, including multiple label images. However, §12 must explicitly require golden tests for exact text, title-case heading, missing punctuation, missing paragraph `(2)`, missing anchor bold, and an all-bold warning.
+6. The brief lists “Name and address of bottler/producer” and “Country of origin for imports.” Sections 5, 11, and 12 reduce these to optional CSV fields or declare phrasing rules out of scope. At minimum, compare supplied application values and report missing/not-found; make origin conditional on imported products.
+7. “README with setup and run instructions” is buried inside a nine-document documentation program in §12. DoD should explicitly require that a clean reviewer can run the app from the README alone.
+8. “A working core application with clean code is preferred over ambitious but incomplete features.” Sections 10–13 violate that instruction through two deployments, nine documents, standards-of-fill logic, PDF support, authentication, an SBOM, keyboard triage, duplicate detection, print reports, and extensive procurement signaling.
+
+## 2. Wrong calls
+
+1. Reverse §12’s two-host deployment. Ship one reliable host, preferably Azure Container Apps, with a tested local Docker fallback; retain Fly only as an emergency deployment option.
+2. Reverse §§0 and 10’s automatic fuzzy many-to-one pairing as the default. Back labels often lack brand, ABV, and net contents, so they can confidently attach to the wrong application. Default to the explicit `images` column; make fuzzy suggestions reviewable and manually reassignable.
+3. Replace §3’s “up to 1000 compare calls” with one chunked batch endpoint. Section 11 later mentions bulk chunks of 100, but §1 and the repository layout define no bulk contract.
+4. Replace §3’s two independent semaphores. “Interactive gets full CPU” plus “batch gets CPU minus one” can exceed total CPU. Use one shared capacity limiter with interactive priority/reservation.
+5. Reverse §4’s assumption that a soft deadline controls an OCR thread. Timeout cannot stop an ONNX call already running; timed-out work can retain capacity and trigger a collapse. Limit passes cooperatively and use a killable process only if hard cancellation proves necessary.
+6. Reverse §5’s relative size check against brand text. Brand height has no regulatory relationship to warning type size. For photos, report “physical size not verifiable”; for PDFs or artwork with trustworthy dimensions, calculate actual size.
+7. Cut §11’s PDF/GIF expansion unless representative inputs prove it necessary. PDFium adds native code, page semantics, image-size amplification, and coordinate/security work to a six-day prototype.
+8. Reverse §6’s claim that “No persistence” is proved by a read-only filesystem. `/tmp` is writable, and Starlette multipart uploads may spool there. Either implement bounded streaming or accurately disclose ephemeral temporary-file use.
+9. Agree with §§1 and 10–12 on local deterministic OCR, baked models, no core LLM, traceable findings, and a human decision.
+
+## 3. Over-scope
+
+1. Cut first: §13 GitHub-profile cleanup, submission-note drafting, talking-points material, branding slot, keyboard shortcuts, paste/camera input, duplicate detection, server-rendered report, and print view. None appears in §12’s DoD.
+2. Cut advanced photo recovery from §§10–11: glare handling, four-way rotation, zoom re-OCR, and AI-generated photo labels. Keep one degraded-photo test because Jenny explicitly calls photos “maybe out of scope.”
+3. Reduce §12 DoD #6 from two hosts plus monitoring to one deployed host, one tested Docker command, SHA/version display, and a final availability check.
+4. Cut standards-of-fill validation and beverage-type inference from §12’s core. They exceed the brief’s comparison task and create regulatory false-positive risk.
+5. Reduce §12 DoD #2 to explicit filename/CSV pairing, streaming results, triage, and export. Add fuzzy pairing only after the 300-item explicit path is reliable.
+6. Cut the access gate, SBOM, hash-pinned lockfile, Swagger UI vendoring, and exhaustive procurement hardening before cutting core tests, error handling, or accessibility basics.
+7. Reduce §12 DoD #5 to README, APPROACH/DECISIONS, REQUIREMENTS_TRACE, and LIMITS/SECURITY. Fold PROCESS, agent instructions, and notices into those files where practical.
+8. If still late, cut evidence crops from §12 DoD #1 but retain click-to-highlight. Do not cut exact-warning tests, the batch path, end-to-end p95 measurement, the eval, no-egress proof, or the single deployment.
+
+## 4. Technical risks the plan underestimates
+
+1. Decorative OCR: confidence is not field accuracy, and expected-value fuzzy search can conceal bad OCR. The Day-0 bake-off needs curved, condensed, outlined, gold-on-black, low-contrast, and mixed-case brands; report exact field recall, false matches, and latency—not mean OCR confidence.
+2. Python wheels: ARCHITECTURE inherits Python 3.12 from PLAN; keep it. Enforce `requires-python ==3.12.*`, build Linux/amd64 in CI, and lock RapidOCR, ONNX Runtime, OpenCV, Pillow, and PDFium from that environment. Do not let a Windows Python 3.13 workstation define the lock.
+3. ORT concurrency: `intra_op_num_threads=1` and `OMP_NUM_THREADS=1` may not disable all inter-op/provider pools. Verify actual process thread count and throughput at concurrency 1/2/3; a semaphore limits requests, not internal ORT threads.
+4. Engine memory: one complete RapidOCR engine per worker may duplicate three model sessions. Measure resident memory after warm-up and under two simultaneous images before asserting that 1 GB works.
+5. Coordinate mapping: preserve quadrilaterals, not only axis-aligned boxes; compose EXIF mirroring, rotation, crop, resize, deskew, and PDF-page transforms. Return normalized coordinates in one canonical oriented-image space and test all eight EXIF orientations plus CSS `object-fit`.
+6. Client-side evidence crops may disagree with server orientation because browsers decode EXIF differently. Generate the displayed preview through the same canonical orientation or return a canonical preview asset.
+7. USWDS without a build step is viable only by vendoring compiled `dist` CSS, JS, fonts, and images with their relative paths intact. Test sprite references, font URLs, CSP behavior, component JavaScript, and asset licensing; do not copy SCSS expecting it to work directly.
+8. Azure Container Apps: explicitly configure external ingress, `targetPort`, CPU/memory pair, `minReplicas: 1`, startup/readiness/liveness probes, model-startup allowance, registry access, secrets, and revision traffic. Verify the configured cost instead of repeating the “~$10” estimate.
+9. The §3 six-second deadline is per image, while Sarah’s expectation is results per application. A normal front/back application may run two OCR jobs serially or contend with batch work. Publish application-level p50/p95 under concurrent load.
+10. Multipart limits are easy to apply after buffering. Enforce aggregate and per-file caps while streaming; multi-image `/verify` must not admit N × 10 MB unchecked.
+11. Browser batch “resume is trivial” is overstated. It works only while the tab and file objects survive. A refresh loses extraction, pairing, notes, and decisions; state this plainly and test unload/export behavior.
+12. Pairing is both ambiguous and potentially \(N \times M\). A warning-only back image may have no useful match signal. Require explicit/manual pairing before treating a grouped application as ready.
+13. PDF rendering multiplies input size and exposes native parsing code. If retained, cap pages, rendered pixels, time, and total output independently of the uploaded-byte limit.
+
+## 5. Reviewer's-eye check
+
+1. Correctness/completeness: points lost for omitting producer/address and import origin, accepting an inexact warning, or falsely flagging valid wine/beer. Points earned by beverage-specific golden fixtures, expected-versus-found evidence, and a zero-false-pass warning suite.
+2. Code quality/organization: points lost if the many endpoints, middleware, duplicated client/server normalization, and nine documents produce more framework than working logic. Points earned by a small dependency-injected pipeline, typed schemas, focused tests, and one readable request path.
+3. Appropriate technical choices: local OCR, one container, baked models, and no egress earn points. Two hosts, PDF support, automatic fuzzy pairing, and unmeasured thread assumptions look like poor scope control.
+4. UX/error handling: the three one-click samples, plain statuses, progressive batch table, and highlights earn points. Opaque auto-pairing, no obvious manual reassignment, excessive controls, or a result after five seconds lose them. Add an observed novice usability result, not a “mother test” checklist.
+5. Attention to requirements: a trace from all five bold phrases to executable acceptance tests earns heavily. The current §12 DoD weakens that by omitting a hard deployed p95 gate and conditional producer/origin checks.
+6. Creative problem-solving: evals, no-egress proof, evidence-to-pixels, and false-alarm measurement are strong differentiators. Publish an error analysis with representative failures and threshold rationale; otherwise the architecture reads as promises rather than engineering evidence.
+
+## 6. Domain check
+
+1. Encode the complete prescribed §16.21 text, including `GOVERNMENT WARNING:`, both numbered clauses, capitalization of “Surgeon General,” and both commas. TTB examples treat missing commas as corrections; do not run the generic punctuation-stripping normalizer over this check. Verify against [27 CFR §16.21](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16/section-16.21).
+2. Section 10 misattributes “separate and apart” to §16.22; it is in §16.21. Section 16.22 covers legibility, contrast, capitalization/bold, compression, characters per inch, type size, and label attachment.
+3. Section 10 is correct that only “GOVERNMENT WARNING” must be bold and the remainder may not be bold. The legal thresholds are 1 mm at ≤237 mL, 2 mm at >237 mL through 3 L, and 3 mm above 3 L, with corresponding 40/25/12 characters-per-inch maxima. Verify [27 CFR §16.22](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16/section-16.22).
+4. Part 16 applies to beverages containing at least 0.5% ABV and intended for human consumption. “Mandatory on all alcohol beverages” is acceptable brief shorthand but should not become an unconditional domain rule.
+5. Section 5’s wine rule needs precision: under Part 4, numerical ABV may be omitted for wine at 14% or less only when “table wine” or “light wine” supplies the designation; the practical COLA scope begins at 7%. Verify [27 CFR §4.36](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-4/subpart-D/section-4.36).
+6. “Malt beverages ABV optional federally” is incomplete. Under §§7.63 and 7.65 it becomes mandatory when alcohol derives from added nonbeverage flavors/ingredients, and state law can also require it. Verify [27 CFR §§7.63–7.65](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-7/subpart-E).
+7. Distilled spirits mandatory information includes name/address as well as brand, class/type, ABV, and net contents; some items have same-field-of-vision requirements. Section 12’s five-check DoD misses this. Verify [27 CFR §5.63](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-E/section-5.63).
+8. Standards-of-fill lists changed in January 2025. If retained, copy the current authorized lists and exceptions from [§5.203](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-K/section-5.203) and [§4.72](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-4/subpart-H/section-4.72), date the source, and test newly added sizes. Do not infer actual container capacity conclusively from OCR text.
+9. Malt beverages have no analogous federal fixed-size list, but net-content expression rules still apply. “No standards of fill” must not become “no net-contents rules.”
+10. Country-of-origin wording is not safely reducible to Parts 4, 5, and 7; customs marking rules may control. Keep it as application-versus-label comparison unless the relevant Title 19 provisions are also verified.
+
+## 7. Top five
+
+1. Replace §12 with a lean DoD: one host, concise docs, explicit batch pairing, and no PDF/standards-of-fill/procurement extras until the core is green.
+2. Make the exact-warning path truly exact and verify §§16.21–16.22, including punctuation, both clauses, anchor bold/caps, non-bold body, applicability, and measurable format limits.
+3. Add a hard acceptance gate for deployed end-to-end p95 under five seconds on a normal front/back application, including concurrent batch load.
+4. Include producer/name-address and conditional import-origin comparison, and correct the wine and malt-beverage requiredness rules.
+5. Fix the execution design before coding: one priority-aware OCR limiter, honest timeout semantics, bounded multipart handling, and a canonical tested coordinate system.
+tokens used
+82,143
+## 1. Missed requirements
+
+1. “**If we can't get results back in about 5 seconds, nobody's going to use it.**” Sections 3 and 14 measure throughput, but §3 permits a 6-second soft deadline and §12 does not require deployed, end-to-end p95 under five seconds. Test the common two-image application through the UI/API, including upload and preprocessing.
+2. “**my mother could figure out**” is addressed with accessibility features, not demonstrated simplicity. Sections 7, 10, and 12 add two screens, pairing confidence, filters, shortcuts, evidence controls, and many statuses. Require an observed, unprompted usability test with older/nontechnical users and record completion time and errors.
+3. “**handle batch uploads**” is addressed strongly in §§2–3, 7, and 12. Preserve streaming progress, per-file failures, cancel, and export; the speculative fuzzy pairing is not required by the brief.
+4. The warning must be “**exact**.” Section 5’s “OCR-tolerant similarity” is too permissive unless every textual or punctuation deviation remains a mismatch or review—not a pass. Use a warning-specific comparator preserving the colon, `(1)`, `(2)`, commas, and periods.
+5. The “**Government Health Warning Statement**” is covered, including multiple label images. However, §12 must explicitly require golden tests for exact text, title-case heading, missing punctuation, missing paragraph `(2)`, missing anchor bold, and an all-bold warning.
+6. The brief lists “Name and address of bottler/producer” and “Country of origin for imports.” Sections 5, 11, and 12 reduce these to optional CSV fields or declare phrasing rules out of scope. At minimum, compare supplied application values and report missing/not-found; make origin conditional on imported products.
+7. “README with setup and run instructions” is buried inside a nine-document documentation program in §12. DoD should explicitly require that a clean reviewer can run the app from the README alone.
+8. “A working core application with clean code is preferred over ambitious but incomplete features.” Sections 10–13 violate that instruction through two deployments, nine documents, standards-of-fill logic, PDF support, authentication, an SBOM, keyboard triage, duplicate detection, print reports, and extensive procurement signaling.
+
+## 2. Wrong calls
+
+1. Reverse §12’s two-host deployment. Ship one reliable host, preferably Azure Container Apps, with a tested local Docker fallback; retain Fly only as an emergency deployment option.
+2. Reverse §§0 and 10’s automatic fuzzy many-to-one pairing as the default. Back labels often lack brand, ABV, and net contents, so they can confidently attach to the wrong application. Default to the explicit `images` column; make fuzzy suggestions reviewable and manually reassignable.
+3. Replace §3’s “up to 1000 compare calls” with one chunked batch endpoint. Section 11 later mentions bulk chunks of 100, but §1 and the repository layout define no bulk contract.
+4. Replace §3’s two independent semaphores. “Interactive gets full CPU” plus “batch gets CPU minus one” can exceed total CPU. Use one shared capacity limiter with interactive priority/reservation.
+5. Reverse §4’s assumption that a soft deadline controls an OCR thread. Timeout cannot stop an ONNX call already running; timed-out work can retain capacity and trigger a collapse. Limit passes cooperatively and use a killable process only if hard cancellation proves necessary.
+6. Reverse §5’s relative size check against brand text. Brand height has no regulatory relationship to warning type size. For photos, report “physical size not verifiable”; for PDFs or artwork with trustworthy dimensions, calculate actual size.
+7. Cut §11’s PDF/GIF expansion unless representative inputs prove it necessary. PDFium adds native code, page semantics, image-size amplification, and coordinate/security work to a six-day prototype.
+8. Reverse §6’s claim that “No persistence” is proved by a read-only filesystem. `/tmp` is writable, and Starlette multipart uploads may spool there. Either implement bounded streaming or accurately disclose ephemeral temporary-file use.
+9. Agree with §§1 and 10–12 on local deterministic OCR, baked models, no core LLM, traceable findings, and a human decision.
+
+## 3. Over-scope
+
+1. Cut first: §13 GitHub-profile cleanup, submission-note drafting, talking-points material, branding slot, keyboard shortcuts, paste/camera input, duplicate detection, server-rendered report, and print view. None appears in §12’s DoD.
+2. Cut advanced photo recovery from §§10–11: glare handling, four-way rotation, zoom re-OCR, and AI-generated photo labels. Keep one degraded-photo test because Jenny explicitly calls photos “maybe out of scope.”
+3. Reduce §12 DoD #6 from two hosts plus monitoring to one deployed host, one tested Docker command, SHA/version display, and a final availability check.
+4. Cut standards-of-fill validation and beverage-type inference from §12’s core. They exceed the brief’s comparison task and create regulatory false-positive risk.
+5. Reduce §12 DoD #2 to explicit filename/CSV pairing, streaming results, triage, and export. Add fuzzy pairing only after the 300-item explicit path is reliable.
+6. Cut the access gate, SBOM, hash-pinned lockfile, Swagger UI vendoring, and exhaustive procurement hardening before cutting core tests, error handling, or accessibility basics.
+7. Reduce §12 DoD #5 to README, APPROACH/DECISIONS, REQUIREMENTS_TRACE, and LIMITS/SECURITY. Fold PROCESS, agent instructions, and notices into those files where practical.
+8. If still late, cut evidence crops from §12 DoD #1 but retain click-to-highlight. Do not cut exact-warning tests, the batch path, end-to-end p95 measurement, the eval, no-egress proof, or the single deployment.
+
+## 4. Technical risks the plan underestimates
+
+1. Decorative OCR: confidence is not field accuracy, and expected-value fuzzy search can conceal bad OCR. The Day-0 bake-off needs curved, condensed, outlined, gold-on-black, low-contrast, and mixed-case brands; report exact field recall, false matches, and latency—not mean OCR confidence.
+2. Python wheels: ARCHITECTURE inherits Python 3.12 from PLAN; keep it. Enforce `requires-python ==3.12.*`, build Linux/amd64 in CI, and lock RapidOCR, ONNX Runtime, OpenCV, Pillow, and PDFium from that environment. Do not let a Windows Python 3.13 workstation define the lock.
+3. ORT concurrency: `intra_op_num_threads=1` and `OMP_NUM_THREADS=1` may not disable all inter-op/provider pools. Verify actual process thread count and throughput at concurrency 1/2/3; a semaphore limits requests, not internal ORT threads.
+4. Engine memory: one complete RapidOCR engine per worker may duplicate three model sessions. Measure resident memory after warm-up and under two simultaneous images before asserting that 1 GB works.
+5. Coordinate mapping: preserve quadrilaterals, not only axis-aligned boxes; compose EXIF mirroring, rotation, crop, resize, deskew, and PDF-page transforms. Return normalized coordinates in one canonical oriented-image space and test all eight EXIF orientations plus CSS `object-fit`.
+6. Client-side evidence crops may disagree with server orientation because browsers decode EXIF differently. Generate the displayed preview through the same canonical orientation or return a canonical preview asset.
+7. USWDS without a build step is viable only by vendoring compiled `dist` CSS, JS, fonts, and images with their relative paths intact. Test sprite references, font URLs, CSP behavior, component JavaScript, and asset licensing; do not copy SCSS expecting it to work directly.
+8. Azure Container Apps: explicitly configure external ingress, `targetPort`, CPU/memory pair, `minReplicas: 1`, startup/readiness/liveness probes, model-startup allowance, registry access, secrets, and revision traffic. Verify the configured cost instead of repeating the “~$10” estimate.
+9. The §3 six-second deadline is per image, while Sarah’s expectation is results per application. A normal front/back application may run two OCR jobs serially or contend with batch work. Publish application-level p50/p95 under concurrent load.
+10. Multipart limits are easy to apply after buffering. Enforce aggregate and per-file caps while streaming; multi-image `/verify` must not admit N × 10 MB unchecked.
+11. Browser batch “resume is trivial” is overstated. It works only while the tab and file objects survive. A refresh loses extraction, pairing, notes, and decisions; state this plainly and test unload/export behavior.
+12. Pairing is both ambiguous and potentially \(N \times M\). A warning-only back image may have no useful match signal. Require explicit/manual pairing before treating a grouped application as ready.
+13. PDF rendering multiplies input size and exposes native parsing code. If retained, cap pages, rendered pixels, time, and total output independently of the uploaded-byte limit.
+
+## 5. Reviewer's-eye check
+
+1. Correctness/completeness: points lost for omitting producer/address and import origin, accepting an inexact warning, or falsely flagging valid wine/beer. Points earned by beverage-specific golden fixtures, expected-versus-found evidence, and a zero-false-pass warning suite.
+2. Code quality/organization: points lost if the many endpoints, middleware, duplicated client/server normalization, and nine documents produce more framework than working logic. Points earned by a small dependency-injected pipeline, typed schemas, focused tests, and one readable request path.
+3. Appropriate technical choices: local OCR, one container, baked models, and no egress earn points. Two hosts, PDF support, automatic fuzzy pairing, and unmeasured thread assumptions look like poor scope control.
+4. UX/error handling: the three one-click samples, plain statuses, progressive batch table, and highlights earn points. Opaque auto-pairing, no obvious manual reassignment, excessive controls, or a result after five seconds lose them. Add an observed novice usability result, not a “mother test” checklist.
+5. Attention to requirements: a trace from all five bold phrases to executable acceptance tests earns heavily. The current §12 DoD weakens that by omitting a hard deployed p95 gate and conditional producer/origin checks.
+6. Creative problem-solving: evals, no-egress proof, evidence-to-pixels, and false-alarm measurement are strong differentiators. Publish an error analysis with representative failures and threshold rationale; otherwise the architecture reads as promises rather than engineering evidence.
+
+## 6. Domain check
+
+1. Encode the complete prescribed §16.21 text, including `GOVERNMENT WARNING:`, both numbered clauses, capitalization of “Surgeon General,” and both commas. TTB examples treat missing commas as corrections; do not run the generic punctuation-stripping normalizer over this check. Verify against [27 CFR §16.21](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16/section-16.21).
+2. Section 10 misattributes “separate and apart” to §16.22; it is in §16.21. Section 16.22 covers legibility, contrast, capitalization/bold, compression, characters per inch, type size, and label attachment.
+3. Section 10 is correct that only “GOVERNMENT WARNING” must be bold and the remainder may not be bold. The legal thresholds are 1 mm at ≤237 mL, 2 mm at >237 mL through 3 L, and 3 mm above 3 L, with corresponding 40/25/12 characters-per-inch maxima. Verify [27 CFR §16.22](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16/section-16.22).
+4. Part 16 applies to beverages containing at least 0.5% ABV and intended for human consumption. “Mandatory on all alcohol beverages” is acceptable brief shorthand but should not become an unconditional domain rule.
+5. Section 5’s wine rule needs precision: under Part 4, numerical ABV may be omitted for wine at 14% or less only when “table wine” or “light wine” supplies the designation; the practical COLA scope begins at 7%. Verify [27 CFR §4.36](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-4/subpart-D/section-4.36).
+6. “Malt beverages ABV optional federally” is incomplete. Under §§7.63 and 7.65 it becomes mandatory when alcohol derives from added nonbeverage flavors/ingredients, and state law can also require it. Verify [27 CFR §§7.63–7.65](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-7/subpart-E).
+7. Distilled spirits mandatory information includes name/address as well as brand, class/type, ABV, and net contents; some items have same-field-of-vision requirements. Section 12’s five-check DoD misses this. Verify [27 CFR §5.63](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-E/section-5.63).
+8. Standards-of-fill lists changed in January 2025. If retained, copy the current authorized lists and exceptions from [§5.203](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-K/section-5.203) and [§4.72](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-4/subpart-H/section-4.72), date the source, and test newly added sizes. Do not infer actual container capacity conclusively from OCR text.
+9. Malt beverages have no analogous federal fixed-size list, but net-content expression rules still apply. “No standards of fill” must not become “no net-contents rules.”
+10. Country-of-origin wording is not safely reducible to Parts 4, 5, and 7; customs marking rules may control. Keep it as application-versus-label comparison unless the relevant Title 19 provisions are also verified.
+
+## 7. Top five
+
+1. Replace §12 with a lean DoD: one host, concise docs, explicit batch pairing, and no PDF/standards-of-fill/procurement extras until the core is green.
+2. Make the exact-warning path truly exact and verify §§16.21–16.22, including punctuation, both clauses, anchor bold/caps, non-bold body, applicability, and measurable format limits.
+3. Add a hard acceptance gate for deployed end-to-end p95 under five seconds on a normal front/back application, including concurrent batch load.
+4. Include producer/name-address and conditional import-origin comparison, and correct the wine and malt-beverage requiredness rules.
+5. Fix the execution design before coding: one priority-aware OCR limiter, honest timeout semantics, bounded multipart handling, and a canonical tested coordinate system.

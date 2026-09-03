@@ -1,0 +1,46 @@
+[project]
+name = "ttb-label-check"
+version = "0.1.0"
+description = "Prototype: AI-assisted verification of alcohol beverage label artwork against COLA application data (TTB take-home)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Daniel R. Cooley" }]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["app", "tools", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "S", "C4", "SIM", "RUF"]
+ignore = [
+  "S101",   # assert is fine in tests
+  "RUF012", # mutable class attrs (pydantic models)
+  "B008",   # FastAPI's Depends()/File()/Form() in defaults is the framework's idiom
+]
+allowed-confusables = ["’", "‘", "“", "”", "–", "—", "−", "′", "″", "‚", "‛", "„", "‐", "‑", "‒", "´", " "]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B011", "E501"]
+"tools/**" = ["S", "T201", "N806", "N803", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "integration: runs the OCR engine on fixture images (slower)",
+  "slow: long-running tests such as load or eval runs",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["app"]
+strict = true
+warn_unreachable = true
+ignore_missing_imports = true   # rapidocr, cv2 ship no stubs
+plugins = ["pydantic.mypy"]
