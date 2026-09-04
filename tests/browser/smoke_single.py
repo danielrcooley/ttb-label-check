@@ -41,7 +41,10 @@ def main() -> int:
         browser = p.chromium.launch()
         ctx = browser.new_context(viewport={"width": 1366, "height": 900})
         page = ctx.new_page()
-        page.on("console", lambda m: problems.append(f"console.{m.type}: {m.text}") if m.type in ("error", "warning") else None)
+        page.on(
+            "console",
+            lambda m: problems.append(f"console.{m.type}: {m.text}") if m.type in ("error", "warning") else None,
+        )
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url} {r.failure}"))
         page.on("response", lambda r: problems.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
@@ -67,7 +70,9 @@ def main() -> int:
             page.locator(".checklist tbody tr").first.click()
             print("   active polygons after row click:", page.locator(".overlay polygon.is-active").count())
 
-        mobile = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, bypass_csp=True).new_page()
+        mobile = browser.new_context(
+            viewport={"width": 390, "height": 844}, device_scale_factor=2, bypass_csp=True
+        ).new_page()
         mobile.goto(BASE + "/", wait_until="networkidle")
         mobile.click("[data-sample=clean]")
         mobile.wait_for_selector("#results:not([hidden]) .verdict", timeout=60000)

@@ -40,6 +40,7 @@ samples/        bundled demo labels + sample CSV (fictional brands only)
 ## Commands
 ```
 python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt
+.venv/Scripts/pip install --no-deps -r requirements-ocr.txt   # never let rapidocr pull desktop opencv-python
 uvicorn app.main:app --reload            # run locally on :8000
 pytest -m "not integration and not slow" # fast tests
 pytest                                    # everything

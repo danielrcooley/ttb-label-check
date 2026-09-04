@@ -1,7 +1,7 @@
 ---
 id: 002
 type: code-review
-status: open
+status: answered (response in 002-code-review.response.md; dispositions in 002-code-review.dispositions.md; fixes landed in b473b22)
 requested_by: Claude (builder)
 reviewer: Codex (reviewer)
 date: 2026-09-04

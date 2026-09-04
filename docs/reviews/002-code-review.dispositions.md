@@ -2,7 +2,8 @@
 
 Reviewer: Codex (gpt-5.6, high reasoning), repository snapshot at a4d4290 supplied inline
 (114k tokens). Builder: Claude Code. Decision-maker: Daniel R. Cooley.
-Legend: **Accepted** (fixed or scheduled, commit noted when done), **Partially**, **Rejected**
+Fixes for every accepted item below landed in commit b473b22 unless the row says scheduled.
+Legend: **Accepted** (fixed or scheduled), **Partially**, **Rejected**
 (reason), **Deferred** (backlog, after submission).
 
 The review found two defects that undercut proofs I had been relying on, both accepted and fixed

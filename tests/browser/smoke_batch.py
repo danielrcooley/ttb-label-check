@@ -40,7 +40,10 @@ def main() -> int:
         browser = p.chromium.launch()
         ctx = browser.new_context(viewport={"width": 1366, "height": 900}, accept_downloads=True)
         page = ctx.new_page()
-        page.on("console", lambda m: problems.append(f"console.{m.type}: {m.text}") if m.type in ("error", "warning") else None)
+        page.on(
+            "console",
+            lambda m: problems.append(f"console.{m.type}: {m.text}") if m.type in ("error", "warning") else None,
+        )
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url} {r.failure}"))
         page.on("response", lambda r: problems.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
@@ -63,7 +66,12 @@ def main() -> int:
 
         page.locator(".batch-table button:has-text('Details')").first.click()
         page.wait_for_selector(".detail-panel .checklist", timeout=30000)
-        print("detail crops:", page.locator(".detail-panel img.crop").count(), "polygons:", page.locator(".detail-panel .overlay polygon").count())
+        print(
+            "detail crops:",
+            page.locator(".detail-panel img.crop").count(),
+            "polygons:",
+            page.locator(".detail-panel .overlay polygon").count(),
+        )
         page.locator(".batch-table .decision-btns button:has-text('Approve')").first.click()
         with page.expect_download() as dl:
             page.click("#batch-export")

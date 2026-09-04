@@ -32,3 +32,9 @@ _Appended by `tools/loadtest.py`. Each block names the host it ran against._
 - final status codes: {200: 10}; 429 responses absorbed by backoff along the way: 0
 - run at 2026-09-03 17:16:10
 
+### steady: 300 x extract (1 image(s) each), concurrency 2, host http://127.0.0.1:8000
+- wall 217.0 s, throughput 1.38 req/s (1.38 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 1447, p95 1495, max 1550
+- final status codes: {200: 300}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-03 17:21:41
+

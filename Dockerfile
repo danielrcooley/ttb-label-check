@@ -9,16 +9,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OMP_NUM_THREADS=1 \
     PORT=8000
 
-# libgomp: onnxruntime. libglib2.0-0, libxcb1, libsm6, libxext6, libxrender1: runtime links of the
-# opencv-python-headless wheel (no display is used). Nothing else beyond the slim image.
+# libgomp: onnxruntime. libglib2.0-0 (libgthread): opencv-python-headless. Nothing else beyond the slim image.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 libxcb1 libsm6 libxext6 libxrender1 \
+ && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app
 
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+COPY requirements.txt requirements-ocr.txt ./
+RUN pip install -r requirements.txt \
+ && pip install --no-deps -r requirements-ocr.txt \
+ && python -c "import cv2, rapidocr, onnxruntime; print('cv2', cv2.__version__, 'headless build:', 'headless' in (cv2.getBuildInformation() or '').lower() or 'n/a')"
 
 COPY --chown=app:app app ./app
 COPY --chown=app:app README.md LICENSE THIRD_PARTY_NOTICES.md ./

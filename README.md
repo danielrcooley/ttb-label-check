@@ -89,6 +89,7 @@ docker run --rm -p 8000:8000 --tmpfs /tmp --network none label-check
 ```bash
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt          # Windows: .venv\Scripts\pip
+.venv/bin/pip install --no-deps -r requirements-ocr.txt   # rapidocr without its desktop-OpenCV dependency
 .venv/bin/uvicorn app.main:app --port 8000
 ```
 
