@@ -67,3 +67,21 @@ jobs:
       - name: Container logs
         if: always()
         run: docker logs lc || true
+      # Publish the verified image to the Azure Container Registry the app pulls from.
+      # (ACR's own cloud build is disabled on new subscriptions, so CI is the build farm.)
+      - name: Log in to Azure Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Push image (sha + latest)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          docker tag label-check:ci ${{ secrets.ACR_LOGIN_SERVER }}/label-check:$SHORT
+          docker tag label-check:ci ${{ secrets.ACR_LOGIN_SERVER }}/label-check:latest
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/label-check:$SHORT
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/label-check:latest
+          echo "pushed label-check:$SHORT"

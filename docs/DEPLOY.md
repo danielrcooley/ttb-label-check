@@ -22,14 +22,20 @@ az group create --name $RG --location $LOCATION
 az acr create --name $ACR --resource-group $RG --sku Basic
 ```
 
-## 2. Build the image in Azure (no local Docker needed)
+## 2. Get the image into the registry
+
+ACR's cloud build (`az acr build`) is disabled on new subscriptions until a support request is
+approved. CI builds the same image on every push to `master`, verifies it, and pushes it to the
+registry as `label-check:<short sha>` and `label-check:latest`, using three repository secrets:
+`ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD` (registry admin credentials; a service principal
+with `AcrPush` is the production-grade alternative).
 
 ```bash
-SHA=$(git rev-parse --short HEAD)
-az acr build --registry $ACR --image label-check:$SHA --build-arg GIT_SHA=$SHA .
+az acr update --name $ACR --admin-enabled true
+az acr credential show --name $ACR     # username + password -> GitHub secrets
 ```
 
-The build runs the same Dockerfile CI builds. Expect a few minutes.
+If ACR Tasks are available on the subscription, `az acr build --registry $ACR --image label-check:$SHA --build-arg GIT_SHA=$SHA .` does the same from the repository root.
 
 ## 3. Environment and app
 
