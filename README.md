@@ -60,7 +60,11 @@ flowchart LR
 
 - **Matching has three outcomes.** Match (same after case, accents, quotes, spacing), Needs review
   (close, usually OCR noise, look at the crop), Mismatch or Not found. Heuristic findings are never
-  failures; only clear text or numeric differences are.
+  failures; only clear text or numeric differences are: a brand the label does not carry, a number
+  that disagrees, an origin statement naming another country, a warning that is missing or worded
+  differently. A class/type worded differently from the application's description, a bottler line
+  that names another party, or a value the engine could not read are review items with the reason,
+  because none of those is a proven defect (decision D-041, reached against 146 real applications).
 - **Numbers are compared as numbers.** "45% Alc./Vol. (90 Proof)" in the application and
   "45% ALC/VOL" on the label agree; proof is cross-checked against percent; "12 FL OZ (355 mL)"
   agrees with "355 mL". Net contents may be left blank (the COLA form itself carries none); the
@@ -136,7 +140,7 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 | Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 18 of 20; 17 of 20 cases ready, 2 need review, 1 issue (a label shrunk to a third of its size); both sideways photographs ready after the rotation retry, at about 6.8 s | [docs/EVAL.md](docs/EVAL.md) |
 | Planted defects detected | 4 of the 4 the tool assesses (wrong ABV, title-case heading, altered wording, missing statement); the other two planted defects (tiny type, all-bold statement) are not assessed in this build and are reported as such | [docs/EVAL.md](docs/EVAL.md) |
 | Per-application latency, local (two images, 2 workers) | median 2,536 ms, p95 3,059 ms on clean artwork | [docs/EVAL.md](docs/EVAL.md) |
-| Real approved labels: 150 applications from TTB's Public COLA Registry, 50 each spirits, wine, malt, artwork as submitted | Warning statement located on 99% (two misses: one upload set with no statement on it, one label that prints it vertically in type too small to read at the registry's size); wording exact on 62% of those located, small-print slips flagged for review on 22%, wording issues on 16% (including three approved labels that genuinely deviate); brand name matched or sent to review on 88%; applicant name on 67%; country of origin found on 92% of imports; alcohol statement read on 81%, net contents on 80% | [docs/EVAL_REAL.md](docs/EVAL_REAL.md) |
+| Real approved labels: 150 applications from TTB's Public COLA Registry, 50 each spirits, wine, malt, artwork as submitted | Warning statement located on 99% (two misses: one upload set with no statement on it, one label that prints it vertically in type too small to read at the registry's size); wording exact on 62% of those located, small-print slips flagged for review on 22%, wording issues on 16% (including three approved labels that genuinely deviate); brand name matched or sent to review on 88%; the registered applicant line (names and address as COLAs stores them) matched the label's bottler line on 41%, the rest sent to review with the reason; country of origin found on 92% of imports; alcohol statement read on 81%, net contents on 80% | [docs/EVAL_REAL.md](docs/EVAL_REAL.md) |
 | Per-application latency, deployed (Azure Container Apps, 2 vCPU, 2 workers, measured from outside) | one client: median 2,674 ms, p95 2,758 ms, max 3,672 ms over 20 front+back applications; a front label alone (no statement, so the one extra round of reads runs): median 3,249 ms, p95 3,334 ms over 10; two concurrent clients: median 4,301 ms, p95 5,032 ms, max 6,876 ms; zero refusals | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Batch throughput, deployed (300 images, 150 applications, through the real batch screen from a laptop browser) | 315 s end to end, 0.95 images/s including comparison and rendering, 2.3 s per image median; 150 ready, 0 errors, no browser errors; 100 single-image requests at capacity: 100 of 100 served, p95 1.8 s | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |

@@ -54,6 +54,8 @@ _ABV_PATTERNS = [
 ]
 _PROOF = re.compile(r"(\d{2,3}(?:[.,]\d)?)\s*(?:°\s*)?proof", re.I)
 _BARE = re.compile(r"^\s*" + _NUM + r"\s*%?\s*$")
+# "table wine", "light wine", and the registry's "table red wine" / "table white wine"
+_TABLE_OR_LIGHT_WINE = re.compile(r"\b(?:table|light)\b(?:\s+\w+){0,2}\s+wine\b")
 
 
 def parse_alcohol(text: str, *, allow_bare: bool = False) -> Alcohol | None:
@@ -253,7 +255,9 @@ def alcohol_statement_required(beverage: BeverageType, class_type: str) -> tuple
         return True, "Required for distilled spirits (27 CFR 5.65)."
     if beverage is BeverageType.wine:
         ct = fold(class_type)
-        if "table wine" in ct or "light wine" in ct:
+        # "Table Wine", "Light Wine", and the registry's class descriptions "Table Red Wine",
+        # "Table White Wine": the designation may carry a color word in the middle.
+        if _TABLE_OR_LIGHT_WINE.search(ct):
             return False, "Wine of 7-14% may state 'Table Wine' or 'Light Wine' instead of a number (27 CFR 4.36)."
         return True, "Required for wine unless designated Table Wine or Light Wine (27 CFR 4.36)."
     return False, (

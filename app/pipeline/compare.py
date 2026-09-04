@@ -24,7 +24,7 @@ from app.schemas import (
 )
 
 from .match import best_span, status_for
-from .normalize import company_forms, fold, fold_company
+from .normalize import company_forms, fold, fold_company, has_responsibility_prefix, split_registered_party
 from .parsers import (
     Alcohol,
     alcohol_matches,
@@ -95,31 +95,96 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
         found_lines = _as_printed(check, lines)
         if found_lines and check.status is Status.match and check.found != expected:
             check.note = f"Label says '{check.found}'."
+    if check.status in (Status.mismatch, Status.not_found):
+        # A hard issue needs positive evidence: an origin statement on the label naming something
+        # else. A country not read anywhere is a heuristic miss and goes to the person (D-041).
+        origin_lines = [ln for ln in lines if _ORIGIN_PREFIX.match(ln.text)]
+        if origin_lines:
+            ln = origin_lines[0]
+            check.status = Status.mismatch
+            check.found = ln.text
+            check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)]
+            check.note = f"The label's origin statement reads '{ln.text}'; the application says '{expected}'."
+        else:
+            check.status = Status.needs_review
+            check.note = (
+                f"No origin statement naming '{expected}' was read. Imports must state the country of origin; "
+                "check the image."
+            )
     return check
 
 
+_BOTTLER_RULE = "27 CFR 5.66 / 4.35 / 7.66"
+_STATUS_RANK = {Status.match: 0, Status.needs_review: 1, Status.mismatch: 2, Status.not_found: 3}
+
+
+def _address_on_label(city: str | None, state_forms: tuple[str, ...], lines: list[OcrLine]) -> bool:
+    """Whether the registered city and state were both read somewhere on the label."""
+    if not city or not state_forms:
+        return False
+    texts = [fold(ln.text) for ln in lines]
+    city_found = any(fold(city) in t for t in texts)
+    state_found = any(re.search(rf"\b{re.escape(form)}\b", t) for form in state_forms for t in texts)
+    return city_found and state_found
+
+
 def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
-    """Name and address as registered vs as printed. Labels abbreviate and prefix ("Brewed by
-    GREEN CHEEK BEER CO." for "Green Cheek Beer Company"); the registry spells out. Neither the
-    prefix nor an omitted corporate form is a difference in who bottled it, so both sides are folded
-    with ``fold_company`` before the ordinary fuzzy match; evidence and the found text stay as
-    printed. Two different forms ("LLC" against "Inc.") name two different legal entities: that
-    match goes to Needs review with both forms in the note."""
+    """Name and address as registered vs as printed (D-041). The registered line may be the brief's
+    short form ("Bottled by Old Tom Distillery, Bardstown, Kentucky") or COLAs' item 8 (trade name,
+    legal name, street, city, state, ZIP, and sometimes the name used on the label). Labels print a
+    responsibility phrase, one of those names, often abbreviated, and a city and state. So: the
+    whole line and each registered name are tried, folded ("Brewed by", corporate forms); the best
+    read wins; the city and state corroborate. Name and address read: Match. Name only: Needs review.
+    A different name on the label's own "bottled by" line, or nothing resembling the name: Needs
+    review with the reason, because the applicant and the lawful bottler may differ ("bottled for")
+    and an unread line is a heuristic miss, not a proven defect. Two different corporate forms
+    ("LLC" against "Inc.") on the same name: Needs review with both forms."""
     folded = [ln.model_copy(update={"text": fold_company(ln.text)}) for ln in lines]
-    check = _text_check("bottler", fold_company(expected), folded, s, rule="27 CFR 5.66 / 4.35 / 7.66")
+    party = split_registered_party(expected)
+    best: Check | None = None
+    for cand in (expected, *party.names):
+        c = _text_check("bottler", fold_company(cand), folded, s, rule=_BOTTLER_RULE)
+        if best is None or (_STATUS_RANK[c.status], -(c.score or 0)) < (_STATUS_RANK[best.status], -(best.score or 0)):
+            best = c
+    check = best if best is not None else _text_check("bottler", fold_company(expected), folded, s, rule=_BOTTLER_RULE)
     check.expected = expected
-    if check.evidence:
-        found_lines = _as_printed(check, lines)
-        if found_lines and check.status is Status.match:
-            want, got = company_forms(expected), company_forms(check.found or "")
-            if want and got and not (want <= got or got <= want):
-                check.status = Status.needs_review
-                check.note = (
-                    f"Same name, but the corporate form differs: the application says "
-                    f"{', '.join(sorted(want))}, the label says {', '.join(sorted(got))}. Confirm on the image."
-                )
-            elif fold(check.found or "") != fold(expected):
-                check.note = f"Label says '{check.found}'."
+    found_lines = _as_printed(check, lines) if check.evidence else []
+    if check.status is Status.match and found_lines:
+        want, got = company_forms(expected), company_forms(check.found or "")
+        if want and got and not (want <= got or got <= want):
+            check.status = Status.needs_review
+            check.note = (
+                f"Same name, but the corporate form differs: the application says "
+                f"{', '.join(sorted(want))}, the label says {', '.join(sorted(got))}. Confirm on the image."
+            )
+        elif party.city and party.state and not _address_on_label(party.city, party.state_forms(), lines):
+            check.status = Status.needs_review
+            check.note = (
+                f"The name matches ('{check.found}'), but the registered city and state ({party.city}, "
+                f"{party.state}) were not read on the label. Confirm the address on the image."
+            )
+        elif fold(check.found or "") != fold(expected):
+            check.note = f"Label says '{check.found}'."
+        return check
+    if check.status in (Status.mismatch, Status.not_found):
+        responsibility = [ln for ln in lines if has_responsibility_prefix(ln.text)]
+        name = party.names[0] if party.names else expected
+        if responsibility:
+            ln = responsibility[0]
+            check.status = Status.needs_review
+            check.found = ln.text
+            check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)]
+            check.note = (
+                f"The label's bottler line reads '{ln.text}', which does not resemble the application's "
+                f"'{name}'. That is lawful when the product is bottled for the applicant by another permittee, "
+                "and an issue otherwise. Confirm on the image."
+            )
+        else:
+            check.status = Status.needs_review
+            check.note = (
+                f"No line resembling the registered name ('{name}') was read. A bottler statement is required "
+                "on the label and is often in small print. Check the image."
+            )
     return check
 
 
@@ -157,8 +222,16 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
     }
     if expected is None:
         if found is None:
-            st = Status.not_found if required else Status.info
-            return Check(status=st, note="No alcohol statement in the application or on the label. " + why, **base)
+            if required:  # nothing read is a heuristic miss, not a proven defect (D-041)
+                return Check(
+                    status=Status.needs_review,
+                    note="An alcohol statement is required for this class, but none was given in the application "
+                    "or read on the label. Inspect the label image. " + why,
+                    **base,
+                )
+            return Check(
+                status=Status.info, note="No alcohol statement in the application or on the label. " + why, **base
+            )
         if required:
             return Check(
                 status=Status.needs_review,
@@ -173,7 +246,10 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
         )
     if found is None:
         return Check(
-            status=Status.not_found, note="No alcohol content statement could be read on the label. " + why, **base
+            status=Status.needs_review,
+            note=f"The application states {expected.percent:g}%, but no alcohol statement could be read on the "
+            "label; it is often in small print. Inspect the image. " + why,
+            **base,
         )
     if len(distinct) > 1:
         stated = ", ".join(f"{v:g}%" for v in distinct)
@@ -299,6 +375,27 @@ def _net_contents_check(app: ApplicationFields, lines: list[OcrLine], s: Setting
     ), fill_check
 
 
+def _class_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
+    """Class/type: the application's description against the designation the label prints. The
+    two legitimately differ in wording (a varietal name for a table wine; "Kentucky Straight Bourbon
+    Whiskey" for the class "straight bourbon whisky"), and the tool has no table of permitted
+    designations, so a difference is never a proven defect: Match when the text agrees, otherwise
+    Needs review with the closest text (D-041)."""
+    check = _text_check("class_type", expected, lines, s, rule="27 CFR 5.63 / 4.34 / 7.63")
+    if check.status in (Status.mismatch, Status.not_found):
+        lead = (
+            f"The closest text on the label ('{check.found}') differs from the application's class description."
+            if check.found
+            else "Nothing on the label resembles the application's class description."
+        )
+        check.status = Status.needs_review
+        check.note = (
+            lead + " Labels carry the designation the regulations permit for the class, so the wording may "
+            "differ legitimately. Confirm the designation on the image."
+        )
+    return check
+
+
 def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo], s: Settings) -> tuple[Verdict, str]:
     if images and all(not im.quality.readable for im in images):
         return Verdict.unreadable, "None of the images could be read reliably. Request clearer label images."
@@ -341,7 +438,7 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
 def compare(app: ApplicationFields, lines: list[OcrLine], images: list[ImageInfo], s: Settings) -> CompareResult:
     checks: list[Check] = [
         _text_check("brand_name", app.brand_name, lines, s, rule="27 CFR 5.64 / 4.33 / 7.64"),
-        _text_check("class_type", app.class_type, lines, s, rule="27 CFR 5.63 / 4.34 / 7.63"),
+        _class_check(app.class_type, lines, s),
         _alcohol_check(app, lines, s),
     ]
     net, fill = _net_contents_check(app, lines, s)

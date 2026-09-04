@@ -97,3 +97,13 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
     image. Sideways photographs are handled earlier by the general rotation retry (three reads).
     Known approximation in the finder: the column tolerance is half the median line thickness of
     the whole image, which large display type can inflate.
+14. **Which findings can fail an application.** Only clear text or numeric differences: a brand the
+    label does not carry, alcohol or net contents that disagree with the application, an origin
+    statement naming another country, a warning statement that is missing or worded differently.
+    Everything else is a review item with its reason and its crop: a class/type worded differently
+    from the application's description (labels print the designation the regulations permit, and
+    the tool has no table of permitted designations, so a genuinely wrong designation is left to the
+    agent); a bottler line naming another party (lawful when bottled for the applicant by another
+    permittee); a required value the engine did not read (its read rate on real artwork is about
+    80%). Decided against 146 real applications whose registered data had turned every one of them
+    into an "issue" (D-041, consult 006).

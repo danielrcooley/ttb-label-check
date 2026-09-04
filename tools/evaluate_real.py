@@ -44,14 +44,12 @@ from app.ocr.pool import OcrPool
 from app.ocr.rapid import RapidEngine
 from app.pipeline.compare import bottler_check
 from app.pipeline.match import best_span, status_for
-from app.pipeline.normalize import fold, key
+from app.pipeline.normalize import fold
 from app.pipeline.warning import build_report
 from app.schemas import OcrLine
 from app.services import Upload, extract
 
 Record = dict[str, Any]
-_RANK = {"match": 0, "needs_review": 1, "mismatch": 2, "not_found": 3}
-_SUFFIX = {"llc", "inc", "ltd", "co", "corp", "lp", "llp", "incorporated", "corporation", "limited", "company"}
 
 
 def _fit(path: Path, max_pixels: int) -> bytes:
@@ -80,28 +78,12 @@ def _status(expected: str, lines: list[OcrLine], s: Settings) -> tuple[str, str,
     return str(st), (cand.text if cand else ""), (int(cand.score) if cand else None)
 
 
-def applicant_names(registered: str) -> list[str]:
-    """The registry's item 8 line often holds 'Trade name, Legal name, LLC'. Try the whole line and
-    each name in it (corporate suffixes reattached), since the label uses one of them."""
-    parts = [p.strip() for p in registered.split(",") if p.strip()]
-    names: list[str] = []
-    for p in parts:
-        if names and key(p) in _SUFFIX:
-            names[-1] = names[-1] + ", " + p
-        else:
-            names.append(p)
-    return [registered] + [n for n in names if n != registered]
-
-
 def _applicant_status(registered: str, lines: list[OcrLine], s: Settings) -> tuple[str, str, int | None]:
-    """The product's own bottler check, best outcome over the names the registry line contains."""
-    best: tuple[str, str, int | None] | None = None
-    for name in applicant_names(registered):
-        check = bottler_check(name, lines, s)
-        cur = (str(check.status), check.found or "", int(check.score) if check.score is not None else None)
-        if best is None or _RANK.get(cur[0], 9) < _RANK.get(best[0], 9):
-            best = cur
-    return best or ("not_found", "", None)
+    """The product's own bottler check on the registry's item 8 line, exactly as the batch screen
+    would receive it from a spreadsheet (names, address and the name used on the label, comma
+    separated)."""
+    check = bottler_check(registered, lines, s)
+    return str(check.status), check.found or "", int(check.score) if check.score is not None else None
 
 
 async def run(real: Path, workers: int) -> tuple[list[Record], Record]:
@@ -120,7 +102,7 @@ async def run(real: Path, workers: int) -> tuple[list[Record], Record]:
         res = await extract(uploads, settings, pool, interactive=True)
         ms = int((time.perf_counter() - t0) * 1000)
         lines = res.lines
-        applicant_line = row["applicant"].split(" | ")[0].strip()
+        applicant_line = ", ".join(part.strip() for part in row["applicant"].split(" | ") if part.strip())
         rec: Record = {
             "ttbid": row["ttbid"],
             "beverage_type": row["beverage_type"],
@@ -188,7 +170,8 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
         "- The COLA form has no alcohol content or net contents fields, so for those only the read rate is reported.",
         '- Class/type is the registry\'s code description ("STRAIGHT BOURBON WHISKY", "TABLE RED WINE"), not the '
         'label\'s wording ("Kentucky Straight Bourbon Whiskey", "Cabernet Sauvignon"), so the class row understates '
-        "what the tool would do with the application's actual wording.",
+        "what the tool would do with the application's actual wording. In the product a class/type that does not "
+        "match is a review item with the closest text, never an issue (D-041); this row reports the raw text match.",
         '- The applicant is the permit holder; a label may lawfully name a different bottler ("bottled for"), '
         "so the applicant row also understates.",
         "- There is no ground truth for the warning statement beyond TTB's approval; the exact rate is what the "
@@ -201,6 +184,10 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
         "record's images, as the extract-only mode of the product does.",
         "- Latency is the service call for the record (decode, all reads, the extra round when it runs); the file "
         "read and the pre-fit to the pixel cap are outside it. p95 is the nearest-rank percentile.",
+        "- The applicant row runs the product's own bottler check on the registry's full item 8 line (names, "
+        "address, the name used on the label), exactly as a spreadsheet would carry it (D-041).",
+        "- Images above the product's 25 megapixel limit are shrunk to fit before the run; the deployed service "
+        "refuses them with a message instead.",
         "",
     ]
     groups: dict[str, list[Record]] = defaultdict(list)

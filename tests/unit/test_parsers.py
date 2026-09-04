@@ -387,3 +387,123 @@ def test_blank_net_contents_is_review_with_the_label_value_never_ready():
     none_read = compare(blank, make_lines(["X", "VODKA"]), [], s)
     net2 = next(c for c in none_read.checks if c.id == "net_contents")
     assert net2.status == "needs_review" and net2.found is None
+
+
+@pytest.mark.parametrize(
+    ("class_type", "required"),
+    [
+        ("Table Wine", False),
+        ("Light Wine", False),
+        ("Table White Wine", False),  # the registry's class description
+        ("Table Red Wine", False),
+        ("Cabernet Sauvignon", True),
+        ("Vermouth", True),
+    ],
+)
+def test_table_and_light_wine_designations_do_not_require_an_alcohol_statement(class_type, required):
+    assert alcohol_statement_required(BeverageType.wine, class_type)[0] is required
+
+
+def _bottler(expected, label_lines):
+    from app.config import Settings
+    from app.pipeline.compare import bottler_check
+
+    from tests.unit.conftest import make_lines
+
+    return bottler_check(expected, make_lines(label_lines), Settings(ocr_workers=1))
+
+
+def test_bottler_registered_line_against_the_label_four_ways():
+    """D-041: name and address read is a match; name only is review; a different name on the
+    label's own bottler line, or nothing resembling the name, is review with the reason."""
+    registered = (
+        "Green Cheek Beer Company, Green Cheek Beer Company, Inc., 2957 RANDOLPH ST UNIT A2 & B, Costa Mesa, CA, 92626"
+    )
+    both = _bottler(registered, ["BREWED BY GREEN CHEEK BEER CO.", "COSTA MESA, CA", "12 FL OZ"])
+    assert both.status == "match", both
+    name_only = _bottler(registered, ["BREWED BY GREEN CHEEK BEER CO.", "ORANGE, CA", "12 FL OZ"])
+    assert name_only.status == "needs_review" and "Costa Mesa" in (name_only.note or ""), name_only
+    other = _bottler(registered, ["BOTTLED BY SOMEBODY ELSE BREWING", "ORANGE, CA"])
+    assert (
+        other.status == "needs_review"
+        and "does not resemble" in (other.note or "")
+        and other.found == "BOTTLED BY SOMEBODY ELSE BREWING"
+    )
+    nothing = _bottler(registered, ["FINE ALE", "12 FL OZ"])
+    assert nothing.status == "needs_review" and "No line resembling" in (nothing.note or "")
+    marker = chr(160) + "(Used on label)"
+    used = _bottler(
+        "INVOER EKKE LLC, 20 PARADISE AVE, PIERMONT, NY, 10968, CANOPY WINE SELECTIONS" + marker,
+        ["IMPORTED BY CANOPY WINE SELECTIONS", "PIERMONT, NY", "750 ML"],
+    )
+    assert used.status == "match", used
+
+
+def test_brief_sample_bottler_still_matches_as_a_whole_line():
+    sample = "Distilled and Bottled by Old Tom Distillery, Bardstown, Kentucky"
+    assert _bottler(sample, ["Distilled and Bottled by Old Tom Distillery,", "Bardstown, Kentucky"]).status == "match"
+
+
+def test_class_type_wording_difference_is_review_not_issue():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    app = ApplicationFields(
+        beverage_type="wine", brand_name="SHOFANG", class_type="Table White Wine", net_contents="750 mL"
+    )
+    res = compare(app, make_lines(["SHOFANG", "Pinot Grigio", "750 mL"]), [], s)
+    cls = next(c for c in res.checks if c.id == "class_type")
+    assert cls.status == "needs_review" and "designation" in (cls.note or "")
+    assert all(c.status not in ("mismatch", "not_found") for c in res.checks if c.id == "class_type")
+
+
+def test_required_alcohol_statement_not_read_is_review_not_issue():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    app = ApplicationFields(
+        beverage_type="spirits", brand_name="X", class_type="Vodka", alcohol_content="40%", net_contents="750 mL"
+    )
+    alc = next(c for c in compare(app, make_lines(["X", "VODKA", "750 mL"]), [], s).checks if c.id == "alcohol_content")
+    assert alc.status == "needs_review" and "could be read" in (alc.note or "")
+    app2 = app.model_copy(update={"alcohol_content": None})
+    alc2 = next(
+        c for c in compare(app2, make_lines(["X", "VODKA", "750 mL"]), [], s).checks if c.id == "alcohol_content"
+    )
+    assert alc2.status == "needs_review" and "required" in (alc2.note or "")
+
+
+def test_origin_not_read_is_review_but_a_different_origin_statement_is_a_mismatch():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    app = ApplicationFields(
+        beverage_type="wine",
+        brand_name="X",
+        class_type="Red Wine",
+        net_contents="750 mL",
+        country_of_origin="Italy",
+        imported=True,
+    )
+    unread = next(
+        c for c in compare(app, make_lines(["X", "RED WINE", "750 mL"]), [], s).checks if c.id == "country_of_origin"
+    )
+    assert unread.status == "needs_review"
+    other = next(
+        c
+        for c in compare(app, make_lines(["X", "Product of France", "750 mL"]), [], s).checks
+        if c.id == "country_of_origin"
+    )
+    assert other.status == "mismatch" and "France" in (other.note or "")

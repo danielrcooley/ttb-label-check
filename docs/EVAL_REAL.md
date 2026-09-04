@@ -8,13 +8,15 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 - The registry stores the applicant's uploads, usually flat artwork, often downscaled by the registry (see the image size row). This is the artwork tier of the real world, not the phone-photo tier.
 - The COLA form has no alcohol content or net contents fields, so for those only the read rate is reported.
-- Class/type is the registry's code description ("STRAIGHT BOURBON WHISKY", "TABLE RED WINE"), not the label's wording ("Kentucky Straight Bourbon Whiskey", "Cabernet Sauvignon"), so the class row understates what the tool would do with the application's actual wording.
+- Class/type is the registry's code description ("STRAIGHT BOURBON WHISKY", "TABLE RED WINE"), not the label's wording ("Kentucky Straight Bourbon Whiskey", "Cabernet Sauvignon"), so the class row understates what the tool would do with the application's actual wording. In the product a class/type that does not match is a review item with the closest text, never an issue (D-041); this row reports the raw text match.
 - The applicant is the permit holder; a label may lawfully name a different bottler ("bottled for"), so the applicant row also understates.
 - There is no ground truth for the warning statement beyond TTB's approval; the exact rate is what the comparator reports on the registry's image, and the hand-checked cases are listed at the end.
 - "Statement located" means the heading was found and a span accumulated behind it, at any similarity; the exact / slips / wording split below it is the accuracy, not the located rate.
 - "Country of origin found" is a proxy: the registry's country name matched somewhere on the label at partial-ratio 90 or better, without checking that it sits in an origin statement.
 - The alcohol and net-contents read rates count a parse anywhere in the concatenated text of all the record's images, as the extract-only mode of the product does.
 - Latency is the service call for the record (decode, all reads, the extra round when it runs); the file read and the pre-fit to the pixel cap are outside it. p95 is the nearest-rank percentile.
+- The applicant row runs the product's own bottler check on the registry's full item 8 line (names, address, the name used on the label), exactly as a spreadsheet would carry it (D-041).
+- Images above the product's 25 megapixel limit are shrunk to fit before the run; the deployed service refuses them with a message instead.
 
 | | spirits (n=50) | wine (n=50) | malt (n=50) | all (n=150) |
 |---|---:|---:|---:|---:|
@@ -22,8 +24,8 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | Brand name: match or needs review | 86% | 96% | 82% | 88% |
 | Class/type (registry description): match | 10% | 0% | 16% | 9% |
 | Class/type (registry description): match or needs review | 54% | 8% | 68% | 43% |
-| Applicant name: match | 26% | 26% | 48% | 33% |
-| Applicant name: match or needs review | 64% | 60% | 78% | 67% |
+| Applicant name: match | 34% | 44% | 44% | 41% |
+| Applicant name: match or needs review | 100% | 100% | 100% | 100% |
 | Country of origin found (imports only) | 88% | 94% | 100% | 92% |
 | Warning statement located (heading found) | 100% | 98% | 98% | 99% |
 | Warning exact (of all) | 62% | 62% | 60% | 61% |
@@ -34,8 +36,8 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | All images readable | 98% | 100% | 100% | 99% |
 | Images per record, median | 2 | 2 | 1 | 2 |
 | Longest image side, median px | 1470 | 1278 | 1063 | 1232 |
-| Latency per record, median | 3688 ms | 3640 ms | 3802 ms | 3669 ms |
-| Latency per record, p95 | 8647 ms | 7693 ms | 7171 ms | 7501 ms |
+| Latency per record, median | 3621 ms | 3548 ms | 3774 ms | 3610 ms |
+| Latency per record, p95 | 8404 ms | 7562 ms | 7235 ms | 7353 ms |
 
 ## Warning assessment, all records
 
@@ -65,4 +67,4 @@ behind the results below. TTB IDs are public registry identifiers; no artwork is
 | 26243001000003 | Ale label with a lot number printed against the statement. | First "26" swept into the statement, reported as noise (review); since the finder stopped joining a vertical strip to horizontal lines (D-039), exact. | Right both times; better now. |
 | 26223001000428 | Vodka neck label, 732 pixels wide; the statement runs up the right edge in small capitals, reading bottom to top. | Found by the 270-degree turn, the first the bounded round tries; reported as wording (similarity 0.71, a stretch of words missing). With the 90-degree turn first it was absent, which is why 270 goes first. | Half right, like the bourbon label above: present, too small to read reliably, visibly reported. |
 
-_Regenerated 2026-09-04 05:24._
+_Regenerated 2026-09-04 08:45._

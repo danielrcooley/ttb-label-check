@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
 
 _QUOTES = {
     "‘": "'",
@@ -164,3 +165,109 @@ def company_forms(s: str) -> frozenset[str]:
 def case_only_difference(a: str, b: str) -> bool:
     """True when a and b differ only by case (after whitespace collapse)."""
     return collapse_ws(a) != collapse_ws(b) and collapse_ws(a).casefold() == collapse_ws(b).casefold()
+
+
+def has_responsibility_prefix(text: str) -> bool:
+    """True for a label line that opens with a responsibility phrase ("Bottled by", "Imported by:",
+    "Produced and bottled for"): the line that names the bottler, producer or importer."""
+    return _BY_PREFIX.match(text) is not None
+
+
+_STATES = {
+    "AL": "alabama", "AK": "alaska", "AZ": "arizona", "AR": "arkansas", "CA": "california",
+    "CO": "colorado", "CT": "connecticut", "DE": "delaware", "DC": "district of columbia",
+    "FL": "florida", "GA": "georgia", "HI": "hawaii", "ID": "idaho", "IL": "illinois", "IN": "indiana",
+    "IA": "iowa", "KS": "kansas", "KY": "kentucky", "LA": "louisiana", "ME": "maine", "MD": "maryland",
+    "MA": "massachusetts", "MI": "michigan", "MN": "minnesota", "MS": "mississippi", "MO": "missouri",
+    "MT": "montana", "NE": "nebraska", "NV": "nevada", "NH": "new hampshire", "NJ": "new jersey",
+    "NM": "new mexico", "NY": "new york", "NC": "north carolina", "ND": "north dakota", "OH": "ohio",
+    "OK": "oklahoma", "OR": "oregon", "PA": "pennsylvania", "RI": "rhode island", "SC": "south carolina",
+    "SD": "south dakota", "TN": "tennessee", "TX": "texas", "UT": "utah", "VT": "vermont",
+    "VA": "virginia", "WA": "washington", "WV": "west virginia", "WI": "wisconsin", "WY": "wyoming",
+    "PR": "puerto rico",
+}  # fmt: skip
+_STATE_BY_NAME = {v: k for k, v in _STATES.items()}
+_STREET = re.compile(r"^\s*(?:\d|p\.?\s*o\.?\s*box\b)", re.I)
+_USED_ON_LABEL = re.compile(r"\(\s*used on label\s*\)", re.I)
+_ZIP = re.compile(r"^\d{5}(?:-\d{4})?$")
+_TRIM = " \t" + chr(160) + chr(65533)  # space, tab, no-break space, replacement char (registry exports)
+
+
+@dataclass(frozen=True)
+class RegisteredParty:
+    """A bottler, producer or importer as registered: the names it may print (in the order to try:
+    the name marked as used on the label, then the trade name, then the legal name) and the city,
+    state and ZIP of its address when the line carries one."""
+
+    names: tuple[str, ...]
+    city: str | None = None
+    state: str | None = None  # two-letter code when recognized, else as written
+    zip_code: str | None = None
+
+    def state_forms(self) -> tuple[str, ...]:
+        """The state as a code and as a name, folded, for matching label text."""
+        if not self.state:
+            return ()
+        code = self.state.upper() if self.state.upper() in _STATES else _STATE_BY_NAME.get(fold(self.state))
+        if code is None:
+            return (fold(self.state),)
+        return (code.lower(), _STATES[code])
+
+
+def _state_code(token: str) -> str | None:
+    t = token.strip()
+    if t.upper() in _STATES and len(t) == 2:
+        return t.upper()
+    return _STATE_BY_NAME.get(fold(t))
+
+
+def split_registered_party(s: str) -> RegisteredParty:
+    """Take apart a registered name-and-address line as COLAs stores it:
+    ``Trade Name, Legal Name, Inc., 2957 RANDOLPH ST, Costa Mesa, CA, 92626, BRAND (Used on label)``
+    or the shorter ``Bottled by Old Tom Distillery, Bardstown, Kentucky``. Corporate forms that
+    follow a comma ("Inc.", "LLC") are reattached to the name before them."""
+    tokens = [t.strip(_TRIM) for t in s.split(",")]
+    tokens = [t for t in tokens if t]
+    label_name: str | None = None
+    rest: list[str] = []
+    for t in tokens:
+        if _USED_ON_LABEL.search(t):
+            label_name = _USED_ON_LABEL.sub("", t).strip(_TRIM) or None
+        else:
+            rest.append(t)
+    tokens = rest
+    street = next((i for i, t in enumerate(tokens) if _STREET.match(t)), None)
+    city = state = zip_code = None
+    if street is not None:
+        head, tail = tokens[:street], tokens[street + 1 :]
+        if tail:
+            city = tail[0]
+        if len(tail) > 1:
+            state = tail[1]
+        if len(tail) > 2 and _ZIP.match(tail[2]):
+            zip_code = tail[2]
+            head = head + tail[3:]  # anything after the ZIP is another name
+        elif len(tail) > 2:
+            head = head + tail[2:]
+    elif len(tokens) >= 3 and _state_code(tokens[-1]):
+        head, city, state = tokens[:-2], tokens[-2], tokens[-1]
+    elif len(tokens) >= 2 and _state_code(tokens[-1]) and len(tokens[-1]) == 2:
+        head, state = tokens[:-1], tokens[-1]
+    else:
+        head = tokens
+    names: list[str] = []
+    for t in head:
+        if names and key(t) in _CORPORATE_TOKENS:
+            names[-1] = names[-1] + ", " + t
+        else:
+            names.append(t)
+    ordered = ([label_name] if label_name else []) + names
+    seen: set[str] = set()
+    unique: list[str] = []
+    for n in ordered:
+        k = fold_company(n)
+        if k and k not in seen:
+            seen.add(k)
+            unique.append(n)
+    code = _state_code(state) if state else None
+    return RegisteredParty(names=tuple(unique), city=city, state=code or state, zip_code=zip_code)
