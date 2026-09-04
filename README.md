@@ -37,7 +37,7 @@ Each one is met by design and checked by a test or a measurement, not by a claim
 |---|---|---|
 | "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.3 s, p95 2.6 s on two workers. Deployed: _DEPLOY_P95_ (see [Measured](#measured)) |
 | "something **my mother could figure out**" | One screen, two numbered steps, one big button, three one-click samples, U.S. Web Design System, statuses as icon + word + color, keyboard and screen-reader friendly. | Observed usability test: _USABILITY_RESULT_ |
-| "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | Load test to hundreds of images: [docs/LOADTEST.md](docs/LOADTEST.md) |
+| "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | 300 images (150 applications) through the real screen in 275 s with zero errors: [docs/LOADTEST.md](docs/LOADTEST.md) |
 | The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes. Punctuation, accent and single-character differences are "Needs review" with a diff (usually OCR noise); a changed, added or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
 
 And the constraint behind the architecture: Marcus's network "blocks outbound traffic to a lot of
@@ -135,6 +135,9 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 | Per-application latency, deployed | _DEPLOY_LATENCY_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Batch throughput, deployed | _DEPLOY_THROUGHPUT_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| 300-image batch through the batch screen (150 applications, local, 2 workers) | 275 s end to end, 1.1 images/s including comparison and rendering; 120 ready, 30 need review, 0 errors, no browser errors | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| 300 sequential extract requests at advertised capacity | 300 of 300 served, p95 1.5 s, zero refusals | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| Inside the CI container (GitHub runner, 1 worker, networking disabled) | ready 2.1 s after start; front+back application verified in 3.1 s | CI run 33821661824 |
 
 **Error analysis.** Every warning miss on clean artwork is the same failure: the multilingual recognizer occasionally emits an accented letter for a plain one ("alcoholič", "drivé"). The tool could silently strip accents and report "exact", and an earlier build did; the reviewer was right that a legal status must not hide instrument error, so those cases are "Needs review" with the diff and the evidence crop, a two-second confirmation for the agent. The remaining degraded misses are text shrunk to a third of its size and one sideways image where the rotation retry picked up a partial read. An English-only recognizer would remove the accent failure; it measured about 60% slower single-threaded (`docs/OCR_EVAL.md`), so it was not adopted for this build.
 

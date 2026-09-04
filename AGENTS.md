@@ -30,10 +30,10 @@ Codex as reviewer). These conventions keep that workflow safe and legible. `CLAU
 ## Layout
 ```
 app/            FastAPI application (routes/, ocr/, pipeline/, static/)
-tests/          unit/ (fast, no OCR)  integration/ (OCR on fixtures)  fixtures/ (committed PNGs)
-tools/          make_labels.py  bakeoff.py  ocr_perf.py  loadtest.py  evaluate.py
-docs/           APPROACH.md  REQUIREMENTS_TRACE.md  LIMITS.md  SECURITY.md  DECISIONS.md
-                PROCESS.md  REGULATIONS.md  BAKEOFF.md  reviews/  regs/
+tests/          unit/ (fast, no OCR)  integration/ (OCR on fixtures)  browser/ (Playwright, manual)  fixtures/ (committed PNGs)
+tools/          make_labels.py  evaluate.py  loadtest.py  ocr_eval2.py  vendor_models.py  container_smoke.py
+docs/           APPROACH.md  REQUIREMENTS_TRACE.md  LIMITS.md  SECURITY.md  DECISIONS.md  DEPLOY.md
+                REGULATIONS.md (+ regs/ XML)  EVAL.md  LOADTEST.md  OCR_EVAL.md  BAKEOFF.md  reviews/
 samples/        bundled demo labels + sample CSV (fictional brands only)
 ```
 

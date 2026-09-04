@@ -38,3 +38,9 @@ _Appended by `tools/loadtest.py`. Each block names the host it ran against._
 - final status codes: {200: 300}; 429 responses absorbed by backoff along the way: 0
 - run at 2026-09-03 17:21:41
 
+### browser batch: 150 applications x 2 images through the batch screen, host http://127.0.0.1:8000
+- wall 275 s (1.09 images/s end to end, including compare calls and rendering)
+- summary tiles: 120 Ready for approval | 30 Need review | 0 Issues / unreadable | 0 Errors | 0 Images not matched | 0/150 Decided | 2.0 s per image, median (p95 2.4 s)
+- no browser errors
+- run at 2026-09-03 17:26:18
+
