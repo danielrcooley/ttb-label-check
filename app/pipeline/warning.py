@@ -179,6 +179,7 @@ def compare_warning(found: str) -> tuple[bool, float]:
 _PUNCT_ONLY = re.compile(r"^[^\w]+$")
 _NUMBER_ONLY = re.compile(r"^\W*\d+\W*$")
 _STRIP = re.compile(r"[^\w]")
+_TRAILING_DIGITS = re.compile(r"[\d\W_]+$")
 # OCR confusables folded to one canonical letter: 0/o, 1/l/i/|/!, 5/s, 8/b, 2/z, 6/g
 _CONFUSABLE = str.maketrans({"0": "o", "1": "l", "i": "l", "|": "l", "!": "l", "5": "s", "8": "b", "2": "z", "6": "g"})
 
@@ -222,6 +223,15 @@ def classify_difference(expected: str, found: str) -> str:
         if tag == "replace":
             # e.g. "Surgeon General," read as "SurgeonGeneral," (merged) or split words
             if _canon_word("".join(left)) == _canon_word("".join(right)):
+                continue
+            # a number swept in from a barcode or lot code printed against the statement, glued to
+            # the word it landed on: 'or' read as 'OR88 186"223932'
+            if (
+                len(left) == 1
+                and right
+                and _same_word_modulo_noise(left[0], _TRAILING_DIGITS.sub("", right[0]))
+                and all(_STRIP.sub("", t).isdigit() for t in right[1:])
+            ):
                 continue
             return "wording"
         # pure insert or delete: punctuation-only tokens are noise; a bare number swept in from a

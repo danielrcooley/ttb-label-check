@@ -507,3 +507,34 @@ def test_origin_not_read_is_review_but_a_different_origin_statement_is_a_mismatc
         if c.id == "country_of_origin"
     )
     assert other.status == "mismatch" and "France" in (other.note or "")
+
+
+def test_bottler_name_printed_whole_inside_the_label_line_with_its_address_is_a_match():
+    marker = chr(160) + "(Used on label)"
+    registered = "RUBIN WINES LLC, 5220 ROSS RD, SEBASTOPOL, CA, 95472, RIVER ROAD FAMILY VINEYARDS AND WINERY" + marker
+    check = _bottler(
+        registered, ["VINTED & BOTTLED BY: RIVER ROAD FAMILY VINEYARDS AND WINERY, SEBASTOPOL, CA", "ALC 14.5% BY VOL"]
+    )
+    assert check.status == "match", check
+
+
+def test_class_type_with_nothing_resembling_it_shows_no_closest_text():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    app = ApplicationFields(
+        beverage_type="wine",
+        brand_name="RON RUBIN",
+        class_type="Dessert/Port/Sherry/(Cooking) Wine",
+        net_contents="375 mL",
+    )
+    lines = make_lines(
+        ["RON RUBIN", "The vineyards for this wine showcase a dark fruit character with hints of", "CABERNET SAUVIGNON"]
+    )
+    cls = next(c for c in compare(app, lines, [], s).checks if c.id == "class_type")
+    assert cls.status == "needs_review" and cls.found is None and cls.evidence == []
+    assert "Nothing on the label resembles" in (cls.note or "")

@@ -144,6 +144,12 @@ def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
     best: Check | None = None
     for cand in (expected, *party.names):
         c = _text_check("bottler", fold_company(cand), folded, s, rule=_BOTTLER_RULE)
+        folded_name = fold_company(cand)
+        if c.status is Status.needs_review and c.found and folded_name and folded_name in fold_company(c.found):
+            # The name is printed whole inside a longer line, with its address after it: that is how
+            # labels print it ("VINTED & BOTTLED BY: RIVER ROAD FAMILY VINEYARDS AND WINERY, SEBASTOPOL, CA").
+            c.status = Status.match
+            c.note = "The registered name appears in full on the label's bottler line."
         if best is None or (_STATUS_RANK[c.status], -(c.score or 0)) < (_STATUS_RANK[best.status], -(best.score or 0)):
             best = c
     check = best if best is not None else _text_check("bottler", fold_company(expected), folded, s, rule=_BOTTLER_RULE)
@@ -383,6 +389,10 @@ def _class_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
     Needs review with the closest text (D-041)."""
     check = _text_check("class_type", expected, lines, s, rule="27 CFR 5.63 / 4.34 / 7.63")
     if check.status in (Status.mismatch, Status.not_found):
+        if check.status is Status.not_found:
+            # Below the mismatch threshold the "closest" span is unrelated text that happens to
+            # share a word ("...this wine showcase..."); showing it would mislead. Show nothing.
+            check.found, check.evidence, check.score = None, [], None
         lead = (
             f"The closest text on the label ('{check.found}') differs from the application's class description."
             if check.found

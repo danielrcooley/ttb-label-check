@@ -235,3 +235,14 @@ def test_word_boundary_changes_are_never_exact():
     assert not merged.exact and merged.assessment == "noise"
     split = report(make_lines(wrapped(CANONICAL.replace("GOVERNMENT WARNING", "GOVERN MENT WARNING"))))
     assert split.present and not split.exact
+
+
+def test_barcode_digits_glued_to_a_word_are_noise_not_wording():
+    """A barcode printed against the statement reads as digits glued to the word it lands on
+    ('or' -> 'OR88 186"223932' on a real Sonoma back label). Review with the diff, not an issue."""
+    text = CANONICAL.upper().replace("A CAR OR OPERATE", 'A CAR OR88 186"223932 OPERATE')
+    r = report(make_lines(wrapped(text)))
+    assert r.present and not r.exact and r.assessment == "noise", r
+    assert "OR88" in (r.diff or "")
+    # a genuinely different word glued to digits is still wording
+    assert classify_difference(CANONICAL, CANONICAL.replace("a car or operate", "a car nor88 operate")) == "wording"
