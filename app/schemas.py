@@ -66,6 +66,12 @@ class OcrLine(BaseModel):
     text: str = Field(max_length=1000)
     confidence: float = Field(ge=0, le=1)
     box: Quad
+    # Type weight measured from the pixels (stroke width over type height; app/pipeline/typeface.py).
+    # None when the print was too small or faint to measure. head/tail split a line that carries
+    # the warning heading into the heading and the rest.
+    weight: float | None = Field(default=None, ge=0, le=2)
+    weight_head: float | None = Field(default=None, ge=0, le=2)
+    weight_tail: float | None = Field(default=None, ge=0, le=2)
 
 
 class Evidence(BaseModel):

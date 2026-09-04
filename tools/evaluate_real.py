@@ -131,6 +131,7 @@ async def run(real: Path, workers: int) -> tuple[list[Record], Record]:
                 "warning_present": w.present,
                 "warning_assessment": w.assessment,
                 "warning_anchor_caps": str(w.anchor_caps),
+                "warning_type_weight": str(w.anchor_bold),  # match / needs_review / not_checked (D-044)
                 "warning_similarity": round(w.similarity, 3) if w.similarity is not None else None,
                 "warning_diff": (w.diff or "")[:300],
                 "alcohol_read": res.fields.alcohol_percent is not None,
@@ -237,6 +238,22 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
         row(
             "Warning heading all capitals (of located)",
             lambda g: pct(sum(r["warning_anchor_caps"] == "match" for r in g), sum(r["warning_present"] for r in g)),
+        )
+    )
+    out.append(
+        row(
+            "Warning heading measured heavier than the body (of located)",
+            lambda g: pct(
+                sum(r.get("warning_type_weight") == "match" for r in g), sum(r["warning_present"] for r in g)
+            ),
+        )
+    )
+    out.append(
+        row(
+            "Warning type weight not measured, small print or inconclusive (of located)",
+            lambda g: pct(
+                sum(r.get("warning_type_weight") == "not_checked" for r in g), sum(r["warning_present"] for r in g)
+            ),
         )
     )
     out.append(row("Alcohol statement read", lambda g: pct(sum(r["alcohol_read"] for r in g), len(g))))

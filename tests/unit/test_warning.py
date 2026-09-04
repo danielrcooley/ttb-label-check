@@ -246,3 +246,45 @@ def test_barcode_digits_glued_to_a_word_are_noise_not_wording():
     assert "OR88" in (r.diff or "")
     # a genuinely different word glued to digits is still wording
     assert classify_difference(CANONICAL, CANONICAL.replace("a car or operate", "a car nor88 operate")) == "wording"
+
+
+def _weighted(head, tail, body):
+    """A statement whose heading line carries head/tail weights and whose other lines carry body."""
+    lines = make_lines(wrapped(CANONICAL))
+    out = [lines[0].model_copy(update={"weight": head, "weight_head": head, "weight_tail": tail})]
+    out += [ln.model_copy(update={"weight": body}) for ln in lines[1:]]
+    return out
+
+
+def test_type_weight_bold_heading_over_regular_body_matches():
+    r = report(_weighted(0.145, 0.118, 0.118))
+    assert r.exact and r.anchor_bold is Status.match and r.body_not_bold is Status.match
+    assert "heavier" in r.notes[2]
+
+
+def test_type_weight_same_weight_is_review_on_both_counts():
+    """All bold, or a heading that is not bold: the measurement cannot tell them apart, so both
+    format rows ask the person, with one note saying why."""
+    all_bold = report(_weighted(0.146, 0.141, 0.141))
+    assert all_bold.anchor_bold is Status.needs_review and all_bold.body_not_bold is Status.needs_review
+    assert "same weight" in all_bold.notes[2] and "whole statement" in all_bold.notes[2]
+    light = report(_weighted(0.115, 0.113, 0.113))
+    assert light.anchor_bold is Status.needs_review and light.body_not_bold is Status.needs_review
+
+
+def test_type_weight_unmeasured_or_inconclusive_is_not_checked():
+    r = report(_weighted(None, None, None))
+    assert r.anchor_bold is Status.not_checked and r.body_not_bold is Status.not_checked
+    assert "could not be measured" in r.notes[2]
+    r2 = report(_weighted(0.160, 0.145, 0.145))  # ratio 1.10: between "same" (1.05) and "heavier" (1.15)
+    assert r2.anchor_bold is Status.not_checked and "confidence" in r2.notes[2]
+
+
+def test_type_weight_heading_alone_on_its_line_compares_stroke_pixels_with_the_other_lines():
+    lines = make_lines(["GOVERNMENT WARNING:", *wrapped(CANONICAL[len("GOVERNMENT WARNING: ") :], 60)])
+    out = [lines[0].model_copy(update={"weight": 0.20, "weight_head": 0.20, "weight_tail": None})]
+    out += [ln.model_copy(update={"weight": 0.13}) for ln in lines[1:]]
+    r = report(out)
+    assert r.anchor_bold is Status.match and "other lines" in r.notes[2]
+    same = [out[0].model_copy(update={"weight": 0.13, "weight_head": 0.13}), *out[1:]]
+    assert report(same).anchor_bold is Status.needs_review

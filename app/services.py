@@ -16,6 +16,7 @@ from app.ocr.pool import OcrPool, Runner
 from app.pipeline.compare import compare
 from app.pipeline.extract import extract_fields
 from app.pipeline.images import DecodedImage, decode_image, rotate_array, to_canonical
+from app.pipeline.typeface import measure_line
 from app.pipeline.warning import WarningSpan, find_warning
 from app.schemas import (
     ApplicationFields,
@@ -55,16 +56,32 @@ class ProcessedImage:
 RescueRead = tuple[ProcessedImage, Upload, int | None]
 
 
-def _to_lines(raw: list[RawLine], dec: DecodedImage, index: int, degrees: int, rot_w: int, rot_h: int) -> list[OcrLine]:
-    return [
-        OcrLine(
-            image_index=index,
-            text=r.text,
-            confidence=round(r.confidence, 4),
-            box=to_canonical(r.box, scale=dec.scale, degrees=degrees, rot_w=rot_w, rot_h=rot_h),
+def _to_lines(
+    raw: list[RawLine],
+    dec: DecodedImage,
+    index: int,
+    degrees: int,
+    rot_w: int,
+    rot_h: int,
+    arr: np.ndarray | None = None,
+) -> list[OcrLine]:
+    """Canonical lines from a read, with the type weight of each line measured on the array the
+    engine read (``arr``), so the warning report can judge bold type without the pixels."""
+    out: list[OcrLine] = []
+    for r in raw:
+        lw = measure_line(arr, r.box, r.text) if arr is not None else None
+        out.append(
+            OcrLine(
+                image_index=index,
+                text=r.text,
+                confidence=round(r.confidence, 4),
+                box=to_canonical(r.box, scale=dec.scale, degrees=degrees, rot_w=rot_w, rot_h=rot_h),
+                weight=lw.weight if lw else None,
+                weight_head=lw.head if lw else None,
+                weight_tail=lw.tail if lw else None,
+            )
         )
-        for r in raw
-    ]
+    return out
 
 
 def _read_score(raw: list[RawLine]) -> float:
@@ -104,20 +121,20 @@ async def process_image(
     t0 = time.perf_counter()
     raw = await run(dec.array)
     h, w = dec.array.shape[:2]
-    reads: dict[int, tuple[list[RawLine], int, int]] = {0: (raw, w, h)}
+    reads: dict[int, tuple[list[RawLine], int, int, np.ndarray]] = {0: (raw, w, h, dec.array)}
     chosen = 0
     mean = float(np.mean([r.confidence for r in raw])) if raw else 0.0
     if mean < settings.ocr_low_conf_retry or len(raw) < settings.ocr_min_lines_retry:
         for degrees in (90, 270):
             rot = rotate_array(dec.array, degrees)
             raw2 = await run(rot)
-            reads[degrees] = (raw2, rot.shape[1], rot.shape[0])
+            reads[degrees] = (raw2, rot.shape[1], rot.shape[0], rot)
             if _read_score(raw2) > _read_score(reads[chosen][0]) * 1.15:
                 chosen = degrees
     ocr_ms = int((time.perf_counter() - t0) * 1000)
-    raw_best, rw, rh = reads[chosen]
-    lines = _to_lines(raw_best, dec, index, chosen, rw, rh)
-    alternates = {d: _to_lines(r, dec, index, d, w2, h2) for d, (r, w2, h2) in reads.items() if d != chosen}
+    raw_best, rw, rh, arr_best = reads[chosen]
+    lines = _to_lines(raw_best, dec, index, chosen, rw, rh, arr_best)
+    alternates = {d: _to_lines(r, dec, index, d, w2, h2, a2) for d, (r, w2, h2, a2) in reads.items() if d != chosen}
     info = ImageInfo(
         index=index,
         filename=up.filename,
@@ -243,7 +260,7 @@ async def _rescue_read(
             )
             arr, turn = rotate_array(dec.array, degrees), degrees
         raw = await run(arr)
-        lines = _to_lines(raw, dec, p.info.index, turn, arr.shape[1], arr.shape[0])
+        lines = _to_lines(raw, dec, p.info.index, turn, arr.shape[1], arr.shape[0], arr)
         p.queue_ms += queue_ms
         p.ocr_ms += int((time.perf_counter() - t0) * 1000)
     return find_warning(lines)

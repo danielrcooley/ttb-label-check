@@ -33,10 +33,15 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 
 ## Known weaknesses, stated plainly
 
-1. **Bold type is not assessed.** 27 CFR 16.22 requires "GOVERNMENT WARNING" in bold and the rest
-   not in bold. The warning card shows both items as "Not checked" with the rule, so an agent does
-   not assume they were verified. A stroke-width heuristic was designed and not built in the time
-   available.
+1. **Bold type is measured, not read.** 27 CFR 16.22 requires "GOVERNMENT WARNING" in bold and the
+   rest not in bold. The tool measures the thickness of the ink strokes in the heading and in the
+   body of the statement, relative to the type height (`app/pipeline/typeface.py`, decision D-044).
+   A heading clearly heavier than the body is a Match on both counts; heading and body of the same
+   weight is Needs review on both, because the measurement cannot tell a heading that is not bold
+   from a statement that is all bold; a small difference is inconclusive. Print under about 24
+   pixels tall or with strokes under 3.5 pixels at the working size is "Not checked" with that
+   reason, which covers most registry artwork of small labels; the synthetic corpus and large
+   artwork measure well. Never a failure: it is a measurement of print, and the crop is shown.
 2. **Physical type size and characters per inch are not assessed.** They need a known scale.
    Artwork files that carry DPI metadata would allow it; this build does not read DPI.
 3. **Photographs are best effort.** The primary input is label artwork as submitted to COLA.

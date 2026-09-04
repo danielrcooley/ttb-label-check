@@ -421,7 +421,11 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
         pass
     elif warning.assessment in ("absent", "wording"):
         issues.append(Check(id="warning", label="Government warning", status=Status.mismatch))
-    elif warning.assessment == "noise" or warning.anchor_caps is Status.needs_review:
+    elif warning.assessment == "noise" or Status.needs_review in (
+        warning.anchor_caps,
+        warning.anchor_bold,
+        warning.body_not_bold,
+    ):
         reviews.append(Check(id="warning", label="Government warning", status=Status.needs_review))
     if issues:
         names = ", ".join(c.label.lower() for c in issues)
@@ -490,7 +494,12 @@ def compare(app: ApplicationFields, lines: list[OcrLine], images: list[ImageInfo
         )
     if fill:
         checks.append(fill)
-    warning = build_report(lines, mismatch_similarity=s.warning_mismatch_similarity)
+    warning = build_report(
+        lines,
+        mismatch_similarity=s.warning_mismatch_similarity,
+        heading_min_ratio=s.type_weight_heading_min_ratio,
+        same_max_ratio=s.type_weight_same_max_ratio,
+    )
     stated = parse_alcohol(app.alcohol_content, allow_bare=True) if app.alcohol_content else None
     if stated and stated.percent is not None and stated.percent < 0.5:
         warning = warning.model_copy(

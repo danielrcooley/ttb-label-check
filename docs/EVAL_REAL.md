@@ -31,13 +31,15 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | Warning exact (of all) | 62% | 62% | 60% | 61% |
 | Warning exact (of located) | 62% | 63% | 61% | 62% |
 | Warning heading all capitals (of located) | 98% | 100% | 98% | 99% |
+| Warning heading measured heavier than the body (of located) | 46% | 59% | 24% | 43% |
+| Warning type weight not measured, small print or inconclusive (of located) | 54% | 41% | 78% | 57% |
 | Alcohol statement read | 70% | 90% | 84% | 81% |
 | Net contents read | 90% | 92% | 58% | 80% |
 | All images readable | 98% | 100% | 100% | 99% |
 | Images per record, median | 2 | 2 | 1 | 2 |
 | Longest image side, median px | 1470 | 1278 | 1063 | 1232 |
-| Latency per record, median | 3572 ms | 3582 ms | 3734 ms | 3578 ms |
-| Latency per record, p95 | 8487 ms | 7462 ms | 6872 ms | 7393 ms |
+| Latency per record, median | 3579 ms | 3610 ms | 3748 ms | 3598 ms |
+| Latency per record, p95 | 8408 ms | 7462 ms | 7105 ms | 7462 ms |
 
 ## Warning assessment, all records
 
@@ -67,4 +69,4 @@ behind the results below. TTB IDs are public registry identifiers; no artwork is
 | 26243001000003 | Ale label with a lot number printed against the statement. | First "26" swept into the statement, reported as noise (review); since the finder stopped joining a vertical strip to horizontal lines (D-039), exact. | Right both times; better now. |
 | 26223001000428 | Vodka neck label, 732 pixels wide; the statement runs up the right edge in small capitals, reading bottom to top. | Found by the 270-degree turn, the first the bounded round tries; reported as wording (similarity 0.71, a stretch of words missing). With the 90-degree turn first it was absent, which is why 270 goes first. | Half right, like the bourbon label above: present, too small to read reliably, visibly reported. |
 
-_Regenerated 2026-09-04 09:33._
+_Regenerated 2026-09-04 12:22._

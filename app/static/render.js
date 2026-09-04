@@ -264,6 +264,8 @@ export function issueTexts(result) {
   const w = result.warning;
   if (w.assessment === "not_required") { /* under 0.5% alcohol: no statement required */ }
   else if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
+  if (w.present && w.anchor_bold === "needs_review") probs.push("Warning: heading may not be bold");
+  if (w.present && w.body_not_bold === "needs_review") probs.push("Warning: statement may be all bold");
   return probs;
 }
 

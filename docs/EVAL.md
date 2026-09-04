@@ -6,7 +6,7 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 ## Artwork tier (10 cases)
 
-- Per-application latency (two images, parallel): median 2710 ms, p95 3010 ms
+- Per-application latency (two images, parallel): median 2524 ms, p95 2922 ms
 
 | Field | Match | Needs review | Mismatch / not found | Match rate |
 |---|---:|---:|---:|---:|
@@ -23,7 +23,7 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 ## Degraded tier (20 cases)
 
-- Per-application latency (two images, parallel): median 2590 ms, p95 6774 ms
+- Per-application latency (two images, parallel): median 2375 ms, p95 6453 ms
 
 | Field | Match | Needs review | Mismatch / not found | Match rate |
 |---|---:|---:|---:|---:|
@@ -39,26 +39,26 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 | Degradation | cases | verdicts | median ms |
 |---|---:|---|---:|
-| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2877 |
-| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2475 |
-| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2392 |
-| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2566 |
-| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2570 |
-| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 3053 |
-| rotate90 | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 6778 |
-| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2363 |
+| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2369 |
+| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2227 |
+| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2254 |
+| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2394 |
+| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2324 |
+| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2483 |
+| rotate90 | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 6566 |
+| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2128 |
 
 ## Problem tier (6 cases)
 
-- Per-application latency (two images, parallel): median 2810 ms, p95 3878 ms
+- Per-application latency (two images, parallel): median 2538 ms, p95 3718 ms
 
 | Planted defect | detected | note |
 |---|---|---|
 | wrong_abv (APP-001) | yes |  |
 | titlecase (APP-002) | yes |  |
-| allbold (APP-003) | n/a | NOT ASSESSED by design: bold type |
+| allbold (APP-003) | yes |  |
 | altered (APP-004) | yes |  |
 | tiny (APP-005) | n/a | NOT ASSESSED by design: physical type size |
 | missing (APP-006) | yes |  |
 
-- Detection rate over the defects the tool assesses: 4/4; 2 planted defects are outside this build's checks and are listed as n/a
+- Detection rate over the defects the tool assesses: 5/5; 1 planted defects are outside this build's checks and are listed as n/a

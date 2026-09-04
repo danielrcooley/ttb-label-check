@@ -43,7 +43,7 @@ PROBLEM_EXPECTATIONS = {
     "altered": lambda r: r.warning.present and not r.warning.exact and r.verdict == "issues_found",
     "missing": lambda r: not r.warning.present and r.verdict == "issues_found",
     "tiny": None,  # planted defect the tool does not assess (physical type size)
-    "allbold": None,  # planted defect the tool does not assess (bold type)
+    "allbold": lambda r: r.warning.present and r.warning.body_not_bold == "needs_review",
 }
 
 
@@ -188,7 +188,6 @@ def summarize(data: dict) -> tuple[str, dict]:
             out += ["| Planted defect | detected | note |", "|---|---|---|"]
             notes = {
                 "tiny": "NOT ASSESSED by design: physical type size",
-                "allbold": "NOT ASSESSED by design: bold type",
             }
             det = 0
             assessed = [c for c in cases if c["assessed"]]

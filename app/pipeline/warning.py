@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import difflib
 import re
+import statistics
 import unicodedata
 from dataclasses import dataclass
 
@@ -257,10 +258,82 @@ def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
     )
 
 
-def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> WarningReport:
+def type_weight_ratio(span: WarningSpan) -> tuple[float, str] | None:
+    """Heading stroke weight over body stroke weight, and what it was measured against. The sound
+    comparison is the heading against the rest of its own line: same size, same face, same box, so
+    the normalization cancels (real labels: a semibold heading reads 1.15, a bold one 1.24, all-bold
+    0.99). When the heading stands alone on its line, its stroke thickness in pixels is compared
+    with the median of the other lines' (the box heights differ, so ratios would not). None when
+    the print was too small or faint to measure."""
+    heading = next((ln for ln in span.lines if _ANCHOR_RE.search(ln.text) and ln.weight_head is not None), None)
+    if heading is None or heading.weight_head is None:
+        return None
+    if heading.weight_tail:
+        return heading.weight_head / heading.weight_tail, "the rest of its line"
+
+    def height(ln: OcrLine) -> float:
+        _, _, y0, y1 = _extent(ln)
+        return max(1.0, y1 - y0)
+
+    others = [ln for ln in span.lines if ln is not heading and ln.weight is not None]
+    if len(others) < 2:
+        return None
+    head_px = heading.weight_head * height(heading)
+    body_px = statistics.median(ln.weight * height(ln) for ln in others if ln.weight is not None)
+    return (head_px / body_px if body_px else 0.0), "the other lines"
+
+
+def type_weight_status(
+    span: WarningSpan, *, heading_min_ratio: float, same_max_ratio: float
+) -> tuple[Status, Status, str]:
+    """Bold type from the stroke weights measured on the pixels (app/pipeline/typeface.py): the
+    heading must be bold and the rest must not be (27 CFR 16.22(a)(2)). A heading clearly heavier
+    is a Match on both counts; heading and body of the same weight is Needs review on both, because
+    the measurement cannot tell a heading that is not bold from a statement that is all bold; a
+    small difference is inconclusive, and print too small or faint to measure is Not checked.
+    Never a failure: it measures print, not wording."""
+    measured = type_weight_ratio(span)
+    if measured is None:
+        return (
+            Status.not_checked,
+            Status.not_checked,
+            "Bold type could not be measured: the print is too small or too faint at the working size. "
+            "Check it on the image (27 CFR 16.22(a)(2)).",
+        )
+    ratio, basis = measured
+    if ratio >= heading_min_ratio:
+        return (
+            Status.match,
+            Status.match,
+            f"The heading is set about {ratio:.1f} times heavier than {basis}: bold heading, remainder not bold "
+            "(27 CFR 16.22(a)(2)).",
+        )
+    if ratio <= same_max_ratio:
+        return (
+            Status.needs_review,
+            Status.needs_review,
+            f"The heading and {basis} measure the same weight: either the heading is not in bold, or the whole "
+            "statement is. Only the heading may be bold (27 CFR 16.22(a)(2)). Confirm on the image.",
+        )
+    return (
+        Status.not_checked,
+        Status.not_checked,
+        f"Bold type could not be judged with confidence from this image (the heading measures only slightly "
+        f"heavier than {basis}); check it on the image (27 CFR 16.22(a)(2)).",
+    )
+
+
+def build_report(
+    lines: list[OcrLine],
+    *,
+    mismatch_similarity: float,
+    heading_min_ratio: float = 1.15,
+    same_max_ratio: float = 1.05,
+) -> WarningReport:
     """Assess the warning statement. ``assessment`` drives the verdict:
-    exact -> pass; noise -> Needs review; wording/absent -> issue. The anchor's capitals are a
-    separate format check (``anchor_caps``) and can send an exact statement to Needs review."""
+    exact -> pass; noise -> Needs review; wording/absent -> issue. The anchor's capitals and the
+    type weight are separate format checks (``anchor_caps``, ``anchor_bold``, ``body_not_bold``)
+    that can send an exact statement to Needs review, never to an issue."""
     span = find_warning(lines)
     if span is None:
         return WarningReport(
@@ -282,6 +355,9 @@ def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> Warning
         )
     exact, similarity = compare_warning(span.text)
     caps_status, caps_note = anchor_caps_status(span.anchor_text)
+    bold_status, body_status, bold_note = type_weight_status(
+        span, heading_min_ratio=heading_min_ratio, same_max_ratio=same_max_ratio
+    )
     if exact:
         assessment = "exact"
     else:
@@ -307,13 +383,8 @@ def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> Warning
         found_text=span.text,
         diff=None if exact else word_diff(CANONICAL, span.text),
         anchor_caps=caps_status,
-        anchor_bold=Status.not_checked,
-        body_not_bold=Status.not_checked,
+        anchor_bold=bold_status,
+        body_not_bold=body_status,
         evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],
-        notes=[
-            notes[assessment],
-            caps_note,
-            "Bold type (anchor bold, remainder not bold) is not assessed automatically in this build; "
-            "check it on the image (27 CFR 16.22(a)(2)).",
-        ],
+        notes=[notes[assessment], caps_note, bold_note],
     )

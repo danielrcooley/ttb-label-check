@@ -205,3 +205,22 @@ def test_early_rejections_carry_security_headers_and_do_not_crash(client):
     )
     assert r.status_code == 413 and r.json()["code"] == "request_too_large"
     assert r.headers["Server-Timing"].startswith("total;dur=") and r.headers["X-Request-ID"]
+
+
+def test_all_bold_warning_is_flagged_for_review_and_a_bold_heading_matches(client, manifest):
+    app = _app(manifest, "APP-003")
+    bold = client.post(
+        "/api/v1/verify",
+        data={"application": app_json(app)},
+        files=image_files("APP-003_front_clean.png", "APP-003_back_allbold.png"),
+    ).json()
+    assert bold["warning"]["exact"], bold["warning"]
+    assert bold["warning"]["body_not_bold"] == "needs_review", bold["warning"]
+    assert bold["verdict"] == "needs_review", bold["summary"]
+    clean = client.post(
+        "/api/v1/verify",
+        data={"application": app_json(app)},
+        files=image_files("APP-003_front_clean.png", "APP-003_back_clean.png"),
+    ).json()
+    assert clean["warning"]["anchor_bold"] == "match" and clean["warning"]["body_not_bold"] == "match", clean["warning"]
+    assert clean["verdict"] == "ready_for_approval", clean["summary"]
