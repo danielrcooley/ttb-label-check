@@ -133,6 +133,10 @@ main { flex: 1 0 auto; }
   .status-tag { border: 2px solid CanvasText; }
   .overlay polygon { fill: none; stroke: Highlight; }
   .dropzone { border-color: CanvasText; }
+  /* a pressed decision or filter button keeps a visible state without its fill */
+  .batch-table .decision-btns .usa-button.is-on, .filter-bar .usa-button.is-on {
+    forced-color-adjust: none; background: Highlight; color: HighlightText; border: 3px solid Highlight; outline: 2px solid CanvasText; outline-offset: 1px;
+  }
 }
 
 @media print {

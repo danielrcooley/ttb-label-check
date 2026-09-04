@@ -338,9 +338,17 @@ function issueList(item) {
 
 function decisionCell(item) {
   const d = state.decisions.get(item.key) || {};
-  const btn = (val, label) => el("button", { type: "button", class: `usa-button usa-button--outline${d.decision === val ? " is-on" : ""}`, text: label,
+  // The pressed button carries a check mark in its text as well as a dark fill, because Windows
+  // contrast themes drop fills; and the click reads the current decision, not the one rendered.
+  const btn = (val, label) => el("button", { type: "button", class: `usa-button usa-button--outline${d.decision === val ? " is-on" : ""}`,
+    text: d.decision === val ? `✓ ${label}` : label,
     "aria-pressed": d.decision === val ? "true" : "false",
-    onclick: () => { state.decisions.set(item.key, { ...d, decision: d.decision === val ? null : val }); renderTable(); renderSummary(); } });
+    title: d.decision === val ? `${label}: press again to clear` : label,
+    onclick: () => {
+      const cur = state.decisions.get(item.key) || {};
+      state.decisions.set(item.key, { ...cur, decision: cur.decision === val ? null : val });
+      renderTable(); renderSummary();
+    } });
   const note = el("input", { type: "text", class: "note-input", placeholder: "Note (optional)", value: d.note || "", "aria-label": `Note for ${item.key}` });
   note.addEventListener("change", () => state.decisions.set(item.key, { ...(state.decisions.get(item.key) || {}), note: note.value }));
   return el("div", {}, [el("div", { class: "decision-btns" }, [btn("approve", "Approve"), btn("reject", "Reject"), btn("flag", "Flag")]), note]);
