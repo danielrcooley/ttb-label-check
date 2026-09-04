@@ -58,25 +58,48 @@ no registry password is stored anywhere.
 
 ## 4. Probes (readiness gates traffic until the models are warm)
 
+**A `--yaml` update replaces the container spec.** Anything the YAML leaves out reverts to the
+defaults: 0.5 vCPU, 1 GiB, no environment variables, scale to zero. The first deployment applied a
+probes-only YAML and ran on half a core (26 s per application, per-client cap shared by everyone
+because `TTB_TRUST_PROXY` was gone) until `az containerapp show` was checked. The YAML must repeat
+resources, environment and scale:
+
 ```bash
-az containerapp update --name $APP --resource-group $RG --yaml - <<'YAML'
+az containerapp update --name $APP --resource-group $RG --yaml - <<YAML
 properties:
   template:
+    scale: { minReplicas: 1, maxReplicas: 1 }
     containers:
       - name: label-check
+        image: $ACR.azurecr.io/label-check:$SHA
+        resources: { cpu: 2.0, memory: 4Gi }
+        env:
+          - { name: TTB_OCR_WORKERS, value: "2" }
+          - { name: TTB_TRUST_PROXY, value: "true" }
+          - { name: TTB_OCR_MAX_SIDE, value: "1280" }
+          - { name: GIT_SHA, value: "$SHA" }
         probes:
           - type: Startup
             httpGet: { path: /api/v1/ready, port: 8000 }
             initialDelaySeconds: 5
             periodSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 36
           - type: Readiness
             httpGet: { path: /api/v1/ready, port: 8000 }
             periodSeconds: 10
+            failureThreshold: 3
           - type: Liveness
             httpGet: { path: /api/v1/health, port: 8000 }
             periodSeconds: 30
+            failureThreshold: 3
 YAML
+```
+
+Afterwards confirm what is running, not what was asked for:
+
+```bash
+az containerapp show --name $APP --resource-group $RG \
+  --query "properties.template.containers[0].[resources.cpu, resources.memory, env[].name]" -o json
 ```
 
 (If the YAML update complains about the container name, take it from

@@ -89,8 +89,15 @@ def decode_image(data: bytes, *, max_pixels: int, max_side: int, filename: str |
             )
         if fmt == "gif":
             im.seek(0)
-        if fmt == "jpeg" and max(w, h) > 2 * max_side:
-            im.draft("RGB", (max_side * 2, max_side * 2))  # decode large JPEGs at reduced size: far less memory
+        # The canonical size is the oriented original, fixed here from the header before any
+        # reduced-size decode can change im.size. EXIF orientations 5-8 swap width and height.
+        swapped = im.getexif().get(0x0112, 1) in (5, 6, 7, 8)
+        canon_w, canon_h = (h, w) if swapped else (w, h)
+        if fmt == "jpeg" and min(w, h) >= 2 * max_side:
+            # libjpeg decodes at 1/2, 1/4 or 1/8 size while keeping both sides at or above max_side:
+            # a 12 MP phone photo costs a quarter of the memory and time. Coordinates are unaffected
+            # because scale is computed against the canonical size recorded above.
+            im.draft("RGB", (max_side, max_side))
         im = ImageOps.exif_transpose(im) or im
         im = im.convert("RGB")
     except ImageError:
@@ -101,11 +108,11 @@ def decode_image(data: bytes, *, max_pixels: int, max_side: int, filename: str |
             "This image could not be decoded.",
             "The file may be truncated or corrupt. Re-export it and try again.",
         ) from exc
-    cw, ch = im.size
-    scale = min(1.0, max_side / max(cw, ch))
-    if scale < 1.0:
-        im = im.resize((max(1, round(cw * scale)), max(1, round(ch * scale))), Image.LANCZOS)
-    return DecodedImage(array=np.asarray(im), width=cw, height=ch, scale=scale, format=fmt, filename=filename)
+    scale = min(1.0, max_side / max(canon_w, canon_h))
+    target = (max(1, round(canon_w * scale)), max(1, round(canon_h * scale)))
+    if im.size != target:
+        im = im.resize(target, Image.LANCZOS)
+    return DecodedImage(array=np.asarray(im), width=canon_w, height=canon_h, scale=scale, format=fmt, filename=filename)
 
 
 def rotate_array(arr: np.ndarray, degrees: int) -> np.ndarray:

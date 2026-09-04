@@ -67,6 +67,49 @@ def test_exif_orientation_is_applied():
     assert (d.width, d.height) == (40, 60)
 
 
+def _jpeg_with_mark(w: int, h: int, mark: tuple[int, int, int, int], orientation: int | None = None) -> bytes:
+    """A light JPEG with a dark rectangle (x0, y0, x1, y1) in stored pixel coordinates."""
+    im = Image.new("RGB", (w, h), (235, 235, 235))
+    x0, y0, x1, y1 = mark
+    for x in range(x0, x1):
+        for y in range(y0, y1):
+            im.putpixel((x, y), (10, 10, 10))
+    buf = BytesIO()
+    if orientation is None:
+        im.save(buf, "JPEG", quality=95)
+    else:
+        exif = im.getexif()
+        exif[0x0112] = orientation
+        im.save(buf, "JPEG", quality=95, exif=exif.tobytes())
+    return buf.getvalue()
+
+
+def test_reduced_size_jpeg_decode_keeps_canonical_size_and_coordinates():
+    """A JPEG at least twice the working size is decoded at reduced size (Image.draft). The size
+    reported to the client and the scale used for boxes must still describe the original file."""
+    d = decode_image(_jpeg_with_mark(1000, 800, (600, 300, 640, 340)), max_pixels=10**7, max_side=200)
+    assert (d.width, d.height) == (1000, 800)
+    assert d.array.shape[:2] == (160, 200)
+    assert d.scale == pytest.approx(0.2)
+    ys, xs = np.nonzero(d.array[:, :, 1] < 128)
+    quad = to_canonical(
+        [(xs.min(), ys.min()), (xs.max() + 1, ys.min()), (xs.max() + 1, ys.max() + 1), (xs.min(), ys.max() + 1)],
+        scale=d.scale,
+        degrees=0,
+        rot_w=200,
+        rot_h=160,
+    )
+    (x0, y0), _, (x1, y1), _ = quad
+    assert abs(x0 - 600) <= 6 and abs(y0 - 300) <= 6 and abs(x1 - 640) <= 6 and abs(y1 - 340) <= 6
+
+
+def test_reduced_size_jpeg_decode_with_exif_rotation_reports_oriented_size():
+    d = decode_image(_jpeg_with_mark(1000, 800, (600, 300, 640, 340), orientation=6), max_pixels=10**7, max_side=200)
+    assert (d.width, d.height) == (800, 1000)
+    assert d.array.shape[:2] == (200, 160)
+    assert d.scale == pytest.approx(0.2)
+
+
 @pytest.mark.parametrize("degrees", [90, 180, 270])
 def test_unrotate_point_round_trips_a_marked_pixel(degrees):
     arr = np.zeros((40, 60, 3), dtype=np.uint8)  # h=40, w=60
