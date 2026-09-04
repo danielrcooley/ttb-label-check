@@ -18,7 +18,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import random
+import re
 import time
 from pathlib import Path
 
@@ -40,16 +42,19 @@ APPLICATION = {
 
 
 def pct(xs: list[float], p: float) -> float:
+    """Nearest-rank percentile: the value at rank ceil(p * n), so the p95 of ten samples is the tenth
+    value, not the ninth (review 007)."""
     if not xs:
         return 0.0
     s = sorted(xs)
-    return s[min(len(s) - 1, int(p * (len(s) - 1)))]
+    return s[max(0, math.ceil(p * len(s)) - 1)]
 
 
 async def one(
     client: httpx.AsyncClient, url: str, endpoint: str, files: list[tuple[str, bytes]], batch: bool, retry: bool
-) -> tuple[int, float, int, float | None]:
-    """Returns (final status, wall ms including retries, number of 429s seen, server-side ms or None)."""
+) -> tuple[int, float, int, float | None, float | None]:
+    """Returns (final status, wall ms including retries, number of 429s seen, server ms from the
+    Server-Timing header or None, pipeline ms from the response's own timing or None)."""
     headers = {"X-Batch": "1"} if batch else {}
     refused = 0
     t0 = time.perf_counter()
@@ -59,25 +64,29 @@ async def one(
         try:
             r = await client.post(f"{url}/api/v1/{endpoint}", files=form, data=data, headers=headers)
         except httpx.HTTPError:
-            return 0, (time.perf_counter() - t0) * 1000, refused, None
+            return 0, (time.perf_counter() - t0) * 1000, refused, None, None
         if r.status_code == 429 and retry:
             refused += 1
             base = float(r.headers.get("Retry-After", "1"))
             await asyncio.sleep(base * (attempt + 1) + random.random() * 0.5)  # grows like the browser client
             continue
         server_ms: float | None = None
+        pipeline_ms: float | None = None
+        m = re.search(r"total;dur=([0-9.]+)", r.headers.get("Server-Timing", ""))
+        if m:
+            server_ms = float(m.group(1))  # the whole request on the server: parsing, uploads, validation, pipeline
         if r.status_code == 200:
             try:
-                server_ms = float(r.json()["timing"]["total_ms"])  # the server's own clock, network excluded
+                pipeline_ms = float(r.json()["timing"]["total_ms"])  # OCR and comparison alone
             except (ValueError, KeyError, TypeError):
-                server_ms = None
-        return r.status_code, (time.perf_counter() - t0) * 1000, refused, server_ms
-    return 429, (time.perf_counter() - t0) * 1000, refused, None
+                pipeline_ms = None
+        return r.status_code, (time.perf_counter() - t0) * 1000, refused, server_ms, pipeline_ms
+    return 429, (time.perf_counter() - t0) * 1000, refused, None, None
 
 
 async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> str:
     sem = asyncio.Semaphore(args.concurrency)
-    results: list[tuple[int, float, int, float | None]] = []
+    results: list[tuple[int, float, int, float | None, float | None]] = []
     async with httpx.AsyncClient(timeout=60) as client:
 
         async def task() -> None:
@@ -89,12 +98,13 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
         t0 = time.perf_counter()
         await asyncio.gather(*(task() for _ in range(args.n)))
         wall = time.perf_counter() - t0
-    ok = [ms for st, ms, _, _ in results if st == 200]
-    server = [sv for st, _, _, sv in results if st == 200 and sv is not None]
+    ok = [ms for st, ms, _, _, _ in results if st == 200]
+    server = [sv for st, _, _, sv, _ in results if st == 200 and sv is not None]
+    pipeline = [pv for st, _, _, _, pv in results if st == 200 and pv is not None]
     codes: dict[int, int] = {}
-    for st, _, _, _ in results:
+    for st, _, _, _, _ in results:
         codes[st] = codes.get(st, 0) + 1
-    refused = sum(r for _, _, r, _ in results)
+    refused = sum(r for _, _, r, _, _ in results)
     return "\n".join(
         [
             f"### steady{' interactive' if args.interactive else ''}: {args.n} x {args.endpoint} "
@@ -102,8 +112,11 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
             f"- wall {wall:.1f} s, throughput {args.n / wall:.2f} req/s ({args.n * len(files) / wall:.2f} images/s)",
             f"- wall latency ms per successful request, including any backoff waits: p50 {pct(ok, 0.5):.0f}, "
             f"p95 {pct(ok, 0.95):.0f}, max {max(ok) if ok else 0:.0f}",
-            f"- server-side latency ms (the response's own timing.total_ms, network excluded): p50 {pct(server, 0.5):.0f}, "
-            f"p95 {pct(server, 0.95):.0f}, max {max(server) if server else 0:.0f}",
+            f"- server latency ms (Server-Timing header: the whole request on the server, network excluded): "
+            f"p50 {pct(server, 0.5):.0f}, p95 {pct(server, 0.95):.0f}, max {max(server) if server else 0:.0f}",
+            f"- pipeline ms (the response's own timing.total_ms: OCR and comparison only): p50 {pct(pipeline, 0.5):.0f}, "
+            f"p95 {pct(pipeline, 0.95):.0f}, max {max(pipeline) if pipeline else 0:.0f}",
+            "- percentiles are nearest-rank",
             f"- final status codes: {codes}; 429 responses absorbed by backoff along the way: {refused}",
         ]
     )
@@ -119,9 +132,9 @@ async def burst(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> str
         wall = time.perf_counter() - t0
         h = await health_task
     codes: dict[int, int] = {}
-    for st, _, _, _ in results:
+    for st, _, _, _, _ in results:
         codes[st] = codes.get(st, 0) + 1
-    served = [ms for st, ms, _, _ in results if st == 200]
+    served = [ms for st, ms, _, _, _ in results if st == 200]
     return "\n".join(
         [
             f"### burst: {args.concurrency} simultaneous {args.endpoint} requests, no backoff, host {args.url}",

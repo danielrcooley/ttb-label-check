@@ -41,7 +41,7 @@ deployment where they cost nothing, and it says plainly where it stops.
 | Consistent error envelope `{code, message, hint, request_id}`; unhandled errors return a generic message and a request id | `app/security.py` |
 | Container runs as a non-root user; only the runtime libraries the slim image needs | `Dockerfile` |
 | No inline event handlers or `innerHTML` with user or OCR text; all text rendered via `textContent` | `app/static/*.js` |
-| CSV export neutralizes spreadsheet formulas (`= + - @` prefixes) | `app/static/batch.js` |
+| CSV export neutralizes spreadsheet formulas (`= + - @` first, or behind leading blanks or control characters) in every cell, notes included; the download's object URL is released a minute after the click | `app/static/render.js` (`csvCell`, `downloadCsv`) |
 | Direct dependencies pinned to exact versions; transitive ones are resolved at build time (no hash lock in this build, see below) | `requirements.txt`, `requirements-ocr.txt` |
 | Dependency audit (`pip-audit`) on every CI run, advisory by design: a newly published advisory in a transitive package must not block a fix from shipping during the review window; findings are reviewed before release | `.github/workflows/ci.yml` |
 | Nothing is published to the registry unless lint, types, unit and integration tests passed; CI runs are serialized per branch so an older image cannot overwrite `latest` | `.github/workflows/ci.yml` |

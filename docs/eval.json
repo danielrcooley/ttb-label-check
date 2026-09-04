@@ -2,8 +2,8 @@
  "summary": {
   "artwork": {
    "cases": 10,
-   "p50_ms": 2524.5,
-   "p95_ms": 2922,
+   "p50_ms": 2376.5,
+   "p95_ms": 2940,
    "rates": {
     "brand_name": 1.0,
     "class_type": 1.0,
@@ -16,8 +16,8 @@
   "false_alarm_rate": 0.0,
   "degraded": {
    "cases": 20,
-   "p50_ms": 2375.0,
-   "p95_ms": 6453,
+   "p50_ms": 2290.0,
+   "p95_ms": 6341,
    "rates": {
     "brand_name": 0.95,
     "class_type": 1.0,
@@ -29,8 +29,8 @@
   },
   "problem": {
    "cases": 6,
-   "p50_ms": 2538.5,
-   "p95_ms": 3718
+   "p50_ms": 2446.0,
+   "p95_ms": 3568
   },
   "problem_detection": 1.0
  },
@@ -43,7 +43,7 @@
      "APP-001_front_clean.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2797,
+    "ms": 2940,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -55,6 +55,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.24,
     "detected": null,
     "assessed": false
    },
@@ -65,7 +68,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_clean.png"
     ],
-    "ms": 2331,
+    "ms": 2356,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -77,6 +80,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.27,
     "detected": null,
     "assessed": false
    },
@@ -87,7 +93,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_clean.png"
     ],
-    "ms": 2499,
+    "ms": 2362,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -99,6 +105,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.241,
     "detected": null,
     "assessed": false
    },
@@ -109,7 +118,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_clean.png"
     ],
-    "ms": 2369,
+    "ms": 2354,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -121,6 +130,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.27,
     "detected": null,
     "assessed": false
    },
@@ -131,7 +143,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_clean.png"
     ],
-    "ms": 2922,
+    "ms": 2669,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -143,6 +155,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.234,
     "detected": null,
     "assessed": false
    },
@@ -153,7 +168,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_clean.png"
     ],
-    "ms": 2550,
+    "ms": 2395,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -165,6 +180,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.259,
     "detected": null,
     "assessed": false
    },
@@ -175,7 +193,7 @@
      "APP-007_front_clean.png",
      "APP-007_back_clean.png"
     ],
-    "ms": 2668,
+    "ms": 2770,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -187,6 +205,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.236,
     "detected": null,
     "assessed": false
    },
@@ -197,7 +218,7 @@
      "APP-008_front_clean.png",
      "APP-008_back_clean.png"
     ],
-    "ms": 2419,
+    "ms": 2278,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -209,6 +230,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.267,
     "detected": null,
     "assessed": false
    },
@@ -219,7 +243,7 @@
      "APP-009_front_clean.png",
      "APP-009_back_clean.png"
     ],
-    "ms": 2554,
+    "ms": 2391,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -231,6 +255,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.239,
     "detected": null,
     "assessed": false
    },
@@ -241,7 +268,7 @@
      "APP-010_front_clean.png",
      "APP-010_back_clean.png"
     ],
-    "ms": 2302,
+    "ms": 2194,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -253,6 +280,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.26,
     "detected": null,
     "assessed": false
    }
@@ -265,7 +295,7 @@
      "APP-001_front_rotate7.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2483,
+    "ms": 2395,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "needs_review",
@@ -277,6 +307,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.24,
     "detected": null,
     "assessed": false
    },
@@ -287,7 +320,7 @@
      "APP-001_front_clean.png",
      "APP-001_back_blur.png"
     ],
-    "ms": 2369,
+    "ms": 2605,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -299,6 +332,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "not_checked",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.134,
     "detected": null,
     "assessed": false
    },
@@ -309,7 +345,7 @@
      "APP-002_front_glare.png",
      "APP-002_back_clean.png"
     ],
-    "ms": 2227,
+    "ms": 2197,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -321,6 +357,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.27,
     "detected": null,
     "assessed": false
    },
@@ -331,7 +370,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_lowcontrast.png"
     ],
-    "ms": 2511,
+    "ms": 2456,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -343,6 +382,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.27,
     "detected": null,
     "assessed": false
    },
@@ -353,7 +395,7 @@
      "APP-003_front_perspective.png",
      "APP-003_back_clean.png"
     ],
-    "ms": 2268,
+    "ms": 2153,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -365,6 +407,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.241,
     "detected": null,
     "assessed": false
    },
@@ -375,7 +420,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_small.png"
     ],
-    "ms": 2114,
+    "ms": 2084,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -387,6 +432,9 @@
     },
     "warning_exact": false,
     "warning_present": true,
+    "type_weight": "not_checked",
+    "type_weight_basis": "too small",
+    "type_weight_ratio": null,
     "detected": null,
     "assessed": false
    },
@@ -397,7 +445,7 @@
      "APP-004_front_jpeg.png",
      "APP-004_back_clean.png"
     ],
-    "ms": 2298,
+    "ms": 2138,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -409,6 +457,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.27,
     "detected": null,
     "assessed": false
    },
@@ -419,7 +470,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_rotate90.png"
     ],
-    "ms": 6680,
+    "ms": 6586,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -431,6 +482,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.271,
     "detected": null,
     "assessed": false
    },
@@ -441,7 +495,7 @@
      "APP-005_front_rotate7.png",
      "APP-005_back_clean.png"
     ],
-    "ms": 2472,
+    "ms": 2412,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -453,6 +507,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.234,
     "detected": null,
     "assessed": false
    },
@@ -463,7 +520,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_blur.png"
     ],
-    "ms": 2607,
+    "ms": 2774,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -475,6 +532,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "not_checked",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.143,
     "detected": null,
     "assessed": false
    },
@@ -485,7 +545,7 @@
      "APP-006_front_glare.png",
      "APP-006_back_clean.png"
     ],
-    "ms": 2458,
+    "ms": 2171,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -497,6 +557,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.259,
     "detected": null,
     "assessed": false
    },
@@ -507,7 +570,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_lowcontrast.png"
     ],
-    "ms": 2394,
+    "ms": 2179,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -519,6 +582,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.261,
     "detected": null,
     "assessed": false
    },
@@ -529,7 +595,7 @@
      "APP-007_front_perspective.png",
      "APP-007_back_clean.png"
     ],
-    "ms": 2381,
+    "ms": 2253,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -541,6 +607,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.236,
     "detected": null,
     "assessed": false
    },
@@ -551,7 +620,7 @@
      "APP-007_front_clean.png",
      "APP-007_back_small.png"
     ],
-    "ms": 2142,
+    "ms": 2091,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -563,6 +632,9 @@
     },
     "warning_exact": false,
     "warning_present": true,
+    "type_weight": "not_checked",
+    "type_weight_basis": "too small",
+    "type_weight_ratio": null,
     "detected": null,
     "assessed": false
    },
@@ -573,7 +645,7 @@
      "APP-008_front_jpeg.png",
      "APP-008_back_clean.png"
     ],
-    "ms": 2210,
+    "ms": 2082,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -585,6 +657,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.267,
     "detected": null,
     "assessed": false
    },
@@ -595,7 +670,7 @@
      "APP-008_front_clean.png",
      "APP-008_back_rotate90.png"
     ],
-    "ms": 6453,
+    "ms": 6341,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -607,6 +682,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.267,
     "detected": null,
     "assessed": false
    },
@@ -617,7 +695,7 @@
      "APP-009_front_rotate7.png",
      "APP-009_back_clean.png"
     ],
-    "ms": 2538,
+    "ms": 2426,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -629,6 +707,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.239,
     "detected": null,
     "assessed": false
    },
@@ -639,7 +720,7 @@
      "APP-009_front_clean.png",
      "APP-009_back_blur.png"
     ],
-    "ms": 2345,
+    "ms": 2333,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -651,6 +732,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "not_checked",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.145,
     "detected": null,
     "assessed": false
    },
@@ -661,7 +745,7 @@
      "APP-010_front_glare.png",
      "APP-010_back_clean.png"
     ],
-    "ms": 2190,
+    "ms": 2174,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -673,6 +757,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.26,
     "detected": null,
     "assessed": false
    },
@@ -683,7 +770,7 @@
      "APP-010_front_clean.png",
      "APP-010_back_lowcontrast.png"
     ],
-    "ms": 2234,
+    "ms": 2327,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -695,6 +782,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.265,
     "detected": null,
     "assessed": false
    }
@@ -707,7 +797,7 @@
      "APP-001_front_wrong_abv.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2384,
+    "ms": 2374,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -719,6 +809,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.24,
     "detected": true,
     "assessed": true
    },
@@ -729,7 +822,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_titlecase.png"
     ],
-    "ms": 2570,
+    "ms": 2518,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -741,6 +834,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.244,
     "detected": true,
     "assessed": true
    },
@@ -751,7 +847,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_allbold.png"
     ],
-    "ms": 2507,
+    "ms": 2351,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -763,6 +859,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "needs_review",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 0.991,
     "detected": true,
     "assessed": true
    },
@@ -773,7 +872,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_altered.png"
     ],
-    "ms": 2119,
+    "ms": 2082,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -785,6 +884,9 @@
     },
     "warning_exact": false,
     "warning_present": true,
+    "type_weight": "match",
+    "type_weight_basis": "the rest of its line (gap)",
+    "type_weight_ratio": 1.266,
     "detected": true,
     "assessed": true
    },
@@ -795,7 +897,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_tiny.png"
     ],
-    "ms": 3038,
+    "ms": 2861,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -807,6 +909,9 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "type_weight": "not_checked",
+    "type_weight_basis": "too small",
+    "type_weight_ratio": null,
     "detected": null,
     "assessed": false
    },
@@ -817,7 +922,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_missing.png"
     ],
-    "ms": 3718,
+    "ms": 3568,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -829,6 +934,9 @@
     },
     "warning_exact": false,
     "warning_present": false,
+    "type_weight": "not_checked",
+    "type_weight_basis": "",
+    "type_weight_ratio": null,
     "detected": true,
     "assessed": true
    }

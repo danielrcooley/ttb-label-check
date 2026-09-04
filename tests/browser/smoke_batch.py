@@ -73,6 +73,10 @@ def main() -> int:
             page.locator(".detail-panel .overlay polygon").count(),
         )
         page.locator(".batch-table .decision-btns button:has-text('Approve')").first.click()
+        if "decision recorded, Approve" not in page.inner_text("#batch-live"):
+            problems.append("batch: the decision was not announced to assistive technology")
+        if page.evaluate("document.activeElement?.dataset?.decision") != "approve":
+            problems.append("batch: focus left the decision button after the table was rebuilt")
         with page.expect_download() as dl:
             page.click("#batch-export")
         with open(dl.value.path(), encoding="utf-8-sig") as f:
@@ -82,6 +86,11 @@ def main() -> int:
         print("export row 1:", lines[1][:160])
         page.click("[data-filter=attention]")
         print("attention rows:", page.locator(".batch-table > tbody > tr:not(.detail-row)").count())
+        if (
+            page.get_attribute("[data-filter=attention]", "aria-pressed") != "true"
+            or page.get_attribute("[data-filter=all]", "aria-pressed") != "false"
+        ):
+            problems.append("batch: filter buttons do not expose their pressed state")
         browser.close()
 
     print("\nPROBLEMS:" if problems else "\nno problems detected")

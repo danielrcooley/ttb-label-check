@@ -5,11 +5,12 @@ The COLA form carries brand name, class/type, origin and the applicant's name an
 alcohol content or net contents, so this runs the extraction path (no application needed) and
 scores what the registry knows:
 
-- brand name, class/type description, applicant name: the product's own matcher (best_span +
-  status_for) against the OCR lines, reported as Match / Needs review / Mismatch / Not found;
+- brand name and class/type description: the product's own matcher (best_span + status_for)
+  against the OCR lines, reported as Match / Needs review / Mismatch / Not found; the applicant's
+  registered line: the product's bottler check (names taken apart, city and state corroborating);
 - country of origin, imports only: the country name found on the label (fuzzy, partial);
-- government warning: the product's warning comparator, reported as exact / case / noise /
-  wording / absent, plus the capital-letters check on the heading;
+- government warning: the product's warning comparator, reported as exact / noise / wording /
+  absent, plus the capital-letters check on the heading and the type-weight measurement;
 - alcohol content and net contents: whether a statement was read at all;
 - per-record latency, image count and image size.
 
@@ -132,6 +133,8 @@ async def run(real: Path, workers: int) -> tuple[list[Record], Record]:
                 "warning_assessment": w.assessment,
                 "warning_anchor_caps": str(w.anchor_caps),
                 "warning_type_weight": str(w.anchor_bold),  # match / needs_review / not_checked (D-044)
+                "warning_type_weight_basis": w.type_weight_basis or "",  # D-045: what was compared, or why not
+                "warning_type_weight_ratio": w.type_weight_ratio,
                 "warning_similarity": round(w.similarity, 3) if w.similarity is not None else None,
                 "warning_diff": (w.diff or "")[:300],
                 "alcohol_read": res.fields.alcohol_percent is not None,
@@ -250,9 +253,33 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
     )
     out.append(
         row(
-            "Warning type weight not measured, small print or inconclusive (of located)",
+            "Warning heading and body measured the same weight, Needs review (of located)",
             lambda g: pct(
-                sum(r.get("warning_type_weight") == "not_checked" for r in g), sum(r["warning_present"] for r in g)
+                sum(r.get("warning_type_weight") == "needs_review" for r in g), sum(r["warning_present"] for r in g)
+            ),
+        )
+    )
+    out.append(
+        row(
+            "Warning type weight measured but inconclusive, no finding (of located)",
+            lambda g: pct(
+                sum(
+                    r.get("warning_type_weight") == "not_checked" and r.get("warning_type_weight_ratio") is not None
+                    for r in g
+                ),
+                sum(r["warning_present"] for r in g),
+            ),
+        )
+    )
+    out.append(
+        row(
+            "Warning type weight not measured: print too small, sizes differ, or no heading line (of located)",
+            lambda g: pct(
+                sum(
+                    r.get("warning_type_weight") == "not_checked" and r.get("warning_type_weight_ratio") is None
+                    for r in g
+                ),
+                sum(r["warning_present"] for r in g),
             ),
         )
     )

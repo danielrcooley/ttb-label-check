@@ -1,6 +1,6 @@
 // Controller for the single-application screen. Vanilla ES module, no build step.
 import { ApiError, health, verify } from "./api.js";
-import { decisionControls, downloadCsv, drawOverlays, el, exportRow, exportStamp, makeCrops, renderChecklist, renderFigures, renderOcrLines, renderVerdict, renderWarning } from "./render.js";
+import { DECISION_WORD, decisionControls, decisionSummary, downloadCsv, drawOverlays, el, exportRow, exportStamp, makeCrops, renderChecklist, renderFigures, renderOcrLines, renderVerdict, renderWarning } from "./render.js";
 
 const MAX_IMAGES = 6;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -28,7 +28,14 @@ function showView(name) {
     if (a.dataset.view === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
 }
-function routeFromHash() { showView(["check", "batch", "about", "accessibility"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "check"); }
+function routeFromHash(moveFocus = false) {
+  const name = ["check", "batch", "about", "accessibility"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "check";
+  showView(name);
+  if (moveFocus) { // a navigation: put the keyboard and the screen reader at the top of the new page
+    const h = document.querySelector(`[data-view-panel="${name}"] h1`);
+    if (h) { h.setAttribute("tabindex", "-1"); h.focus(); }
+  }
+}
 
 // ------------------------------------------------------------------ display theme
 function wireTheme() {
@@ -172,6 +179,9 @@ async function runCheck() {
   const missing = validate(app);
   if (missing.length) { showFormError(`Please add ${missing.join(", ")}.`); return; }
   showFormError("");
+  // A new check starts clean: the previous result, decision and export must not outlive it (review 007)
+  state.result = null; state.app = null; state.decision = null; state.checkedFiles = [];
+  $("#results").hidden = true;
   const btn = $("#check-btn");
   btn.disabled = true;
   setStatus(`Reading ${state.files.length} image${state.files.length === 1 ? "" : "s"}…`, true);
@@ -180,6 +190,7 @@ async function runCheck() {
     const result = await verify(state.files, app);
     state.result = result;
     state.app = app;
+    state.checkedFiles = [...state.files]; // the export names the files that were checked, not the list as edited later
     state.decision = null;
     state.activeId = null;
     const crops = await makeCrops(state.files, result.images, result.checks);
@@ -210,24 +221,31 @@ async function runCheck() {
 }
 
 // ------------------------------------------------------------------ decision, export, print
-function renderDecision() {
+function renderDecision(previous = null) {
   const box = $("#decision");
+  // the controls are rebuilt on every change: keep the keyboard focus on the same button
+  const focused = document.activeElement?.closest?.("#decision") ? document.activeElement.dataset.decision : null;
   box.replaceChildren(
     el("h3", { class: "margin-top-0", text: "Your decision" }),
     el("p", { class: "usa-hint", text: "Goes into the export and the printout only; nothing is stored on the server." }),
-    decisionControls(() => state.decision || {}, (next) => { state.decision = next; renderDecision(); }, "Note for this application"),
+    decisionControls(() => state.decision || {}, (next) => { const before = state.decision || {}; state.decision = next; renderDecision(before); }, "Note for this application"),
+    el("p", { class: "print-only", text: decisionSummary(state.decision) }),
     el("div", { class: "decision-actions" }, [
       el("button", { type: "button", class: "usa-button usa-button--outline", text: "Export result (CSV)", onclick: exportSingle }),
       el("button", { type: "button", class: "usa-button usa-button--outline", text: "Print", onclick: () => window.print() }),
     ]),
   );
+  if (focused) box.querySelector(`[data-decision="${focused}"]`)?.focus();
+  if (previous && (previous.decision || null) !== (state.decision?.decision || null)) {
+    $("#decision-live").textContent = state.decision?.decision ? `Decision recorded: ${DECISION_WORD[state.decision.decision]}.` : "Decision cleared.";
+  }
 }
 
 function exportSingle() {
   const app = state.app || readApplication();
   const stem = (app.application_id || app.brand_name || "result").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40);
   downloadCsv(`label-check-${stem}-${exportStamp()}.csv`, [exportRow({
-    application: app, result: state.result, status: "done", decision: state.decision, files: state.files, elapsedMs: state.elapsedMs,
+    application: app, result: state.result, status: "done", decision: state.decision, files: state.checkedFiles || state.files, elapsedMs: state.elapsedMs,
   })]);
 }
 
@@ -237,7 +255,7 @@ async function boot() {
   wireDropzone();
   wireTheme();
   routeFromHash();
-  window.addEventListener("hashchange", routeFromHash);
+  window.addEventListener("hashchange", () => routeFromHash(true));
   $("#check-form").addEventListener("submit", (e) => { e.preventDefault(); runCheck(); });
   document.querySelectorAll("[data-sample]").forEach((b) => b.addEventListener("click", () => useSample(b.dataset.sample)));
   window.addEventListener("beforeunload", (e) => { if (state.result) { e.preventDefault(); e.returnValue = ""; } });

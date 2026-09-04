@@ -188,6 +188,12 @@ _STATES = {
 }  # fmt: skip
 _STATE_BY_NAME = {v: k for k, v in _STATES.items()}
 _STREET = re.compile(r"^\s*(?:\d|p\.?\s*o\.?\s*box\b)", re.I)
+# a street written without a leading number ("One Winery Road"): the token ends with a street word
+_STREET_WORD = re.compile(
+    r"\b(?:road|rd|street|st|avenue|ave|boulevard|blvd|drive|dr|lane|ln|way|highway|hwy|route|rte|court|ct|"
+    r"place|pl|parkway|pkwy|circle|cir|trail|trl|terrace|ter|plaza|square|sq)\.?\s*$",
+    re.I,
+)
 _USED_ON_LABEL = re.compile(r"\(\s*used on label\s*\)", re.I)
 _ZIP = re.compile(r"^\d{5}(?:-\d{4})?$")
 _TRIM = " \t" + chr(160) + chr(65533)  # space, tab, no-break space, replacement char (registry exports)
@@ -236,7 +242,9 @@ def split_registered_party(s: str) -> RegisteredParty:
         else:
             rest.append(t)
     tokens = rest
-    street = next((i for i, t in enumerate(tokens) if _STREET.match(t)), None)
+    street = next(
+        (i for i, t in enumerate(tokens) if (_STREET.match(t) or _STREET_WORD.search(t)) and not _ZIP.match(t)), None
+    )
     city = state = zip_code = None
     if street is not None:
         head, tail = tokens[:street], tokens[street + 1 :]
@@ -249,6 +257,9 @@ def split_registered_party(s: str) -> RegisteredParty:
             head = head + tail[3:]  # anything after the ZIP is another name
         elif len(tail) > 2:
             head = head + tail[2:]
+    elif len(tokens) >= 4 and _ZIP.match(tokens[-1]) and _state_code(tokens[-2]):
+        # no recognisable street, but the line ends city, state, ZIP
+        head, city, state, zip_code = tokens[:-3], tokens[-3], tokens[-2], tokens[-1]
     elif len(tokens) >= 3 and _state_code(tokens[-1]):
         head, city, state = tokens[:-2], tokens[-2], tokens[-1]
     elif len(tokens) >= 2 and _state_code(tokens[-1]) and len(tokens[-1]) == 2:

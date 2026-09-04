@@ -3,7 +3,7 @@
 // compared (/compare), rows stream into the table, the agent records decisions, and everything can
 // be exported. The server stays stateless; a refresh clears the session and the page says so.
 import { ApiError, compare, extract, health } from "./api.js";
-import { decisionControls, downloadCsv, drawOverlays, el, exportRow, exportStamp, issueTexts, makeCrops, renderChecklist, renderFigures, renderWarning, statusTag } from "./render.js";
+import { DECISION_WORD, decisionControls, downloadCsv, drawOverlays, el, exportRow, exportStamp, issueTexts, makeCrops, renderChecklist, renderFigures, renderWarning, statusTag } from "./render.js";
 
 const VERDICT_WORD = { ready_for_approval: "Ready", needs_review: "Needs review", issues_found: "Issues found", unreadable: "Unreadable" };
 const VERDICT_STATUS = { ready_for_approval: "match", needs_review: "needs_review", issues_found: "mismatch", unreadable: "not_found" };
@@ -65,8 +65,10 @@ async function setCsv(file) {
     const bad = body.rows.filter((r) => r.errors.length);
     const none = bad.length > 0 && bad.length === body.rows.length;
     const count = `${body.rows.length} row${body.rows.length === 1 ? "" : "s"}`;
+    const empty = body.rows.length === 0;
     box.replaceChildren(...[
-      el("p", { class: `text-bold margin-0${none ? " text-secondary-dark" : ""}`, text: none ? `${file.name}: ${count}, none usable (every row has a problem).` : `${file.name}: ${count}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
+      el("p", { class: `text-bold margin-0${none || empty ? " text-secondary-dark" : ""}`,
+        text: empty ? `${file.name}: no data rows under the header.` : none ? `${file.name}: ${count}, none usable (every row has a problem).` : `${file.name}: ${count}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
       body.warnings.length ? el("ul", { class: "usa-list usa-list--unstyled text-secondary-dark" }, body.warnings.map((w) => el("li", { text: w }))) : null,
       bad.length ? el("details", none ? { open: "" } : {}, [el("summary", { text: "Rows with problems (they will be skipped)" }),
         el("ul", { class: "usa-list" }, bad.slice(0, 20).map((r) => el("li", { text: `Row ${r.row_number}: ${r.errors.join("; ")}` })))]) : null,
@@ -334,11 +336,23 @@ function issueList(item) {
 }
 
 function decisionCell(item) {
-  return decisionControls(
+  const cell = decisionControls(
     () => state.decisions.get(item.key) || {},
-    (next) => { state.decisions.set(item.key, next); renderTable(); renderSummary(); },
+    (next) => {
+      const before = state.decisions.get(item.key)?.decision || null;
+      const focused = document.activeElement?.dataset?.decision || null; // the table is rebuilt: keep the focus
+      state.decisions.set(item.key, next);
+      renderTable();
+      renderSummary();
+      if (focused) $("#batch-table")?.querySelector(`[data-item="${CSS.escape(item.key)}"] [data-decision="${focused}"]`)?.focus();
+      if ((next.decision || null) !== before) {
+        $("#batch-live").textContent = next.decision ? `${item.key}: decision recorded, ${DECISION_WORD[next.decision]}.` : `${item.key}: decision cleared.`;
+      }
+    },
     `Note for ${item.key}`,
   );
+  cell.dataset.item = item.key;
+  return cell;
 }
 
 function renderTable() {
@@ -473,7 +487,7 @@ function boot() {
   $("#batch-demo").addEventListener("click", loadDemo);
   document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => {
     state.filter = b.dataset.filter; state.page = 0;
-    document.querySelectorAll("[data-filter]").forEach((x) => x.classList.toggle("is-on", x === b));
+    document.querySelectorAll("[data-filter]").forEach((x) => { x.classList.toggle("is-on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
     renderTable();
   }));
   $("#pager-prev").addEventListener("click", () => { state.page--; renderTable(); });

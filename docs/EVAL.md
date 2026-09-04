@@ -6,7 +6,7 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 ## Artwork tier (10 cases)
 
-- Per-application latency (two images, parallel): median 2524 ms, p95 2922 ms
+- Per-application latency (two images, parallel): median 2376 ms, p95 2940 ms
 
 | Field | Match | Needs review | Mismatch / not found | Match rate |
 |---|---:|---:|---:|---:|
@@ -19,11 +19,12 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | warning exact | 10 | 0 | 0 | 100% |
 
 - Verdicts: {<Verdict.ready_for_approval: 'ready_for_approval'>: 10}
+- Warning type weight of the statements located: heading heavier 10, same weight (Needs review) 0, measured but inconclusive 0, not measured 0
 - **False-alarm rate on clean artwork: 0.0%** (0 of 60 field checks not reported as Match)
 
 ## Degraded tier (20 cases)
 
-- Per-application latency (two images, parallel): median 2375 ms, p95 6453 ms
+- Per-application latency (two images, parallel): median 2290 ms, p95 6341 ms
 
 | Field | Match | Needs review | Mismatch / not found | Match rate |
 |---|---:|---:|---:|---:|
@@ -36,21 +37,22 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | warning exact | 18 | 2 | 0 | 90% |
 
 - Verdicts: {<Verdict.needs_review: 'needs_review'>: 2, <Verdict.ready_for_approval: 'ready_for_approval'>: 17, <Verdict.issues_found: 'issues_found'>: 1}
+- Warning type weight of the statements located: heading heavier 15, same weight (Needs review) 0, measured but inconclusive 3, not measured 2 (too small 2)
 
 | Degradation | cases | verdicts | median ms |
 |---|---:|---|---:|
-| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2369 |
-| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2227 |
-| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2254 |
-| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2394 |
-| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2324 |
-| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2483 |
-| rotate90 | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 6566 |
-| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2128 |
+| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2605 |
+| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2174 |
+| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2110 |
+| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2327 |
+| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2203 |
+| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2412 |
+| rotate90 | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 6464 |
+| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2088 |
 
 ## Problem tier (6 cases)
 
-- Per-application latency (two images, parallel): median 2538 ms, p95 3718 ms
+- Per-application latency (two images, parallel): median 2446 ms, p95 3568 ms
 
 | Planted defect | detected | note |
 |---|---|---|
@@ -61,4 +63,5 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | tiny (APP-005) | n/a | NOT ASSESSED by design: physical type size |
 | missing (APP-006) | yes |  |
 
-- Detection rate over the defects the tool assesses: 5/5; 1 planted defects are outside this build's checks and are listed as n/a
+- Detection rate over the defects the tool assesses: 5/5; 1 planted defect is outside this build's checks and listed as n/a
+- Warning type weight of the statements located: heading heavier 3, same weight (Needs review) 1, measured but inconclusive 0, not measured 1 (too small 1)

@@ -31,7 +31,8 @@ Codex as reviewer). These conventions keep that workflow safe and legible. `CLAU
 ```
 app/            FastAPI application (routes/, ocr/, pipeline/, static/)
 tests/          unit/ (fast, no OCR)  integration/ (OCR on fixtures)  browser/ (Playwright, manual)  fixtures/ (committed PNGs)
-tools/          make_labels.py  evaluate.py  loadtest.py  ocr_eval2.py  vendor_models.py  container_smoke.py
+tools/          make_labels.py  evaluate.py  cola_fetch.py  evaluate_real.py  loadtest.py  measure_deployed.sh
+                batch_tally.py  ocr_eval2.py  vendor_models.py  container_smoke.py
 docs/           APPROACH.md  REQUIREMENTS_TRACE.md  LIMITS.md  SECURITY.md  DECISIONS.md  DEPLOY.md
                 REGULATIONS.md (+ regs/ XML)  EVAL.md  LOADTEST.md  OCR_EVAL.md  BAKEOFF.md  reviews/
 samples/        bundled demo labels + sample CSV (fictional brands only)

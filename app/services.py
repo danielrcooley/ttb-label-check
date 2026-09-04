@@ -56,33 +56,51 @@ class ProcessedImage:
 RescueRead = tuple[ProcessedImage, Upload, int | None]
 
 
-def _to_lines(
-    raw: list[RawLine],
-    dec: DecodedImage,
-    index: int,
-    degrees: int,
-    rot_w: int,
-    rot_h: int,
-    arr: np.ndarray | None = None,
-) -> list[OcrLine]:
-    """Canonical lines from a read, with the type weight of each line measured on the array the
-    engine read (``arr``), so the warning report can judge bold type without the pixels."""
-    out: list[OcrLine] = []
-    gray = to_gray(arr) if arr is not None and raw else None
-    for r in raw:
-        lw = measure_line(gray, r.box, r.text) if gray is not None else None
-        out.append(
-            OcrLine(
-                image_index=index,
-                text=r.text,
-                confidence=round(r.confidence, 4),
-                box=to_canonical(r.box, scale=dec.scale, degrees=degrees, rot_w=rot_w, rot_h=rot_h),
-                weight=lw.weight if lw else None,
-                weight_head=lw.head if lw else None,
-                weight_tail=lw.tail if lw else None,
-            )
+def _to_lines(raw: list[RawLine], dec: DecodedImage, index: int, degrees: int, rot_w: int, rot_h: int) -> list[OcrLine]:
+    """Canonical lines from a read."""
+    return [
+        OcrLine(
+            image_index=index,
+            text=r.text,
+            confidence=round(r.confidence, 4),
+            box=to_canonical(r.box, scale=dec.scale, degrees=degrees, rot_w=rot_w, rot_h=rot_h),
         )
-    return out
+        for r in raw
+    ]
+
+
+def _measure_statement(
+    lines: list[OcrLine], raw: list[RawLine], arr: np.ndarray, dec: DecodedImage
+) -> tuple[list[OcrLine], WarningSpan | None]:
+    """The type weight of the warning statement's lines, and only those, measured on the array the
+    engine read (D-045: bold is needed where the regulation asks for it, not on every line). Stroke
+    and type height are carried in canonical pixels, so lines from reads at different scales
+    compare. Returns the lines (measured copies in place of the statement's) and the span."""
+    span = find_warning(lines)
+    if span is None or not raw:
+        return lines, span
+    gray = to_gray(arr)
+    by_box = {(ln.image_index, ln.box): r for ln, r in zip(lines, raw, strict=True)}
+    measured: dict[tuple[int, object], OcrLine] = {}
+    for ln in span.lines:
+        r = by_box.get((ln.image_index, ln.box))
+        if r is None:
+            continue
+        lw = measure_line(gray, r.box, r.text)
+        measured[(ln.image_index, ln.box)] = ln.model_copy(
+            update={
+                "weight": lw.weight,
+                "weight_head": lw.head,
+                "weight_tail": lw.tail,
+                "weight_split": lw.split,
+                "stroke_px": round(lw.stroke_px / dec.scale, 3) if lw.stroke_px else None,
+                "type_px": round(lw.type_px / dec.scale, 2) if lw.type_px else None,
+            }
+        )
+    if not measured:
+        return lines, span
+    out = [measured.get((ln.image_index, ln.box), ln) for ln in lines]
+    return out, find_warning(out)
 
 
 def _read_score(raw: list[RawLine]) -> float:
@@ -134,8 +152,12 @@ async def process_image(
                 chosen = degrees
     ocr_ms = int((time.perf_counter() - t0) * 1000)
     raw_best, rw, rh, arr_best = reads[chosen]
-    lines = _to_lines(raw_best, dec, index, chosen, rw, rh, arr_best)
-    alternates = {d: _to_lines(r, dec, index, d, w2, h2, a2) for d, (r, w2, h2, a2) in reads.items() if d != chosen}
+    lines, _ = _measure_statement(_to_lines(raw_best, dec, index, chosen, rw, rh), raw_best, arr_best, dec)
+    alternates = {
+        d: _measure_statement(_to_lines(r, dec, index, d, w2, h2), r, a2, dec)[0]
+        for d, (r, w2, h2, a2) in reads.items()
+        if d != chosen
+    }
     info = ImageInfo(
         index=index,
         filename=up.filename,
@@ -261,10 +283,10 @@ async def _rescue_read(
             )
             arr, turn = rotate_array(dec.array, degrees), degrees
         raw = await run(arr)
-        lines = _to_lines(raw, dec, p.info.index, turn, arr.shape[1], arr.shape[0], arr)
+        _, span = _measure_statement(_to_lines(raw, dec, p.info.index, turn, arr.shape[1], arr.shape[0]), raw, arr, dec)
         p.queue_ms += queue_ms
         p.ocr_ms += int((time.perf_counter() - t0) * 1000)
-    return find_warning(lines)
+    return span
 
 
 def engine_info(pool: OcrPool) -> EngineInfo:

@@ -18,6 +18,10 @@
     document.documentElement.dataset.theme = resolve(c);
   }
   apply();
+  // Print on white: a dark display would print as light text on white paper wherever background
+  // printing is off. The page prints light and returns to the chosen display afterwards.
+  window.addEventListener("beforeprint", function () { document.documentElement.dataset.theme = "light"; });
+  window.addEventListener("afterprint", function () { apply(); });
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { apply(); });
   }

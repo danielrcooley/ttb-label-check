@@ -98,6 +98,9 @@ async def run(labels: Path, workers: int) -> dict:
                     "checks": {c.id: c.status for c in res.checks},
                     "warning_exact": res.warning.exact,
                     "warning_present": res.warning.present,
+                    "type_weight": str(res.warning.anchor_bold),  # match / needs_review / not_checked (D-045)
+                    "type_weight_basis": res.warning.type_weight_basis or "",
+                    "type_weight_ratio": res.warning.type_weight_ratio,
                     "detected": (PROBLEM_EXPECTATIONS[variant](res) if PROBLEM_EXPECTATIONS.get(variant) else None)
                     if tier == "problem"
                     else None,
@@ -106,6 +109,26 @@ async def run(labels: Path, workers: int) -> dict:
             )
     pool.shutdown()
     return {"tiers": tiers, "engine": pool.info(), "workers": workers}
+
+
+def _type_weight_line(cases: list[dict]) -> str:
+    """One line of counts for the bold-type measurement (D-045): what it found and where it abstained."""
+    st = Counter(c.get("type_weight", "") for c in cases if c["warning_present"])
+    basis = Counter(c.get("type_weight_basis", "") for c in cases if c["warning_present"])
+    measured_unsure = sum(
+        1
+        for c in cases
+        if c["warning_present"] and c.get("type_weight") == "not_checked" and c.get("type_weight_ratio") is not None
+    )
+    unmeasured = st.get("not_checked", 0) - measured_unsure
+    reasons = ", ".join(
+        f"{k} {v}" for k, v in sorted(basis.items()) if k in ("too small", "size differs", "no heading line")
+    )
+    return (
+        f"- Warning type weight of the statements located: heading heavier {st.get('match', 0)}, "
+        f"same weight (Needs review) {st.get('needs_review', 0)}, measured but inconclusive {measured_unsure}, "
+        f"not measured {unmeasured}" + (f" ({reasons})" if reasons else "")
+    )
 
 
 def summarize(data: dict) -> tuple[str, dict]:
@@ -163,7 +186,7 @@ def summarize(data: dict) -> tuple[str, dict]:
                 f"{sum(1 for c in cases if not c['warning_present'])} | {100 * wex / len(cases):.0f}% |"
             )
             verdicts = Counter(c["verdict"] for c in cases)
-            out += ["", f"- Verdicts: {dict(verdicts)}"]
+            out += ["", f"- Verdicts: {dict(verdicts)}", _type_weight_line(cases)]
             if tier == "artwork":
                 total_checks = sum(1 for c in cases for f in FIELDS if f in c["checks"])
                 non_match = sum(1 for c in cases for f in FIELDS if f in c["checks"] and c["checks"][f] != "match")
@@ -199,7 +222,9 @@ def summarize(data: dict) -> tuple[str, dict]:
             out += [
                 "",
                 f"- Detection rate over the defects the tool assesses: {det}/{len(assessed)}; "
-                f"{len(cases) - len(assessed)} planted defects are outside this build's checks and are listed as n/a",
+                f"{len(cases) - len(assessed)} planted defect{'' if len(cases) - len(assessed) == 1 else 's'} "
+                f"{'is' if len(cases) - len(assessed) == 1 else 'are'} outside this build's checks and listed as n/a",
+                _type_weight_line(cases),
                 "",
             ]
     return "\n".join(out), summary

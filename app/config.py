@@ -56,11 +56,12 @@ class Settings(BaseSettings):
         description="Longest side for the one full-resolution re-read of large artwork whose statement "
         "was unreadable at the working size",
     )
-    # --- type weight of the warning statement (docs/DECISIONS.md D-044; calibrated on the synthetic
-    # corpus, where a bold heading over a regular body measures 1.18-1.28 and all-bold 1.04; strokes under
-    # 3.5 px or type under 24 px are not measured, see app/pipeline/typeface.py)
+    # --- type weight of the warning statement (docs/DECISIONS.md D-044, D-045; with the boundary found at
+    # the word gap in the print, a bold heading over a regular body measures 1.24-1.29 on the synthetic
+    # corpus (1.16 blurred) and all-bold 1.00; strokes under 3.8 px or type under 24 px are not measured,
+    # see app/pipeline/typeface.py)
     type_weight_heading_min_ratio: float = Field(
-        default=1.15, description="Heading stroke weight over body stroke weight at or above which the heading is bold"
+        default=1.20, description="Heading stroke weight over body stroke weight at or above which the heading is bold"
     )
     type_weight_same_max_ratio: float = Field(
         default=1.05, description="At or below this ratio the heading and the body are the same weight"

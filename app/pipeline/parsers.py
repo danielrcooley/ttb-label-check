@@ -54,8 +54,11 @@ _ABV_PATTERNS = [
 ]
 _PROOF = re.compile(r"(\d{2,3}(?:[.,]\d)?)\s*(?:°\s*)?proof", re.I)
 _BARE = re.compile(r"^\s*" + _NUM + r"\s*%?\s*$")
-# "table wine", "light wine", and the registry's "table red wine" / "table white wine"
-_TABLE_OR_LIGHT_WINE = re.compile(r"\b(?:table|light)\b(?:\s+\w+){0,2}\s+wine\b")
+# "table wine", "light wine", and the registry's "table red wine" / "table white wine" (a colour word
+# between, or "red table wine"); not "light sparkling wine" or "table dessert wine", which are not the
+# designations 27 CFR 4.36 names (review 007)
+_COLOR = r"(?:red|white|rose|pink|blush|amber)"
+_TABLE_OR_LIGHT_WINE = re.compile(rf"\b(?:(?:table|light)\s+(?:{_COLOR}\s+)?wine|{_COLOR}\s+(?:table|light)\s+wine)\b")
 
 
 def parse_alcohol(text: str, *, allow_bare: bool = False) -> Alcohol | None:

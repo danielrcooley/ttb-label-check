@@ -156,6 +156,7 @@
             </div>
           </div>
           <div id="decision" class="decision-block margin-top-4"></div>
+          <p id="decision-live" class="usa-sr-only" aria-live="polite"></p>
           <details class="margin-top-4">
             <summary class="text-bold">Everything the tool read (OCR lines)</summary>
             <div id="ocr-lines" class="margin-top-1"></div>
@@ -207,6 +208,7 @@
           <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-cancel" hidden>Pause</button>
           <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-export" hidden>Export results (CSV)</button>
           <span id="batch-status" class="status-line" role="status" aria-live="polite"></span>
+          <p id="batch-live" class="usa-sr-only" aria-live="polite"></p>
         </div>
         <div id="batch-error" class="usa-alert usa-alert--error usa-alert--slim margin-top-2" role="alert" hidden>
           <div class="usa-alert__body"><p class="usa-alert__text"></p></div>
@@ -221,10 +223,10 @@
 
         <div id="batch-results" class="margin-top-3" hidden>
           <div class="filter-bar" role="group" aria-label="Filter results">
-            <button type="button" class="usa-button usa-button--outline is-on" data-filter="all">All</button>
-            <button type="button" class="usa-button usa-button--outline" data-filter="attention">Needs attention</button>
-            <button type="button" class="usa-button usa-button--outline" data-filter="ready">Ready</button>
-            <button type="button" class="usa-button usa-button--outline" data-filter="undecided">Undecided</button>
+            <button type="button" class="usa-button usa-button--outline is-on" data-filter="all" aria-pressed="true">All</button>
+            <button type="button" class="usa-button usa-button--outline" data-filter="attention" aria-pressed="false">Needs attention</button>
+            <button type="button" class="usa-button usa-button--outline" data-filter="ready" aria-pressed="false">Ready</button>
+            <button type="button" class="usa-button usa-button--outline" data-filter="undecided" aria-pressed="false">Undecided</button>
           </div>
           <div id="batch-table"></div>
           <nav class="pager" aria-label="Results pages"><button type="button" class="usa-button usa-button--outline" id="pager-prev">Previous</button><span id="pager-text"></span><button type="button" class="usa-button usa-button--outline" id="pager-next">Next</button></nav>
@@ -276,7 +278,7 @@
         <ul>
           <li>Built with the U.S. Web Design System. Target: WCAG 2.1 AA and Section 508.</li>
           <li>Every status is an icon, a word and a color, never a color alone. A pressed button carries a check mark in its text.</li>
-          <li>Works with the keyboard alone, at 200 percent zoom, on a phone, and in Windows contrast themes; progress and results are announced to screen readers.</li>
+          <li>Works with the keyboard alone, at 200 percent zoom and on a phone (checked by the browser tests), and in Windows contrast themes (checked by hand by the author, who uses one); progress, results and recorded decisions are announced to screen readers; moving between pages puts the focus on the new page's heading.</li>
           <li>No time limits; the only motion is a progress spinner, which stops when your system asks for reduced motion.</li>
         </ul>
         <h2>If something does not work for you</h2>
@@ -290,7 +292,7 @@
       <div class="grid-container">
         <div class="grid-row grid-gap">
           <div class="mobile-lg:grid-col-8">
-            <p class="margin-y-2 font-body-3xs text-base">Label Check prototype. Not an official U.S. Government system. No data is stored. <span id="build-info"></span></p>
+            <p class="margin-y-2 font-body-3xs text-base-dark">Label Check prototype. Not an official U.S. Government system. No data is stored. <span id="build-info"></span></p>
           </div>
         </div>
       </div>

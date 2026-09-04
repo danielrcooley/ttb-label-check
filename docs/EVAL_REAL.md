@@ -24,22 +24,24 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | Brand name: match or needs review | 86% | 96% | 82% | 88% |
 | Class/type (registry description): match | 10% | 0% | 16% | 9% |
 | Class/type (registry description): match or needs review | 54% | 8% | 68% | 43% |
-| Applicant name: match | 66% | 86% | 58% | 70% |
+| Applicant name: match | 62% | 84% | 58% | 68% |
 | Applicant name: match or needs review | 100% | 100% | 100% | 100% |
 | Country of origin found (imports only) | 88% | 94% | 100% | 92% |
 | Warning statement located (heading found) | 100% | 98% | 98% | 99% |
 | Warning exact (of all) | 62% | 62% | 60% | 61% |
 | Warning exact (of located) | 62% | 63% | 61% | 62% |
 | Warning heading all capitals (of located) | 98% | 100% | 98% | 99% |
-| Warning heading measured heavier than the body (of located) | 46% | 59% | 24% | 43% |
-| Warning type weight not measured, small print or inconclusive (of located) | 54% | 41% | 78% | 57% |
+| Warning heading measured heavier than the body (of located) | 36% | 43% | 20% | 33% |
+| Warning heading and body measured the same weight, Needs review (of located) | 0% | 0% | 0% | 0% |
+| Warning type weight measured but inconclusive, no finding (of located) | 24% | 22% | 8% | 18% |
+| Warning type weight not measured: print too small, sizes differ, or no heading line (of located) | 40% | 37% | 73% | 50% |
 | Alcohol statement read | 70% | 90% | 84% | 81% |
 | Net contents read | 90% | 92% | 58% | 80% |
 | All images readable | 98% | 100% | 100% | 99% |
 | Images per record, median | 2 | 2 | 1 | 2 |
 | Longest image side, median px | 1470 | 1278 | 1063 | 1232 |
-| Latency per record, median | 3579 ms | 3610 ms | 3748 ms | 3598 ms |
-| Latency per record, p95 | 8408 ms | 7462 ms | 7105 ms | 7462 ms |
+| Latency per record, median | 3529 ms | 3600 ms | 3677 ms | 3610 ms |
+| Latency per record, p95 | 8534 ms | 7162 ms | 6737 ms | 7162 ms |
 
 ## Warning assessment, all records
 
@@ -69,4 +71,4 @@ behind the results below. TTB IDs are public registry identifiers; no artwork is
 | 26243001000003 | Ale label with a lot number printed against the statement. | First "26" swept into the statement, reported as noise (review); since the finder stopped joining a vertical strip to horizontal lines (D-039), exact. | Right both times; better now. |
 | 26223001000428 | Vodka neck label, 732 pixels wide; the statement runs up the right edge in small capitals, reading bottom to top. | Found by the 270-degree turn, the first the bounded round tries; reported as wording (similarity 0.71, a stretch of words missing). With the 90-degree turn first it was absent, which is why 270 goes first. | Half right, like the bourbon label above: present, too small to read reliably, visibly reported. |
 
-_Regenerated 2026-09-04 12:22._
+_Regenerated 2026-09-04 14:54._

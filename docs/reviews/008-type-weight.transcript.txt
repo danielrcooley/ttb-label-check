@@ -1,0 +1,2597 @@
+Reading additional input from stdin...
+OpenAI Codex v0.153.1
+--------
+workdir: C:\Users\dcwes\AppData\Local\Temp\claude\C--Projects\e02f4c8e-8b9f-407b-a848-9cbfe91c6de6\scratchpad\codex008
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a06e3f-f3ce-7cf3-ae1c-deca9d6124f1
+--------
+user
+The consult request and all of the material are in the appended stdin block: the request first, then excerpts of review 007, then the current source and test files under '===== FILE: path =====' headers with line numbers, the decision and doc excerpts, and the builder's measurement script with its full output on both corpora. Answer the request's numbered sections 1 to 7, in order, terse and numbered, most important first, citing file and line. Do not run commands and do not modify files. Your final message must be the complete answer in Markdown.
+
+<stdin>
+---
+id: 008
+type: design consult (method review of the bold-type measurement, D-044)
+status: requested
+requested_by: Claude (builder), at the author's request ("review the bold detector and collaborate with Codex on it")
+reviewer: Codex (reviewer)
+date: 2026-09-04
+inputs: the current text of app/pipeline/typeface.py, app/pipeline/warning.py, app/services.py, app/schemas.py, app/pipeline/images.py, the two test files, the decision and doc rows, the relevant findings of review 007, and the builder's measurement scripts with their output on both corpora (appended after this request)
+---
+
+# Consult 008: how to measure bold type in the warning statement
+
+## What the product does today (D-044)
+27 CFR 16.22(a)(2) requires "GOVERNMENT WARNING" in capitals and bold and the rest of the statement
+not in bold. OCR gives text and boxes, not weight. The product measures each OCR line's stroke
+thickness on the array the engine read: greyscale, Otsu, the minority class is ink, the L2
+distance transform over the ink, stroke = 4 x the mean distance, divided by the crop height
+(`stroke_ratio`). A line carrying the heading is measured as heading and remainder separately,
+splitting the box at the heading's share of the CHARACTERS (`m.end() / len(text)`), the head
+crop trimmed to 0.95 of that point and the tail crop starting at 1.08 of it (`measure_line`).
+`type_weight_ratio` compares the heading with the rest of its own line, or, when the heading
+stands alone, its stroke in pixels (weight x the canonical box's y-extent) with the median of the
+other lines'. `type_weight_status`: ratio >= 1.15 gives Match on both format rows ("heading bold",
+"remainder not bold"); <= 1.05 gives Needs review on both; between is inconclusive (Not checked);
+too small or faint is Not checked with the reason. Gates: box height >= 24 px and stroke >= 3.8 px.
+Every line of every read (upright, the rotation retry's losing reads, rescue reads) is measured.
+
+## What review 007 found (verbatim numbering from that response)
+- 1.1 High: for a rotated read the canonical box's y-extent is the line's LENGTH, not the type
+  height, so the standalone-heading comparison is wrong there.
+- 1.2 High: a heavier heading cannot prove the body is not bold (extra-bold over bold passes both
+  rows and can reach Ready).
+- 1.8 Medium: the head/tail boundary is inferred from character count despite proportional glyph
+  widths; uniform all-bold text could be split across dissimilar glyph populations.
+- 1.9 Medium: the documented denominator is the unpadded box height but the crop is padded by 2 px
+  and clamped at image edges.
+- 3.1/3.2: the measurement runs on the event loop while the OCR slot is held, for every line of
+  every read, most of it unnecessary: locate the warning first, then measure only its span.
+- 7.11: the tests draw bars; they do not exercise proportional fonts, anti-aliasing, edges,
+  textured grounds or uniformly all-bold lines.
+
+## What the builder measured (scripts and full output appended)
+Experiment A, on every heading-carrying line of a located statement: the per-column stroke
+profile of the line crop (4 x mean distance per column) and its single change point (the split
+that minimizes the within-segment sum of squares, searched over 12-70 percent of the width),
+against the product's character-share split. Synthetic corpus (bold heading over regular body,
+Roboto-like faces; the all-bold planted defect; blur, low contrast, JPEG variants):
+
+| label | product split | tail crop starts | pixel change point | share of the tail crop that is still heading | ratio, product split | ratio, pixel split |
+|---|---|---|---|---|---|---|
+| clean (8 labels) | 0.40 | 0.43 | 0.48-0.53 | 10-18 % | 1.17-1.21 | 1.24-1.29 |
+| blur (3) | 0.40 | 0.43 | 0.49 | 11-12 % | 1.12-1.13 (inconclusive) | 1.16 |
+| low contrast / JPEG / altered (5) | 0.40 | 0.43 | 0.48 | 10 % | 1.18-1.19 | 1.27-1.28 |
+| title-case heading (1) | 0.33 | 0.36 | 0.37 | 2 % | 1.24 | 1.27 |
+| all bold (1) | 0.47 | 0.51 | none (0.13, no step; columns 5.1 vs 5.2 px) | 0 | 0.99 | 1.00 |
+
+Capitals set bold are wider than lowercase, so the heading's true share of the width exceeds its
+share of the characters by about a quarter; the product's tail crop begins inside the bold heading
+on every bold-over-regular label, which drags the ratio down by 0.07-0.09 and puts correct but
+blurred labels in the inconclusive band. The real corpus (150 approved labels) is in the appended
+`split_real.log`, one line per located statement, same columns; "B" lines are statements whose
+heading stands alone, with the heading's box height against the median of the other lines'.
+
+## The builder's proposed redesign, for your critique
+P1. Measure only the lines of a located statement (after `find_warning`), on the array they were
+    read from; the rotation retry's losing reads and rescue reads are measured only when a span is
+    found in them. The author's direction: "just detect bold where it's needed".
+P2. Geometry: the type height is the SHORT side of the box in the read's own array (a line is
+    always longer than it is tall); the stroke is carried in canonical pixels (stroke in the read's
+    pixels times the read-to-canonical scale), so the standalone-heading comparison is right for
+    upright reads, rotated reads, a sideways strip boxed vertically in an upright read, and the
+    full-resolution rescue read; the ratio's denominator is the unpadded box height.
+P3. Split the heading line at the pixels: the change point of the per-column stroke profile,
+    searched within 0.8 to 1.6 times the character-share estimate, with a margin of 0.15 x type
+    height on each side of it; when no valid change point exists, fall back to the character share.
+P4. Matrix: heading clearly heavier (>= threshold) gives "heading bold" = Match and "remainder not
+    bold" = Not checked with the note "lighter than the heading; its own weight is not measured";
+    same weight (<= threshold) gives Needs review on both rows with one note (either the heading is
+    not bold or the whole statement is); between = inconclusive; unmeasured = Not checked with the
+    reason. Never a failure.
+P5. Standalone heading: compare canonical stroke pixels with the median of the body lines' only
+    when the heading's type height is within 25 percent of the body's median type height; otherwise
+    Not checked ("the heading is set in a different size; weight cannot be compared").
+P6. Thresholds: keep 1.15 / 1.05 unless the new distributions say otherwise.
+
+## What we need from you
+Terse numbered answers, most important first, citing file and line into the attached material.
+Where you are not sure, say so in five words and move on. Do not restate the code.
+
+1. **The estimator.** Is 4 x mean distance transform over Otsu ink a sound stroke-width estimate
+   for 3-8 px strokes with anti-aliasing and JPEG ringing? Name the bias direction for thin
+   strokes, for dense lowercase (counters, junctions), for capitals, and for a textured ground.
+   Is there a cheaper or sounder estimator worth switching to before submission (granulometry by
+   morphological opening, the mode of horizontal run lengths, the stroke width transform, the
+   ratio of ink area to skeleton length)? Rank by robustness per hour of work.
+2. **The split (P3).** Change point on the column stroke profile versus finding the gap after the
+   colon versus anything else; the failure modes you expect (the "(1)" numeral, the colon, a
+   heading in title case, an OCR text that drops or adds characters, a heading in a different face,
+   a statement whose heading is split over two lines "GOVERNMENT" / "WARNING: (1) ...", a heading
+   line that is only "GOVERNMENT WARNING:" plus one word). Is the search window and margin right?
+3. **Geometry (P2).** Confirm or correct that the short side of the read-array box is the type
+   height in each of the four read cases, and that carrying the stroke in canonical pixels makes
+   the standalone comparison scale-safe across a working-size read and a full-resolution rescue.
+   Say what `_adopt` (a rescued statement replacing lines of the kept read) does to a span whose
+   lines come from two reads.
+4. **The matrix (P4, P5, P6).** Can "remainder not bold" ever be asserted from this measurement?
+   Is an absolute gate on the body (stroke over type height at or below some value = regular
+   weight) defensible at the working size, given the estimator's bias? Are 1.15 and 1.05 the right
+   operating points after the split fix; if you would move them, to what and why; and should the
+   inconclusive band be wider?
+5. **Validation.** What must be reported for D-045, EVAL.md and EVAL_REAL.md so a reviewer can
+   reproduce and believe the claim: which distributions, which counts per corpus, what counts as a
+   false alarm on approved labels, and what the honest one-sentence summary of the method's power
+   is. Point at anything in the appended output that contradicts the proposed numbers.
+6. **Tests.** The tests to add, one line each, in the order you would write them; include at least
+   one that draws proportional text with a real font rather than bars.
+7. **Risks.** Anything in P1-P6 that makes the product worse than today, and the cheapest way to
+   avoid it.
+
+## Rules
+Read-only; report only. Do not run commands or modify files. D-044 (measure bold from the pixels,
+report it as a heuristic, never fail on it) is the author's decision; the question is how to do it
+well. AGENTS.md rule 4 holds: heuristic findings are Needs review, never Fail.
+
+
+===== EXCERPT: docs/reviews/007-final-pass.response.md (sections 1, 3 and 7) =====
+1. **Bugs introduced by these changes**
+
+   1. **High:** Standalone-heading weight is wrong for rotated reads. Weight is measured against the raw horizontal box, but `type_weight_ratio` reconstructs pixels using the canonical box’s y-extent; for a rotated read that is the line’s length, not type height. Ratios therefore depend on character count and can falsely Match or review. `app/services.py:73-82`, `app/pipeline/warning.py:274-283`
+   2. **High:** A heavier heading causes both “heading bold” and “remainder not bold” to Match. Relative weight cannot prove the body is not bold: an extra-bold heading over a bold body passes and can produce Ready. `app/pipeline/warning.py:303-310`, `app/pipeline/compare.py:424-448`
+   3. **High:** Bottler containment is a raw substring test. Registered `ACE` can Match `PALACE WINES`; city and state may independently appear anywhere on the label, including appellation or marketing text. `app/pipeline/compare.py:121-128`, `app/pipeline/compare.py:145-152`, `app/pipeline/compare.py:166-174`
+   4. **High:** `_origin_check` treats any prefixed line, including `Bottled in Napa, CA`, as proof of another country and returns Mismatch when the expected country was unread. The regex does not establish that the suffix is a country. `app/pipeline/compare.py:50-53`, `app/pipeline/compare.py:98-107`
+   5. **High:** A failed second check leaves the previous result and decision visible. Export then combines the old application/result with the current mutable file list. Files are not snapshotted at successful check time. `app/static/app.js:71-92`, `app/static/app.js:170-193`, `app/static/app.js:199-209`, `app/static/app.js:226-231`
+   6. **Medium:** The reported “server-side latency” excludes multipart parsing, upload reads and validation because service timing starts after those operations. The middleware’s `Server-Timing` covers the whole server request, but the load tool ignores it. `app/routes/api.py:119-122`, `app/services.py:291-301`, `app/security.py:131-195`, `tools/loadtest.py:68-74`
+   7. **Medium:** The load-test percentile is not nearest-rank. For ten samples, p95 selects the ninth value instead of the maximum; the published 3,917 ms front-only p95 should be 3,928 ms under nearest-rank. `tools/loadtest.py:42-46`, `docs/LOADTEST.md:173-177`
+   8. **Medium:** Same-line head/tail boundaries are inferred from character count, despite proportional glyph widths, prefixes and OCR spacing. Uniform all-bold text can be split across dissimilar glyph populations and exceed 1.15 spuriously. Uncertain without a pixel corpus. `app/pipeline/typeface.py:96-106`
+   9. **Medium:** The documented denominator is the unpadded box height, but `_crop` adds padding and `stroke_ratio` divides by the padded crop height. At an image edge, clamping also removes the protective padding and can inflate border-touching strokes. `app/pipeline/typeface.py:44-64`, `app/pipeline/typeface.py:67-74`, `app/pipeline/typeface.py:90-94`
+   10. **Medium:** The table/light-wine regex is broader than the decided red/white variants. `Light Sparkling Wine` or `Light Dessert Wine` is treated as the numeric-alcohol exception. `app/pipeline/parsers.py:57-58`, `app/pipeline/parsers.py:252-262`
+   11. **Medium:** The warning card’s overall badge says Match whenever wording is exact and caps match, even when both bold rows are Needs review. The page therefore presents contradictory statuses. `app/static/render.js:122-145`
+   12. **Low:** A header-only CSV produces “0 rows” and later “0 of 0 have problems,” rather than “no data rows.” `app/static/batch.js:65-72`, `app/static/batch.js:242-245`
+   13. **Low:** Extract-only batch rows export `done` in the `verdict` column despite having no comparison result. `app/static/batch.js:199-206`, `app/static/batch.js:436-441`, `app/static/render.js:293-300`
+   14. No wrong source array was found: chosen, losing-rotation and rescue lines are measured on their corresponding OCR arrays; weights survive `_adopt` and batch remapping. `app/services.py:125-138`, `app/services.py:229-267`, `app/static/batch.js:177-185`
+
+2. **False passes and false alarms**
+
+   1. **False Ready:** Application bottler `ACE WINES, Napa, CA`; label `BOTTLED BY PALACE WINES`, plus unrelated `Napa Valley` and `California` lines. Substring promotion plus global address search yields Match. `app/pipeline/compare.py:121-128`, `app/pipeline/compare.py:148-152`
+   2. **False Ready:** Exact warning with bold body and extra-bold heading. Ratio ≥1.15 marks both format requirements Match although the body violates the rule. `app/pipeline/warning.py:303-310`
+   3. **False Ready:** Wine class `Light Sparkling Wine`, no application or label ABV. The regex makes alcohol optional, returning Info; otherwise matching inputs may become Ready. `app/pipeline/parsers.py:258-262`, `app/pipeline/compare.py:229-252`
+   4. **Not Ready, correctly:** A wrong class differing from the application becomes Needs review, never Ready. If the same invalid designation appears on both sides it Matches, but designation validity is explicitly out of scope. `app/pipeline/compare.py:384-406`, `docs/LIMITS.md:56-59`
+   5. **Issue softened to review:** Canonical `operate` read as `operated88 123` satisfies the barcode rule because removing digits leaves a one-character “noise” change. A genuine wording change is hidden, although it still cannot become Ready. `app/pipeline/warning.py:228-246`
+   6. **False Issue:** Expected `Italy`, label contains `Bottled in Napa, CA`, while the real origin is unread. This is classified as positive contrary-origin evidence. `app/pipeline/compare.py:98-107`
+   7. **False Issue, pre-existing but now contradicted by new prose:** Application says `750 mL`, OCR reads no volume; net contents remains Not found and therefore Issues, although this is a heuristic read failure. `app/pipeline/compare.py:359-362`, `app/pipeline/compare.py:412-434`, `docs/LIMITS.md:105-113`
+   8. A correct bottler using a spelled-out state is supported (`CA`/`California`). Less conventional streets such as `One Winery Road` are not recognized as addresses, allowing a name-only Match because `party.city` remains unset. `app/pipeline/normalize.py:207-221`, `app/pipeline/normalize.py:239-257`, `app/pipeline/compare.py:166-174`
+   9. Blank net contents always causing Needs review is deliberate D-040, not an implementation false alarm. `app/pipeline/compare.py:306-323`
+   10. AGENTS rule 4 is honored by the new class, unread-alcohol, blank-net and bold-review branches, but not by the overbroad contrary-origin branch; unread nonblank net contents also remains inconsistent with it. `AGENTS.md:18-19`, `app/pipeline/compare.py:98-107`
+   11. AGENTS rule 3 is honored: Approve/Reject are explicitly user-recorded decisions, while the exported verdict remains the tool’s recommendation. `app/static/render.js:272-284`, `app/static/render.js:296-300`
+
+3. **Latency against the five-second requirement**
+
+   1. Weight processing runs synchronously on the event loop while the OCR slot remains held. Every line gets one distance transform; an anchor line can get three. Losing rotation reads and rescue reads are also measured. This can delay unrelated requests and health responses on text-dense images. `app/services.py:71-85`, `app/services.py:113-148`, `app/pipeline/typeface.py:47-64`
+   2. Most work is unnecessary: construct lines first, locate the warning, then measure only its span. Batch currently pays the per-line cost for every extracted image so weights can later reach `/compare`. `app/services.py:137-138`, `app/services.py:170-171`, `app/static/batch.js:177-195`
+   3. Greyscale is correctly computed once per read. `cv2.setNumThreads(1)` prevents OpenCV oversubscription, though it is process-global and also affects OCR preprocessing. `app/services.py:70-73`, `app/pipeline/typeface.py:22-24`
+   4. `ocr_ms` stops before weight measurement, so its name now understates slot/CPU work; `total_ms` includes measurement but excludes route parsing and upload reads. `app/services.py:122-138`, `app/services.py:274-301`
+   5. The documented worst deployed interactive result is over target: two clients had wall p95 6.028 s/max 8.882 s and server-service max 5.687 s. The real-label evaluation p95 is 7.462 s; rotated synthetic cases are about 6.566 s. `docs/LOADTEST.md:166-170`, `docs/EVAL_REAL.md:41-42`, `docs/EVAL.md:48`
+   6. The acceptance decision requires deployed end-to-end p95 under concurrent batch load; no attached run measures that condition. Two interactive clients are not concurrent batch load. `docs/DECISIONS.md:26`, `docs/LOADTEST.md:159-185`
+   7. The wall/server caveat is disclosed, but describing JSON `timing.total_ms` as server-side latency is incomplete. Use the middleware header or rename it “pipeline time.” `README.md:148`, `tools/loadtest.py:68-74`
+   3. CSV object URLs are never revoked, retaining exported application data and leaking memory until navigation. `app/static/render.js:310-315`
+   4. `localStorage` contains only `labelcheck-theme`; labels, decisions and applications remain in memory. Logs contain method, path, status, timing and request ID only. `app/static/theme.js:4-26`, `app/security.py:197-205`
+   5. `theme.js` is a same-origin external script and is permitted by the existing CSP; no inline-script exception was added. `app/static/index.html:10`, `app/security.py:24-27`
+   6. No new server-side storage, cloud call or sensitive request parameter was introduced. `X-Batch` remains the only behavioral header. Client-supplied weight fields on `/compare` are trustable only as part of the already client-supplied OCR transcript. `app/routes/api.py:121-139`, `app/schemas.py:64-74`
+
+6. **Docs accuracy**
+
+   1. README still contains submission placeholders while claiming an observed usability test: `_USABILITY_RESULT_` and `_AUTHOR_SECTION_`. `README.md:40`, `README.md:224-226`
+   2. README’s local latency row is stale: it says 2,536/3,059 ms; current EVAL says 2,524/2,922 ms. `README.md:145`, `docs/EVAL.md:9`
+   3. D-044 says 150 labels produced 34 measurable, 29 heavier, 5 inconclusive and 16 too small. EVAL_REAL reports approximately 64 Match and 84 Not checked among 148 located warnings. README further mislabels every non-Match as “too small,” although the bucket includes inconclusive readings. `docs/DECISIONS.md:52`, `docs/EVAL_REAL.md:30-35`, `README.md:146`
+   4. REQUIREMENTS_TRACE still says bold is not assessed automatically. `docs/REQUIREMENTS_TRACE.md:13`
+   5. LIMITS says the stroke gate is 3.5 px; code and D-044 use 3.8 px. The config comment repeats the stale 3.5 value. `docs/LIMITS.md:41-43`, `app/pipeline/typeface.py:29`, `app/config.py:59-66`
+   6. The 146-row deployed tally and 102 bottler matches have no committed reproducer or result artifact; the linked decisions/review record rationale, not the run. `README.md:147`, `docs/DECISIONS.md:48-49`
+   7. The 315-second deployed browser batch belongs to build `a9738ed`, while README presents it beside current-build measurements. No post-D-044 browser batch is attached. `README.md:149`, `docs/LOADTEST.md:145-157`
+   8. LOADTEST’s claimed 200 ms bold A/B is not represented by paired server-timing blocks; the prior build logged wall time only. `docs/LOADTEST.md:151-157`
+   9. SECURITY points formula protection to `batch.js`; it now lives in shared `render.js`, and the stated protection omits its leading-whitespace limitation. `docs/SECURITY.md:43-45`, `app/static/render.js:303-306`
+      - **Must — S:** Clear stale results at check start and snapshot files/application/result for export and print.
+      - **Must — M:** Use full `Server-Timing`, correct percentile calculation, rerun current-build interactive and browser-batch measurements, and align every published number.
+      - **Must — M:** Fix dark filter state, focus retention/announcements, print colors, progress contrast and accessibility claims.
+      - **Must — S:** Remove placeholders; update REQUIREMENTS_TRACE, LIMITS, SECURITY, D-044 totals and stale README latency.
+      - **Must — S:** Harden CSV formula prefixes and revoke object URLs.
+      - **Can wait — M:** Measure only warning-span lines and move pixel work off the event loop.
+      - **Can wait — S:** Add bold statuses to explicit CSV columns and use `extract_only` instead of `done`.
+      - **Can wait — S:** Improve header-only CSV messaging.
+      - **Can wait — M:** Shorten the README narrative and scoring-sheet prose after factual blockers are fixed.
+
+===== FILE: app/pipeline/typeface.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Type weight from pixels: is a line of print bold?
+     2	
+     3	OCR gives text and boxes, not weight. What can be measured is the thickness of the ink strokes in
+     4	a line's box relative to the type height: bold faces run roughly 1.4 to 1.8 times heavier than
+     5	their regular weight, and a heading set in bold next to a body set regular shows as a clear step.
+     6	The measurement is a heuristic: it is reported as a ratio and the warning report decides (D-044),
+     7	and only a confident reading becomes a finding; small or low-contrast print is "not measured".
+     8	
+     9	Method per crop: greyscale, Otsu threshold, the minority class is ink; the distance transform over
+    10	the ink averages about a quarter of the stroke width, so stroke = 4 * mean distance; the result is
+    11	divided by the crop height (the type size, ascenders to descenders as the detector boxed it).
+    12	"""
+    13	
+    14	from __future__ import annotations
+    15	
+    16	import re
+    17	from dataclasses import dataclass
+    18	
+    19	import cv2
+    20	import numpy as np
+    21	
+    22	# Tiny crops gain nothing from OpenCV's thread pool, and on a two-vCPU host that pool contends with the
+    23	# OCR engine's threads (one intra-op thread per worker). Keep OpenCV single-threaded in this process.
+    24	cv2.setNumThreads(1)
+    25	
+    26	_ANCHOR = re.compile(r"g\s*o\s*v\s*e\s*r\s*n\s*m\s*e\s*n\s*t\s*w\s*a\s*r\s*n\s*i\s*n\s*g\s*:?", re.I)
+    27	MIN_HEIGHT = 24  # px of box height: below this the strokes are a pixel or two and the ratio is noise
+    28	MIN_WIDTH = 24
+    29	MIN_STROKE = 3.8  # px: thinner strokes are quantized (a bold heading over a regular body measures 1.0 at 3 px)
+    30	
+    31	
+    32	@dataclass(frozen=True)
+    33	class LineWeight:
+    34	    weight: float | None  # whole line
+    35	    head: float | None  # the "GOVERNMENT WARNING" part, when the line carries it
+    36	    tail: float | None  # the rest of that same line
+    37	
+    38	
+    39	def stroke_ratio(gray: np.ndarray) -> float | None:
+    40	    """Stroke width of the print in a greyscale crop, as a fraction of the crop height; None when
+    41	    the crop is too small or holds no clean ink."""
+    42	    if gray.ndim != 2:
+    43	        return None
+    44	    h, w = gray.shape
+    45	    if h < MIN_HEIGHT or w < MIN_WIDTH:
+    46	        return None
+    47	    _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    48	    ink = bw == 0
+    49	    if ink.mean() > 0.5:
+    50	        ink = ~ink  # light print on a dark ground
+    51	    frac = float(ink.mean())
+    52	    if frac < 0.03 or frac > 0.6:
+    53	        return None
+    54	    dt = cv2.distanceTransform(ink.astype(np.uint8), cv2.DIST_L2, 5)
+    55	    vals = dt[ink]
+    56	    if vals.size < 40:
+    57	        return None
+    58	    stroke = 4.0 * float(vals.mean())  # overstates strokes under ~3 px, evenly for heading and body
+    59	    if stroke < MIN_STROKE:
+    60	        return None
+    61	    ratio = float(stroke / float(h))
+    62	    if ratio > 0.6:  # a "stroke" over half the type height is a solid block or a bar code, not print
+    63	        return None
+    64	    return ratio
+    65	
+    66	
+    67	def _crop(arr: np.ndarray, x0: float, y0: float, x1: float, y1: float, pad: int = 2) -> np.ndarray | None:
+    68	    h, w = arr.shape[:2]
+    69	    xa, ya = max(0, int(x0) - pad), max(0, int(y0) - pad)
+    70	    xb, yb = min(w, int(x1) + pad), min(h, int(y1) + pad)
+    71	    if xb - xa < MIN_WIDTH or yb - ya < MIN_HEIGHT:
+    72	        return None
+    73	    part = arr[ya:yb, xa:xb]
+    74	    return cv2.cvtColor(part, cv2.COLOR_RGB2GRAY) if part.ndim == 3 else part
+    75	
+    76	
+    77	def to_gray(arr: np.ndarray) -> np.ndarray:
+    78	    """Greyscale once per read; measure_line accepts either the colour array or this."""
+    79	    return cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY) if arr.ndim == 3 else arr
+    80	
+    81	
+    82	def measure_line(arr: np.ndarray, box: object, text: str) -> LineWeight:
+    83	    """Weights for one OCR line in the array it was read from. When the line carries the warning
+    84	    heading, the heading's part and the rest are measured apart, splitting the box in proportion
+    85	    to the characters (a heading set heavier is a little wider than its share, so the head region
+    86	    is trimmed and the tail region starts a little later)."""
+    87	    pts = list(box)  # type: ignore[call-overload]
+    88	    xs = [float(p[0]) for p in pts]
+    89	    ys = [float(p[1]) for p in pts]
+    90	    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    91	    if y1 - y0 < MIN_HEIGHT:  # the box itself, before padding: small print is not measured at all
+    92	        return LineWeight(weight=None, head=None, tail=None)
+    93	    whole = _crop(arr, x0, y0, x1, y1)
+    94	    weight = stroke_ratio(whole) if whole is not None else None
+    95	    head = tail = None
+    96	    m = _ANCHOR.search(text)
+    97	    if m and len(text.strip()) > 0:
+    98	        frac = m.end() / max(1, len(text))
+    99	        split = x0 + (x1 - x0) * frac
+   100	        if m.end() >= len(text.strip()) - 2:  # the heading is the whole line
+   101	            head = weight
+   102	        else:
+   103	            hc = _crop(arr, x0, y0, x0 + (split - x0) * 0.95, y1)
+   104	            tc = _crop(arr, x0 + (split - x0) * 1.08, y0, x1, y1)
+   105	            head = stroke_ratio(hc) if hc is not None else None
+   106	            tail = stroke_ratio(tc) if tc is not None else None
+   107	    return LineWeight(weight=weight, head=head, tail=tail)
+
+
+===== FILE: app/pipeline/warning.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Government health warning statement checks (27 CFR Part 16).
+     2	
+     3	Exactness is literal here: the only Pass is a character-for-character match of every word and
+     4	punctuation mark, ignoring letter case, the style of quotation marks, and spacing next to
+     5	punctuation ("WARNING :(1)"). Those are rendering choices rather than wording: 16.22 requires
+     6	capitals only for the two anchor words, and approved labels commonly print the remainder in
+     7	capitals (docs/EVAL_REAL.md). A word boundary that moves between letters ("womens hould") is not
+     8	spacing; it changes the words and can never be exact. The anchor's capitals are checked
+     9	separately. Anything else is Needs review or a mismatch, never a Pass. The generic fuzzy
+    10	normalizer is not used.
+    11	"""
+    12	
+    13	from __future__ import annotations
+    14	
+    15	import difflib
+    16	import re
+    17	import statistics
+    18	import unicodedata
+    19	from dataclasses import dataclass
+    20	
+    21	from rapidfuzz import fuzz
+    22	from rapidfuzz.distance import OSA
+    23	
+    24	from app.schemas import Evidence, OcrLine, Status, WarningReport
+    25	
+    26	from .match import reading_order
+    27	from .normalize import collapse_ws, fold, join_hyphenated, unify_punctuation
+    28	
+    29	# Verbatim text of 27 CFR 16.21, verified against the eCFR API on 2026-09-03 (docs/REGULATIONS.md).
+    30	CANONICAL = (
+    31	    "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic "
+    32	    "beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic "
+    33	    "beverages impairs your ability to drive a car or operate machinery, and may cause health problems."
+    34	)
+    35	ANCHOR = "GOVERNMENT WARNING"
+    36	_ANCHOR_RE = re.compile(r"g\s*o\s*v\s*e\s*r\s*n\s*m\s*e\s*n\s*t\s*w\s*a\s*r\s*n\s*i\s*n\s*g", re.I)
+    37	_CANON_FOLD = fold(CANONICAL)
+    38	
+    39	
+    40	@dataclass(frozen=True)
+    41	class WarningSpan:
+    42	    text: str
+    43	    lines: tuple[OcrLine, ...]
+    44	    anchor_text: str  # the anchor as OCR read it, for the caps check
+    45	    similarity: float = 0.0  # to the canonical text, 0-1, case-folded
+    46	
+    47	
+    48	def _anchor_score(text: str) -> int:
+    49	    """Both words must be present (fuzzily); \"WARNING\" alone is not an anchor."""
+    50	    t = fold(text)
+    51	    return int(min(fuzz.partial_ratio("government", t), fuzz.partial_ratio("warning", t)))
+    52	
+    53	
+    54	def _anchor_at(group: list[OcrLine], i: int) -> tuple[str, list[OcrLine]] | None:
+    55	    """The anchor as read and the lines that form it, or None. Either both words on one line, or
+    56	    "GOVERNMENT" alone on this line with a line starting "WARNING" a little further down the same
+    57	    column (a common layout when the two words are set large; the reading order may slip an
+    58	    unrelated neighbour between them, which is left out of the statement)."""
+    59	    ln = group[i]
+    60	    if _anchor_score(ln.text) >= 80:
+    61	        m = _ANCHOR_RE.search(ln.text)
+    62	        return (m.group(0) if m else ln.text), [ln]
+    63	    if fuzz.ratio("government", fold(ln.text)) >= 85:
+    64	        for j in range(i + 1, min(i + 4, len(group))):
+    65	            if fold(group[j].text).startswith("warning") and _column_overlap(ln, group[j]) >= 0.3:
+    66	                return ln.text + " " + group[j].text, [ln, group[j]]
+    67	    return None
+    68	
+    69	
+    70	def _extent(ln: OcrLine) -> tuple[float, float, float, float]:
+    71	    xs, ys = [p[0] for p in ln.box], [p[1] for p in ln.box]
+    72	    return min(xs), max(xs), min(ys), max(ys)
+    73	
+    74	
+    75	def _column_overlap(a: OcrLine, b: OcrLine) -> float:
+    76	    """Overlap across the reading direction, as a fraction of the narrower line. Boxes live in the
+    77	    oriented original image, so a statement read from a rotated image (a sideways photo, or a label
+    78	    that prints the warning vertically along its edge) comes back as vertical strips stacked left to
+    79	    right: for those, the column is shared along y, not x. A vertical strip and a horizontal line
+    80	    are never one column, whatever their boxes overlap: the strips of a statement printed along
+    81	    the edge of an upright label cross the label's other text without belonging to it."""
+    82	    ax0, ax1, ay0, ay1 = _extent(a)
+    83	    bx0, bx1, by0, by1 = _extent(b)
+    84	    a_vertical, b_vertical = (ay1 - ay0) > (ax1 - ax0), (by1 - by0) > (bx1 - bx0)
+    85	    if a_vertical != b_vertical:
+    86	        return 0.0
+    87	    if a_vertical:
+    88	        inter = max(0.0, min(ay1, by1) - max(ay0, by0))
+    89	        return inter / max(1.0, min(ay1 - ay0, by1 - by0))
+    90	    inter = max(0.0, min(ax1, bx1) - max(ax0, bx0))
+    91	    return inter / max(1.0, min(ax1 - ax0, bx1 - bx0))
+    92	
+    93	
+    94	def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
+    95	    """Locate the warning statement: an anchor line, then following lines while similarity to the
+    96	    canonical text keeps improving. Returns the best span over all images."""
+    97	    best: WarningSpan | None = None
+    98	    best_sim = -1.0
+    99	    # Both directions: a statement printed vertically maps back with its lines running right to left
+   100	    # or left to right depending on which way the label was turned, and the anchor may sit last.
+   101	    ordered = [g for grp in reading_order(lines).values() for g in (grp, grp[::-1])]
+   102	    for group in ordered:
+   103	        for i, ln in enumerate(group):
+   104	            anchor = _anchor_at(group, i)
+   105	            if anchor is None:
+   106	                continue
+   107	            anchor_text, head = anchor
+   108	            acc: list[OcrLine] = list(head)
+   109	            local_best: tuple[float, list[OcrLine]] | None = (
+   110	                fuzz.ratio(_CANON_FOLD, fold(join_hyphenated([x.text for x in acc]))) / 100,
+   111	                list(acc),
+   112	            )
+   113	            declines = 0
+   114	            start = next(k for k, x in enumerate(group) if x is head[-1])  # identity, not equality
+   115	            for nxt in group[start + 1 :]:
+   116	                if _column_overlap(ln, nxt) < 0.3:
+   117	                    continue  # a different column or an unrelated block
+   118	                acc.append(nxt)
+   119	                sim = fuzz.ratio(_CANON_FOLD, fold(join_hyphenated([x.text for x in acc]))) / 100
+   120	                if local_best is None or sim > local_best[0]:
+   121	                    local_best = (sim, list(acc))
+   122	                    declines = 0
+   123	                else:
+   124	                    declines += 1
+   125	                    if declines >= 2:
+   126	                        break
+   127	                if "health problems" in fold(nxt.text) and len(acc) > 1:
+   128	                    break
+   129	            if local_best and local_best[0] > best_sim:
+   130	                best_sim = local_best[0]
+   131	                best = WarningSpan(
+   132	                    text=join_hyphenated([x.text for x in local_best[1]]),
+   133	                    lines=tuple(local_best[1]),
+   134	                    anchor_text=anchor_text,
+   135	                    similarity=local_best[0],
+   136	                )
+   137	    return best
+   138	
+   139	
+   140	def _canon_form(s: str) -> str:
+   141	    # Whitespace and typographic quotes are rendering, not wording; everything else must be literal.
+   142	    return collapse_ws(unify_punctuation(s))
+   143	
+   144	
+   145	def word_diff(expected: str, found: str) -> str | None:
+   146	    """Compact word-level diff, e.g. '-may +can' or '-(2) '. None when identical. Words are aligned
+   147	    ignoring letter case (a statement printed in capitals shows only its real differences)."""
+   148	    a, b = _canon_form(expected).split(" "), _canon_form(found).split(" ")
+   149	    out: list[str] = []
+   150	    matcher = difflib.SequenceMatcher(a=[w.casefold() for w in a], b=[w.casefold() for w in b], autojunk=False)
+   151	    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+   152	        if tag == "equal":
+   153	            continue
+   154	        if i2 > i1:
+   155	            out.append("-" + " ".join(a[i1:i2]))
+   156	        if j2 > j1:
+   157	            out.append("+" + " ".join(b[j1:j2]))
+   158	    return " | ".join(out) if out else None
+   159	
+   160	
+   161	_TOKEN = re.compile(r"[a-z0-9]+|[^a-z0-9\s]")
+   162	
+   163	
+   164	def _tokens(s: str) -> list[str]:
+   165	    """What exactness compares: the words (runs of letters and digits) and the punctuation marks,
+   166	    in order, ignoring letter case and the spacing between them. "WARNING :(1)" and "WARNING: (1)"
+   167	    give the same tokens; "womens hould" and "women should" do not."""
+   168	    return _TOKEN.findall(_canon_form(s).casefold())
+   169	
+   170	
+   171	def compare_warning(found: str) -> tuple[bool, float]:
+   172	    """Returns (exact, similarity 0-1). Exact ignores letter case and spacing around punctuation,
+   173	    nothing else."""
+   174	    canon, got = _canon_form(CANONICAL), _canon_form(found)
+   175	    exact = _tokens(canon) == _tokens(got)
+   176	    similarity = fuzz.ratio(canon.casefold(), got.casefold()) / 100
+   177	    return exact, similarity
+   178	
+   179	
+   180	_PUNCT_ONLY = re.compile(r"^[^\w]+$")
+   181	_NUMBER_ONLY = re.compile(r"^\W*\d+\W*$")
+   182	_STRIP = re.compile(r"[^\w]")
+   183	_TRAILING_DIGITS = re.compile(r"[\d\W_]+$")
+   184	# OCR confusables folded to one canonical letter: 0/o, 1/l/i/|/!, 5/s, 8/b, 2/z, 6/g
+   185	_CONFUSABLE = str.maketrans({"0": "o", "1": "l", "i": "l", "|": "l", "!": "l", "5": "s", "8": "b", "2": "z", "6": "g"})
+   186	
+   187	
+   188	def _canon_word(w: str) -> str:
+   189	    decomposed = unicodedata.normalize("NFKD", w)
+   190	    letters = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+   191	    return _STRIP.sub("", letters).casefold().translate(_CONFUSABLE)
+   192	
+   193	
+   194	def _same_word_modulo_noise(a: str, b: str) -> bool:
+   195	    """True when two tokens differ only by punctuation, case, accents, OCR confusables, or one slip
+   196	    (a character dropped, added, changed, or two adjacent ones swapped) in a word of four or more
+   197	    letters. A slip is left to the person with the diff (Needs review): approved labels read as
+   198	    "Suregon" and "YOURS" were small print, and one that reads "WOMAN" genuinely prints it
+   199	    (docs/EVAL_REAL.md); the tool cannot tell the two apart from an image, so it never passes either.
+   200	    A whole word replaced, added or dropped is a wording change."""
+   201	    ka, kb = _canon_word(a), _canon_word(b)
+   202	    if ka == kb:
+   203	        return True
+   204	    return len(ka) >= 4 and len(kb) >= 4 and OSA.distance(ka, kb) <= 1
+   205	
+   206	
+   207	def classify_difference(expected: str, found: str) -> str:
+   208	    """'exact' | 'noise' (punctuation, case, confusables) | 'wording' (a word added, dropped or replaced)."""
+   209	    a = _canon_form(expected).split(" ")
+   210	    b = _canon_form(found).split(" ")
+   211	    if a == b:
+   212	        return "exact"
+   213	    verdict = "noise"
+   214	    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
+   215	        a=[w.casefold() for w in a], b=[w.casefold() for w in b], autojunk=False
+   216	    ).get_opcodes():
+   217	        if tag == "equal":
+   218	            continue
+   219	        left, right = a[i1:i2], b[j1:j2]
+   220	        if tag == "replace" and len(left) == len(right):
+   221	            if all(_same_word_modulo_noise(x, y) for x, y in zip(left, right, strict=True)):
+   222	                continue
+   223	            return "wording"
+   224	        if tag == "replace":
+   225	            # e.g. "Surgeon General," read as "SurgeonGeneral," (merged) or split words
+   226	            if _canon_word("".join(left)) == _canon_word("".join(right)):
+   227	                continue
+   228	            # a number swept in from a barcode or lot code printed against the statement, glued to
+   229	            # the word it landed on: 'or' read as 'OR88 186"223932'
+   230	            if (
+   231	                len(left) == 1
+   232	                and right
+   233	                and _same_word_modulo_noise(left[0], _TRAILING_DIGITS.sub("", right[0]))
+   234	                and all(_STRIP.sub("", t).isdigit() for t in right[1:])
+   235	            ):
+   236	                continue
+   237	            return "wording"
+   238	        # pure insert or delete: punctuation-only tokens are noise; a bare number swept in from a
+   239	        # neighbouring line (a lot code, a year) is noise; anything else added or dropped (a word, a
+   240	        # missing clause number like "(2)") is a wording change
+   241	        tokens = left or right
+   242	        if all(_PUNCT_ONLY.match(t) for t in tokens):
+   243	            continue
+   244	        if tag == "insert" and all(_NUMBER_ONLY.match(t) for t in tokens):
+   245	            continue
+   246	        return "wording"
+   247	    return verdict
+   248	
+   249	
+   250	def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
+   251	    letters = [c for c in anchor_text if c.isalpha()]
+   252	    if letters and all(c.isupper() for c in letters):
+   253	        return Status.match, "GOVERNMENT WARNING appears in capital letters."
+   254	    return (
+   255	        Status.needs_review,
+   256	        f"Read as '{collapse_ws(anchor_text)}', which is not all capitals. "
+   257	        "Capital letters are required (27 CFR 16.22(a)(2)). Confirm on the image.",
+   258	    )
+   259	
+   260	
+   261	def type_weight_ratio(span: WarningSpan) -> tuple[float, str] | None:
+   262	    """Heading stroke weight over body stroke weight, and what it was measured against. The sound
+   263	    comparison is the heading against the rest of its own line: same size, same face, same box, so
+   264	    the normalization cancels (real labels: a semibold heading reads 1.15, a bold one 1.24, all-bold
+   265	    0.99). When the heading stands alone on its line, its stroke thickness in pixels is compared
+   266	    with the median of the other lines' (the box heights differ, so ratios would not). None when
+   267	    the print was too small or faint to measure."""
+   268	    heading = next((ln for ln in span.lines if _ANCHOR_RE.search(ln.text) and ln.weight_head is not None), None)
+   269	    if heading is None or heading.weight_head is None:
+   270	        return None
+   271	    if heading.weight_tail:
+   272	        return heading.weight_head / heading.weight_tail, "the rest of its line"
+   273	
+   274	    def height(ln: OcrLine) -> float:
+   275	        _, _, y0, y1 = _extent(ln)
+   276	        return max(1.0, y1 - y0)
+   277	
+   278	    others = [ln for ln in span.lines if ln is not heading and ln.weight is not None]
+   279	    if len(others) < 2:
+   280	        return None
+   281	    head_px = heading.weight_head * height(heading)
+   282	    body_px = statistics.median(ln.weight * height(ln) for ln in others if ln.weight is not None)
+   283	    return (head_px / body_px if body_px else 0.0), "the other lines"
+   284	
+   285	
+   286	def type_weight_status(
+   287	    span: WarningSpan, *, heading_min_ratio: float, same_max_ratio: float
+   288	) -> tuple[Status, Status, str]:
+   289	    """Bold type from the stroke weights measured on the pixels (app/pipeline/typeface.py): the
+   290	    heading must be bold and the rest must not be (27 CFR 16.22(a)(2)). A heading clearly heavier
+   291	    is a Match on both counts; heading and body of the same weight is Needs review on both, because
+   292	    the measurement cannot tell a heading that is not bold from a statement that is all bold; a
+   293	    small difference is inconclusive, and print too small or faint to measure is Not checked.
+   294	    Never a failure: it measures print, not wording."""
+   295	    measured = type_weight_ratio(span)
+   296	    if measured is None:
+   297	        return (
+   298	            Status.not_checked,
+   299	            Status.not_checked,
+   300	            "Bold type could not be measured: the print is too small or too faint at the working size. "
+   301	            "Check it on the image (27 CFR 16.22(a)(2)).",
+   302	        )
+   303	    ratio, basis = measured
+   304	    if ratio >= heading_min_ratio:
+   305	        return (
+   306	            Status.match,
+   307	            Status.match,
+   308	            f"The heading is set about {ratio:.1f} times heavier than {basis}: bold heading, remainder not bold "
+   309	            "(27 CFR 16.22(a)(2)).",
+   310	        )
+   311	    if ratio <= same_max_ratio:
+   312	        return (
+   313	            Status.needs_review,
+   314	            Status.needs_review,
+   315	            f"The heading and {basis} measure the same weight: either the heading is not in bold, or the whole "
+   316	            "statement is. Only the heading may be bold (27 CFR 16.22(a)(2)). Confirm on the image.",
+   317	        )
+   318	    return (
+   319	        Status.not_checked,
+   320	        Status.not_checked,
+   321	        f"Bold type could not be judged with confidence from this image (the heading measures only slightly "
+   322	        f"heavier than {basis}); check it on the image (27 CFR 16.22(a)(2)).",
+   323	    )
+   324	
+   325	
+   326	def build_report(
+   327	    lines: list[OcrLine],
+   328	    *,
+   329	    mismatch_similarity: float,
+   330	    heading_min_ratio: float = 1.15,
+   331	    same_max_ratio: float = 1.05,
+   332	) -> WarningReport:
+   333	    """Assess the warning statement. ``assessment`` drives the verdict:
+   334	    exact -> pass; noise -> Needs review; wording/absent -> issue. The anchor's capitals and the
+   335	    type weight are separate format checks (``anchor_caps``, ``anchor_bold``, ``body_not_bold``)
+   336	    that can send an exact statement to Needs review, never to an issue."""
+   337	    span = find_warning(lines)
+   338	    if span is None:
+   339	        return WarningReport(
+   340	            present=False,
+   341	            exact=False,
+   342	            assessment="absent",
+   343	            similarity=0.0,
+   344	            found_text=None,
+   345	            diff=None,
+   346	            anchor_caps=Status.not_found,
+   347	            anchor_bold=Status.not_checked,
+   348	            body_not_bold=Status.not_checked,
+   349	            notes=[
+   350	                "No GOVERNMENT WARNING statement was found on any image. It is mandatory on all alcoholic "
+   351	                "beverages of 0.5% alcohol or more (27 CFR 16.21). If the warning is on a label image not "
+   352	                "uploaded, add that image. A statement printed sideways in very small type can also go "
+   353	                "unread; check the image."
+   354	            ],
+   355	        )
+   356	    exact, similarity = compare_warning(span.text)
+   357	    caps_status, caps_note = anchor_caps_status(span.anchor_text)
+   358	    bold_status, body_status, bold_note = type_weight_status(
+   359	        span, heading_min_ratio=heading_min_ratio, same_max_ratio=same_max_ratio
+   360	    )
+   361	    if exact:
+   362	        assessment = "exact"
+   363	    else:
+   364	        assessment = classify_difference(CANONICAL, span.text)
+   365	        if assessment == "noise" and similarity < mismatch_similarity:
+   366	            assessment = "wording"  # too many differences to call it noise
+   367	    notes = {
+   368	        "exact": "Wording is exact (27 CFR 16.21).",
+   369	        "noise": (
+   370	            "Wording matches apart from punctuation, an accent, or single characters as read, which is usually "
+   371	            "OCR noise (a dropped colon, a '1' read as 'i', a stray accent). Compare the diff with the image."
+   372	        ),
+   373	        "wording": (
+   374	            "Wording differs from the required text: a word is missing, added or changed. "
+   375	            "The statement must be word for word (27 CFR 16.21)."
+   376	        ),
+   377	    }
+   378	    return WarningReport(
+   379	        present=True,
+   380	        exact=exact,
+   381	        assessment=assessment,
+   382	        similarity=round(similarity, 4),
+   383	        found_text=span.text,
+   384	        diff=None if exact else word_diff(CANONICAL, span.text),
+   385	        anchor_caps=caps_status,
+   386	        anchor_bold=bold_status,
+   387	        body_not_bold=body_status,
+   388	        evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],
+   389	        notes=[notes[assessment], caps_note, bold_note],
+   390	    )
+
+
+===== FILE: app/services.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Orchestration: bytes in, verified result out. The only module that touches both the OCR pool
+     2	and the pure pipeline."""
+     3	
+     4	from __future__ import annotations
+     5	
+     6	import asyncio
+     7	import time
+     8	import uuid
+     9	from dataclasses import dataclass, field
+    10	
+    11	import numpy as np
+    12	
+    13	from app.config import Settings
+    14	from app.ocr.base import RawLine
+    15	from app.ocr.pool import OcrPool, Runner
+    16	from app.pipeline.compare import compare
+    17	from app.pipeline.extract import extract_fields
+    18	from app.pipeline.images import DecodedImage, decode_image, rotate_array, to_canonical
+    19	from app.pipeline.typeface import measure_line, to_gray
+    20	from app.pipeline.warning import WarningSpan, find_warning
+    21	from app.schemas import (
+    22	    ApplicationFields,
+    23	    EngineInfo,
+    24	    ExtractResponse,
+    25	    ImageInfo,
+    26	    ImageQuality,
+    27	    OcrLine,
+    28	    Timing,
+    29	    VerifyResponse,
+    30	)
+    31	
+    32	
+    33	def new_request_id() -> str:
+    34	    return uuid.uuid4().hex[:12]
+    35	
+    36	
+    37	@dataclass
+    38	class Upload:
+    39	    data: bytes
+    40	    filename: str | None
+    41	
+    42	
+    43	@dataclass
+    44	class ProcessedImage:
+    45	    info: ImageInfo
+    46	    lines: list[OcrLine]
+    47	    queue_ms: int
+    48	    ocr_ms: int
+    49	    # Orientations the rotation retry read but did not keep (degrees -> lines in canonical
+    50	    # coordinates). The warning rescue looks there first; it costs nothing.
+    51	    alternates: dict[int, list[OcrLine]] = field(default_factory=dict)
+    52	
+    53	
+    54	# One extra read for the warning rescue: the image, its upload, and the turn in degrees (None =
+    55	# once more upright at bounded full resolution).
+    56	RescueRead = tuple[ProcessedImage, Upload, int | None]
+    57	
+    58	
+    59	def _to_lines(
+    60	    raw: list[RawLine],
+    61	    dec: DecodedImage,
+    62	    index: int,
+    63	    degrees: int,
+    64	    rot_w: int,
+    65	    rot_h: int,
+    66	    arr: np.ndarray | None = None,
+    67	) -> list[OcrLine]:
+    68	    """Canonical lines from a read, with the type weight of each line measured on the array the
+    69	    engine read (``arr``), so the warning report can judge bold type without the pixels."""
+    70	    out: list[OcrLine] = []
+    71	    gray = to_gray(arr) if arr is not None and raw else None
+    72	    for r in raw:
+    73	        lw = measure_line(gray, r.box, r.text) if gray is not None else None
+    74	        out.append(
+    75	            OcrLine(
+    76	                image_index=index,
+    77	                text=r.text,
+    78	                confidence=round(r.confidence, 4),
+    79	                box=to_canonical(r.box, scale=dec.scale, degrees=degrees, rot_w=rot_w, rot_h=rot_h),
+    80	                weight=lw.weight if lw else None,
+    81	                weight_head=lw.head if lw else None,
+    82	                weight_tail=lw.tail if lw else None,
+    83	            )
+    84	        )
+    85	    return out
+    86	
+    87	
+    88	def _read_score(raw: list[RawLine]) -> float:
+    89	    """How much confident text was read: sum of confidences of lines at or above 0.5."""
+    90	    return float(sum(r.confidence for r in raw if r.confidence >= 0.5))
+    91	
+    92	
+    93	def _quality(raw: list[RawLine]) -> ImageQuality:
+    94	    if not raw:
+    95	        return ImageQuality(
+    96	            mean_confidence=0.0,
+    97	            line_count=0,
+    98	            readable=False,
+    99	            reason="No text was detected. The image may be blank, too small, or not a label.",
+   100	        )
+   101	    mean = float(np.mean([r.confidence for r in raw]))
+   102	    if mean < 0.6:
+   103	        return ImageQuality(
+   104	            mean_confidence=round(mean, 3),
+   105	            line_count=len(raw),
+   106	            readable=False,
+   107	            reason="Text was detected but read with low confidence. The image may be blurry, "
+   108	            "low contrast, or photographed at an angle. Request a clearer image.",
+   109	        )
+   110	    return ImageQuality(mean_confidence=round(mean, 3), line_count=len(raw), readable=True)
+   111	
+   112	
+   113	async def process_image(
+   114	    up: Upload, index: int, settings: Settings, run: Runner, *, queue_ms: int = 0
+   115	) -> ProcessedImage:
+   116	    """Decode one upload and read it on the given slot, retrying sideways orientations when the
+   117	    first read is poor (the one failure mode the engine does not recover on its own). The reads
+   118	    that lose the retry are kept as alternates rather than thrown away."""
+   119	    dec = decode_image(
+   120	        up.data, max_pixels=settings.max_image_pixels, max_side=settings.ocr_max_side, filename=up.filename
+   121	    )
+   122	    t0 = time.perf_counter()
+   123	    raw = await run(dec.array)
+   124	    h, w = dec.array.shape[:2]
+   125	    reads: dict[int, tuple[list[RawLine], int, int, np.ndarray]] = {0: (raw, w, h, dec.array)}
+   126	    chosen = 0
+   127	    mean = float(np.mean([r.confidence for r in raw])) if raw else 0.0
+   128	    if mean < settings.ocr_low_conf_retry or len(raw) < settings.ocr_min_lines_retry:
+   129	        for degrees in (90, 270):
+   130	            rot = rotate_array(dec.array, degrees)
+   131	            raw2 = await run(rot)
+   132	            reads[degrees] = (raw2, rot.shape[1], rot.shape[0], rot)
+   133	            if _read_score(raw2) > _read_score(reads[chosen][0]) * 1.15:
+   134	                chosen = degrees
+   135	    ocr_ms = int((time.perf_counter() - t0) * 1000)
+   136	    raw_best, rw, rh, arr_best = reads[chosen]
+   137	    lines = _to_lines(raw_best, dec, index, chosen, rw, rh, arr_best)
+   138	    alternates = {d: _to_lines(r, dec, index, d, w2, h2, a2) for d, (r, w2, h2, a2) in reads.items() if d != chosen}
+   139	    info = ImageInfo(
+   140	        index=index,
+   141	        filename=up.filename,
+   142	        width=dec.width,
+   143	        height=dec.height,
+   144	        format=dec.format,
+   145	        rotated_degrees=chosen,
+   146	        quality=_quality(raw_best),
+   147	    )
+   148	    return ProcessedImage(info=info, lines=lines, queue_ms=queue_ms, ocr_ms=ocr_ms, alternates=alternates)
+   149	
+   150	
+   151	async def process_images(
+   152	    uploads: list[Upload], settings: Settings, pool: OcrPool, *, interactive: bool
+   153	) -> list[ProcessedImage]:
+   154	    """Interactive: each image takes its own slot so a front+back pair costs one image-time, and a
+   155	    statement that went unread gets one more round of reads (``_rescue_warning``).
+   156	    Batch: one slot is held for all the images of the request, so it can never be refused halfway,
+   157	    and every image is read exactly once. The batch screen reads images before it knows which
+   158	    application they belong to, so a front label, which carries no statement by design, must not
+   159	    trigger re-reads (measured: they cut batch throughput to a quarter, docs/LOADTEST.md)."""
+   160	    if interactive:
+   161	
+   162	        async def one(i: int, u: Upload) -> ProcessedImage:
+   163	            async with pool.slot(interactive=True) as (run, queue_ms):
+   164	                return await process_image(u, i, settings, run, queue_ms=queue_ms)
+   165	
+   166	        processed = list(await asyncio.gather(*(one(i, u) for i, u in enumerate(uploads))))
+   167	        if settings.warning_rescue:
+   168	            await _rescue_warning(uploads, processed, settings, pool)
+   169	        return processed
+   170	    async with pool.slot(interactive=False) as (run, queue_ms):
+   171	        return [await process_image(u, i, settings, run, queue_ms=queue_ms) for i, u in enumerate(uploads)]
+   172	
+   173	
+   174	async def _rescue_warning(
+   175	    uploads: list[Upload], processed: list[ProcessedImage], settings: Settings, pool: OcrPool
+   176	) -> None:
+   177	    """Two layouts hide the statement from the ordinary read: printed sideways along the edge of a
+   178	    small label that otherwise reads perfectly upright (so the low-confidence retry never fires),
+   179	    and printed in small type on large artwork (unreadable once the image is scaled to the working
+   180	    size). When no usable statement was found (none, or a span far from the required text): first
+   181	    look at the orientations the rotation retry already read, then run ONE round of extra reads in
+   182	    parallel on their own slots, at most one per worker: turned 270 then 90 degrees and, for large
+   183	    artwork, once more at bounded full resolution (that one first when the heading was seen but the
+   184	    body was not). One round keeps the interactive path inside its time budget whatever the number
+   185	    of workers, and the round is the same for the same input and configuration. The best span that
+   186	    beats the upright read is kept. A read that cannot get a slot is refused like any other
+   187	    interactive read (BusyError, HTTP 429), never skipped silently."""
+   188	    upright = find_warning([ln for p in processed for ln in p.lines])
+   189	    floor = upright.similarity if upright else 0.0
+   190	    if floor >= settings.warning_rescue_below:
+   191	        return
+   192	    for p in processed:  # free: what the retry read and did not keep
+   193	        for lines in p.alternates.values():
+   194	            span = find_warning(lines)
+   195	            if span is not None and span.similarity > floor:
+   196	                _adopt(p, span)
+   197	                floor = span.similarity
+   198	    if floor >= settings.warning_rescue_below:
+   199	        return
+   200	    plans: list[list[RescueRead]] = []
+   201	    for up, p in zip(uploads, processed, strict=True):
+   202	        if not p.info.quality.readable:
+   203	            continue  # nothing legible at all; turning it will not help
+   204	        seen = {p.info.rotated_degrees, *p.alternates}
+   205	        # 270 first: it unrolls a statement printed up a label's right edge, reading bottom to top,
+   206	        # which is how three of the four such labels in the real sample print it (docs/EVAL_REAL.md).
+   207	        turns: list[RescueRead] = [(p, up, d) for d in (270, 90) if d not in seen]
+   208	        side = min(settings.warning_rescue_max_side, max(p.info.width, p.info.height))
+   209	        full: list[RescueRead] = [(p, up, None)] if side > settings.ocr_max_side else []
+   210	        heading_seen = find_warning(p.lines) is not None
+   211	        plans.append(full + turns if heading_seen else turns + full)
+   212	    # The first read of every image before any second read, so a front+back pair shares the round.
+   213	    depth = max((len(plan) for plan in plans), default=0)
+   214	    ordered = [plan[k] for k in range(depth) for plan in plans if k < len(plan)]
+   215	    reads = ordered[: pool.workers]
+   216	    if not reads:
+   217	        return
+   218	    spans = await asyncio.gather(*(_rescue_read(p, up, degrees, settings, pool) for p, up, degrees in reads))
+   219	    best: dict[int, WarningSpan] = {}
+   220	    for (p, _, _), span in zip(reads, spans, strict=True):
+   221	        idx = p.info.index
+   222	        if span is not None and span.similarity > floor and (idx not in best or span.similarity > best[idx].similarity):
+   223	            best[idx] = span
+   224	    for p in processed:
+   225	        if p.info.index in best:
+   226	            _adopt(p, best[p.info.index])
+   227	
+   228	
+   229	def _adopt(p: ProcessedImage, span: WarningSpan) -> None:
+   230	    """Add a rescued statement to an image's lines and drop what the kept read had in the same
+   231	    places: the same strip of print read in another orientation is garbage, and two readings of
+   232	    one region must not both be there."""
+   233	    p.lines = [*(ln for ln in p.lines if not any(_same_place(ln, s) for s in span.lines)), *span.lines]
+   234	
+   235	
+   236	def _same_place(a: OcrLine, b: OcrLine) -> bool:
+   237	    """True when the boxes cover mostly the same area (more than half of the smaller one)."""
+   238	    ax = [pt[0] for pt in a.box]
+   239	    ay = [pt[1] for pt in a.box]
+   240	    bx = [pt[0] for pt in b.box]
+   241	    by = [pt[1] for pt in b.box]
+   242	    inter_w = max(0.0, min(max(ax), max(bx)) - max(min(ax), min(bx)))
+   243	    inter_h = max(0.0, min(max(ay), max(by)) - max(min(ay), min(by)))
+   244	    area_a = max(1.0, (max(ax) - min(ax)) * (max(ay) - min(ay)))
+   245	    area_b = max(1.0, (max(bx) - min(bx)) * (max(by) - min(by)))
+   246	    return inter_w * inter_h / min(area_a, area_b) > 0.5
+   247	
+   248	
+   249	async def _rescue_read(
+   250	    p: ProcessedImage, up: Upload, degrees: int | None, settings: Settings, pool: OcrPool
+   251	) -> WarningSpan | None:
+   252	    async with pool.slot(interactive=True) as (run, queue_ms):
+   253	        t0 = time.perf_counter()
+   254	        if degrees is None:
+   255	            side = min(settings.warning_rescue_max_side, max(p.info.width, p.info.height))
+   256	            dec = decode_image(up.data, max_pixels=settings.max_image_pixels, max_side=side, filename=up.filename)
+   257	            arr, turn = dec.array, 0
+   258	        else:
+   259	            dec = decode_image(
+   260	                up.data, max_pixels=settings.max_image_pixels, max_side=settings.ocr_max_side, filename=up.filename
+   261	            )
+   262	            arr, turn = rotate_array(dec.array, degrees), degrees
+   263	        raw = await run(arr)
+   264	        lines = _to_lines(raw, dec, p.info.index, turn, arr.shape[1], arr.shape[0], arr)
+   265	        p.queue_ms += queue_ms
+   266	        p.ocr_ms += int((time.perf_counter() - t0) * 1000)
+   267	    return find_warning(lines)
+   268	
+   269	
+   270	def engine_info(pool: OcrPool) -> EngineInfo:
+   271	    return EngineInfo(name="rapidocr-onnxruntime", models=pool.info(), workers=pool.workers)
+   272	
+   273	
+   274	def _timing(t0: float, processed: list[ProcessedImage]) -> Timing:
+   275	    return Timing(
+   276	        total_ms=int((time.perf_counter() - t0) * 1000),
+   277	        queue_ms=max((p.queue_ms for p in processed), default=0),
+   278	        ocr_ms=[p.ocr_ms for p in processed],
+   279	    )
+   280	
+   281	
+   282	async def verify(
+   283	    app: ApplicationFields,
+   284	    uploads: list[Upload],
+   285	    settings: Settings,
+   286	    pool: OcrPool,
+   287	    *,
+   288	    interactive: bool = True,
+   289	    request_id: str | None = None,
+   290	) -> VerifyResponse:
+   291	    t0 = time.perf_counter()
+   292	    processed = await process_images(uploads, settings, pool, interactive=interactive)
+   293	    lines = [ln for p in processed for ln in p.lines]
+   294	    images = [p.info for p in processed]
+   295	    result = compare(app, lines, images, settings)
+   296	    return VerifyResponse(
+   297	        request_id=request_id or new_request_id(),
+   298	        application=app,
+   299	        images=images,
+   300	        lines=lines,
+   301	        timing=_timing(t0, processed),
+   302	        engine=engine_info(pool),
+   303	        **result.model_dump(),
+   304	    )
+   305	
+   306	
+   307	async def extract(
+   308	    uploads: list[Upload],
+   309	    settings: Settings,
+   310	    pool: OcrPool,
+   311	    *,
+   312	    interactive: bool = False,
+   313	    request_id: str | None = None,
+   314	) -> ExtractResponse:
+   315	    t0 = time.perf_counter()
+   316	    processed = await process_images(uploads, settings, pool, interactive=interactive)
+   317	    lines = [ln for p in processed for ln in p.lines]
+   318	    return ExtractResponse(
+   319	        request_id=request_id or new_request_id(),
+   320	        images=[p.info for p in processed],
+   321	        lines=lines,
+   322	        fields=extract_fields(lines),
+   323	        timing=_timing(t0, processed),
+   324	        engine=engine_info(pool),
+   325	    )
+
+
+===== FILE: app/schemas.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Pydantic models shared by the API and the pipeline.
+     2	
+     3	Coordinates: every box is a quadrilateral of four (x, y) points in the *oriented original
+     4	image* space (after EXIF transpose, before any downscaling). The client draws in that space.
+     5	"""
+     6	
+     7	from __future__ import annotations
+     8	
+     9	from enum import StrEnum
+    10	
+    11	from pydantic import BaseModel, ConfigDict, Field
+    12	
+    13	Point = tuple[float, float]
+    14	Quad = tuple[Point, Point, Point, Point]
+    15	
+    16	
+    17	class BeverageType(StrEnum):
+    18	    spirits = "spirits"
+    19	    wine = "wine"
+    20	    malt = "malt"
+    21	
+    22	
+    23	class Status(StrEnum):
+    24	    match = "match"
+    25	    needs_review = "needs_review"
+    26	    mismatch = "mismatch"
+    27	    not_found = "not_found"
+    28	    not_checked = "not_checked"
+    29	    info = "info"
+    30	
+    31	
+    32	class Verdict(StrEnum):
+    33	    ready_for_approval = "ready_for_approval"
+    34	    needs_review = "needs_review"
+    35	    issues_found = "issues_found"
+    36	    unreadable = "unreadable"
+    37	
+    38	
+    39	class ApplicationFields(BaseModel):
+    40	    """What the agent has in front of them from the COLA application, as written."""
+    41	
+    42	    model_config = ConfigDict(str_strip_whitespace=True)
+    43	
+    44	    application_id: str | None = Field(default=None, max_length=64, description="Agent's reference, e.g. a TTB ID")
+    45	    beverage_type: BeverageType
+    46	    brand_name: str = Field(min_length=1, max_length=200)
+    47	    class_type: str = Field(min_length=1, max_length=200)
+    48	    alcohol_content: str | None = Field(
+    49	        default=None, max_length=100, description='As written, e.g. "45% Alc./Vol. (90 Proof)"'
+    50	    )
+    51	    net_contents: str | None = Field(
+    52	        default=None,
+    53	        max_length=100,
+    54	        description='As written, e.g. "750 mL". May be blank (the COLA form carries none): the result then '
+    55	        "shows what the label says and asks the agent to confirm it",
+    56	    )
+    57	    bottler: str | None = Field(
+    58	        default=None, max_length=300, description="Name and address of bottler/producer/importer"
+    59	    )
+    60	    country_of_origin: str | None = Field(default=None, max_length=100)
+    61	    imported: bool = False
+    62	
+    63	
+    64	class OcrLine(BaseModel):
+    65	    image_index: int = Field(ge=0, le=64)
+    66	    text: str = Field(max_length=1000)
+    67	    confidence: float = Field(ge=0, le=1)
+    68	    box: Quad
+    69	    # Type weight measured from the pixels (stroke width over type height; app/pipeline/typeface.py).
+    70	    # None when the print was too small or faint to measure. head/tail split a line that carries
+    71	    # the warning heading into the heading and the rest.
+    72	    weight: float | None = Field(default=None, ge=0, le=2)
+    73	    weight_head: float | None = Field(default=None, ge=0, le=2)
+    74	    weight_tail: float | None = Field(default=None, ge=0, le=2)
+    75	
+    76	
+    77	class Evidence(BaseModel):
+    78	    image_index: int
+    79	    box: Quad
+    80	    text: str
+    81	
+    82	
+    83	class Check(BaseModel):
+    84	    id: str
+    85	    label: str
+    86	    status: Status
+    87	    expected: str | None = None
+    88	    found: str | None = None
+    89	    score: float | None = Field(default=None, description="0-100 similarity where applicable")
+    90	    note: str = ""
+    91	    rule: str | None = Field(default=None, description="Regulatory citation where applicable")
+    92	    evidence: list[Evidence] = Field(default_factory=list)
+    93	
+    94	
+    95	class WarningReport(BaseModel):
+    96	    present: bool
+    97	    exact: bool
+    98	    assessment: str = Field(
+    99	        default="absent",
+   100	        description="exact | noise | wording | absent | not_required (how the read text relates to 16.21; "
+   101	        "exact ignores letter case and spacing, the anchor's capitals are anchor_caps)",
+   102	    )
+   103	    similarity: float
+   104	    found_text: str | None = None
+   105	    diff: str | None = Field(default=None, description="Compact word diff: -expected +found")
+   106	    anchor_caps: Status
+   107	    anchor_bold: Status
+   108	    body_not_bold: Status
+   109	    evidence: list[Evidence] = Field(default_factory=list)
+   110	    notes: list[str] = Field(default_factory=list)
+   111	    rule: str = "27 CFR 16.21 (text), 16.22 (format)"
+   112	
+   113	
+   114	class ImageQuality(BaseModel):
+   115	    mean_confidence: float
+   116	    line_count: int
+   117	    readable: bool
+   118	    reason: str | None = None
+   119	
+   120	
+   121	class ImageInfo(BaseModel):
+   122	    index: int
+   123	    filename: str | None
+   124	    width: int
+   125	    height: int
+   126	    format: str
+   127	    rotated_degrees: int = Field(default=0, description="Rotation applied by the orientation retry, if any")
+   128	    quality: ImageQuality
+   129	
+   130	
+   131	class Timing(BaseModel):
+   132	    total_ms: int
+   133	    queue_ms: int
+   134	    ocr_ms: list[int]
+   135	
+   136	
+   137	class EngineInfo(BaseModel):
+   138	    name: str
+   139	    models: dict[str, str]
+   140	    workers: int
+   141	
+   142	
+   143	class ExtractedFields(BaseModel):
+   144	    """Best guesses read from the label without application data (extract-only mode)."""
+   145	
+   146	    alcohol_percent: float | None = None
+   147	    proof: float | None = None
+   148	    net_contents_ml: list[float] = Field(default_factory=list)
+   149	    warning_present: bool = False
+   150	    origin_lines: list[str] = Field(default_factory=list)
+   151	    bottler_lines: list[str] = Field(default_factory=list)
+   152	    largest_text: str | None = Field(default=None, description="Tallest line, usually the brand")
+   153	
+   154	
+   155	class ExtractResponse(BaseModel):
+   156	    request_id: str
+   157	    images: list[ImageInfo]
+   158	    lines: list[OcrLine]
+   159	    fields: ExtractedFields
+   160	    timing: Timing
+   161	    engine: EngineInfo
+   162	
+   163	
+   164	class CompareResult(BaseModel):
+   165	    verdict: Verdict
+   166	    checks: list[Check]
+   167	    warning: WarningReport
+   168	    summary: str
+   169	
+   170	
+   171	class VerifyResponse(CompareResult):
+   172	    request_id: str
+   173	    application: ApplicationFields
+   174	    images: list[ImageInfo]
+   175	    lines: list[OcrLine]
+   176	    timing: Timing
+   177	    engine: EngineInfo
+   178	
+   179	
+   180	class CompareItem(BaseModel):
+   181	    item_id: str = Field(max_length=128)
+   182	    application: ApplicationFields
+   183	    lines: list[OcrLine] = Field(max_length=2000)
+   184	    images: list[ImageInfo] = Field(default_factory=list, max_length=64)
+   185	
+   186	
+   187	class CompareRequest(BaseModel):
+   188	    items: list[CompareItem] = Field(min_length=1)
+   189	
+   190	
+   191	class CompareResponseItem(CompareResult):
+   192	    item_id: str
+   193	
+   194	
+   195	class CompareResponse(BaseModel):
+   196	    request_id: str
+   197	    results: list[CompareResponseItem]
+   198	
+   199	
+   200	class HealthResponse(BaseModel):
+   201	    status: str
+   202	    ready: bool
+   203	    error: str | None = Field(default=None, description="Set when OCR warm-up failed")
+   204	    engine: EngineInfo
+   205	    max_concurrency: int
+   206	    in_flight: int
+   207	    requests_in_flight: int = 0
+   208	    version: str
+   209	    git_sha: str
+   210	
+   211	
+   212	class ErrorResponse(BaseModel):
+   213	    code: str
+   214	    message: str
+   215	    hint: str | None = None
+   216	    request_id: str | None = None
+
+
+===== FILE: app/pipeline/images.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Image intake: format sniffing, decompression-bomb guard, EXIF orientation, downscaling, and
+     2	the coordinate transforms that map OCR boxes back to the oriented original image.
+     3	
+     4	Canonical space = the image after EXIF transpose, at its original resolution. Every box the API
+     5	returns lives there.
+     6	"""
+     7	
+     8	from __future__ import annotations
+     9	
+    10	from collections.abc import Sequence
+    11	from dataclasses import dataclass
+    12	from io import BytesIO
+    13	
+    14	import numpy as np
+    15	from PIL import Image, ImageOps
+    16	
+    17	from app.schemas import Quad
+    18	
+    19	_SIGNATURES: tuple[tuple[bytes, str], ...] = (
+    20	    (b"\x89PNG\r\n\x1a\n", "png"),
+    21	    (b"\xff\xd8\xff", "jpeg"),
+    22	    (b"GIF87a", "gif"),
+    23	    (b"GIF89a", "gif"),
+    24	    (b"II*\x00", "tiff"),
+    25	    (b"MM\x00*", "tiff"),
+    26	    (b"BM", "bmp"),
+    27	)
+    28	SUPPORTED = ("png", "jpeg", "gif", "webp", "tiff", "bmp")
+    29	
+    30	
+    31	class ImageError(Exception):
+    32	    def __init__(self, code: str, message: str, hint: str | None = None) -> None:
+    33	        super().__init__(message)
+    34	        self.code, self.message, self.hint = code, message, hint
+    35	
+    36	
+    37	def sniff_format(data: bytes) -> str | None:
+    38	    for sig, fmt in _SIGNATURES:
+    39	        if data.startswith(sig):
+    40	            return fmt
+    41	    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+    42	        return "webp"
+    43	    return None
+    44	
+    45	
+    46	@dataclass
+    47	class DecodedImage:
+    48	    array: np.ndarray  # RGB uint8, downscaled working copy
+    49	    width: int  # canonical (oriented original) width
+    50	    height: int  # canonical height
+    51	    scale: float  # working = canonical * scale
+    52	    format: str
+    53	    filename: str | None
+    54	
+    55	
+    56	def decode_image(data: bytes, *, max_pixels: int, max_side: int, filename: str | None = None) -> DecodedImage:
+    57	    fmt = sniff_format(data)
+    58	    if fmt is None:
+    59	        head = data[:5]
+    60	        if head.startswith(b"%PDF"):
+    61	            raise ImageError(
+    62	                "unsupported_format",
+    63	                "PDF files are not supported.",
+    64	                "Export the label artwork as PNG or JPEG and upload that.",
+    65	            )
+    66	        if head.lstrip().startswith(b"<"):
+    67	            raise ImageError(
+    68	                "unsupported_format",
+    69	                "SVG and other text-based files are not supported.",
+    70	                "Upload PNG, JPEG, GIF, WebP, TIFF or BMP.",
+    71	            )
+    72	        if data[4:12] in (b"ftypheic", b"ftypheix", b"ftypmif1", b"ftypmsf1"):
+    73	            raise ImageError(
+    74	                "unsupported_format",
+    75	                "HEIC photos are not supported.",
+    76	                "On iPhone, share the photo as JPEG, or set Camera > Formats to Most Compatible.",
+    77	            )
+    78	        raise ImageError(
+    79	            "unsupported_format", "This file is not a supported image.", "Upload PNG, JPEG, GIF, WebP, TIFF or BMP."
+    80	        )
+    81	    try:
+    82	        im = Image.open(BytesIO(data))
+    83	        w, h = im.size
+    84	        if w * h > max_pixels:
+    85	            raise ImageError(
+    86	                "image_too_large",
+    87	                f"This image is {w} x {h} pixels, above the {max_pixels // 1_000_000} megapixel limit.",
+    88	                "Resize the image below the limit and upload it again.",
+    89	            )
+    90	        if fmt == "gif":
+    91	            im.seek(0)
+    92	        # The canonical size is the oriented original, fixed here from the header before any
+    93	        # reduced-size decode can change im.size. EXIF orientations 5-8 swap width and height.
+    94	        swapped = im.getexif().get(0x0112, 1) in (5, 6, 7, 8)
+    95	        canon_w, canon_h = (h, w) if swapped else (w, h)
+    96	        if fmt == "jpeg" and min(w, h) >= 2 * max_side:
+    97	            # libjpeg decodes at 1/2, 1/4 or 1/8 size while keeping both sides at or above max_side:
+    98	            # a 12 MP phone photo costs a quarter of the memory and time. Coordinates are unaffected
+    99	            # because scale is computed against the canonical size recorded above.
+   100	            im.draft("RGB", (max_side, max_side))
+   101	        im = ImageOps.exif_transpose(im) or im
+   102	        im = im.convert("RGB")
+   103	    except ImageError:
+   104	        raise
+   105	    except Exception as exc:  # Pillow raises many types for corrupt data
+   106	        raise ImageError(
+   107	            "corrupt_image",
+   108	            "This image could not be decoded.",
+   109	            "The file may be truncated or corrupt. Re-export it and try again.",
+   110	        ) from exc
+   111	    scale = min(1.0, max_side / max(canon_w, canon_h))
+   112	    target = (max(1, round(canon_w * scale)), max(1, round(canon_h * scale)))
+   113	    if im.size != target:
+   114	        im = im.resize(target, Image.LANCZOS)
+   115	    return DecodedImage(array=np.asarray(im), width=canon_w, height=canon_h, scale=scale, format=fmt, filename=filename)
+   116	
+   117	
+   118	def rotate_array(arr: np.ndarray, degrees: int) -> np.ndarray:
+   119	    """Rotate counter-clockwise by 90, 180 or 270 degrees (numpy convention)."""
+   120	    k = {0: 0, 90: 1, 180: 2, 270: 3}[degrees]
+   121	    return np.ascontiguousarray(np.rot90(arr, k)) if k else arr
+   122	
+   123	
+   124	def unrotate_point(x: float, y: float, degrees: int, rot_w: int, rot_h: int) -> tuple[float, float]:
+   125	    """Map a point in a rotated array back to the unrotated array's coordinates.
+   126	
+   127	    rot_w, rot_h are the rotated array's width and height. Derived from numpy.rot90 semantics:
+   128	    k=1 (90 CCW): rotated (x, y) came from original (rot_h - y, x)
+   129	    k=2 (180):    original (rot_w - x, rot_h - y)
+   130	    k=3 (270 CCW = 90 CW): original (y, rot_w - x)
+   131	    """
+   132	    if degrees == 0:
+   133	        return x, y
+   134	    if degrees == 90:
+   135	        return rot_h - y, x
+   136	    if degrees == 180:
+   137	        return rot_w - x, rot_h - y
+   138	    if degrees == 270:
+   139	        return y, rot_w - x
+   140	    raise ValueError(degrees)
+   141	
+   142	
+   143	def to_canonical(
+   144	    box: np.ndarray | Sequence[Sequence[float]], *, scale: float, degrees: int, rot_w: int, rot_h: int
+   145	) -> Quad:
+   146	    """OCR box (4 points, in the working array as fed to OCR, possibly rotated) -> canonical quad."""
+   147	    pts = []
+   148	    for x, y in box:
+   149	        ux, uy = unrotate_point(float(x), float(y), degrees, rot_w, rot_h)
+   150	        pts.append((round(ux / scale, 1), round(uy / scale, 1)))
+   151	    return (pts[0], pts[1], pts[2], pts[3])
+
+
+===== FILE: tests/unit/test_typeface.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Type weight from pixels: stroke width over height, on drawn strokes of known width."""
+     2	
+     3	from __future__ import annotations
+     4	
+     5	import numpy as np
+     6	from app.pipeline.typeface import MIN_HEIGHT, measure_line, stroke_ratio
+     7	
+     8	
+     9	def _strokes(width: int, height: int = 48, count: int = 8, canvas_w: int = 320, ink: int = 0) -> np.ndarray:
+    10	    """A white canvas with `count` vertical bars of the given stroke width, like a line of print."""
+    11	    arr = np.full((height, canvas_w, 3), 255, dtype=np.uint8)
+    12	    step = canvas_w // (count + 1)
+    13	    for i in range(1, count + 1):
+    14	        x = i * step
+    15	        arr[6 : height - 6, x : x + width] = ink
+    16	    return arr
+    17	
+    18	
+    19	def _gray(arr: np.ndarray) -> np.ndarray:
+    20	    return arr[:, :, 0]
+    21	
+    22	
+    23	def test_bold_strokes_measure_heavier_than_regular_in_proportion():
+    24	    regular = stroke_ratio(_gray(_strokes(4)))
+    25	    bold = stroke_ratio(_gray(_strokes(7)))
+    26	    assert regular is not None and bold is not None
+    27	    assert 1.35 < bold / regular < 2.1  # 7 px over 4 px; the estimator overstates thin strokes a little
+    28	    assert 0.08 < regular < 0.14 and 0.14 < bold < 0.22
+    29	
+    30	
+    31	def test_too_small_or_empty_crops_are_not_measured():
+    32	    assert stroke_ratio(_gray(_strokes(4, height=MIN_HEIGHT - 4))) is None
+    33	    assert stroke_ratio(np.full((48, 320), 255, dtype=np.uint8)) is None  # blank
+    34	    assert stroke_ratio(_gray(_strokes(1, height=48))) is None  # hairline strokes are noise
+    35	
+    36	
+    37	def test_light_print_on_a_dark_ground_measures_the_same():
+    38	    dark = _strokes(6)
+    39	    inverted = 255 - dark
+    40	    a, b = stroke_ratio(_gray(dark)), stroke_ratio(_gray(inverted))
+    41	    assert a is not None and b is not None and abs(a - b) < 0.01
+    42	
+    43	
+    44	def test_heading_line_is_split_into_heading_and_remainder():
+    45	    # a line whose left 40% carries heavy strokes (the heading) and whose right part is regular
+    46	    canvas = np.full((48, 600, 3), 255, dtype=np.uint8)
+    47	    canvas[:, :240] = _strokes(7, canvas_w=240, count=6)
+    48	    canvas[:, 260:] = _strokes(4, canvas_w=340, count=8)
+    49	    text = "GOVERNMENT WARNING: (1) According to the Surgeon General,"  # the heading is ~19 of 57 characters
+    50	    box = ((0, 0), (600, 0), (600, 48), (0, 48))
+    51	    lw = measure_line(canvas, box, text)
+    52	    assert lw.weight is not None and lw.head is not None and lw.tail is not None
+    53	    assert lw.head > lw.tail * 1.3
+    54	    plain = measure_line(canvas, box, "because of the risk of birth defects")
+    55	    assert plain.head is None and plain.tail is None and plain.weight is not None
+    56	
+    57	
+    58	def test_solid_blocks_and_bar_codes_are_not_print():
+    59	    """A crop that is mostly ink, or whose 'strokes' are wider than half the height (a bar code or a
+    60	    filled panel the detector boxed as a line), must not yield a weight; one of these crashed the
+    61	    real-label evaluation with a ratio of 2.2 before the cap."""
+    62	    assert stroke_ratio(np.zeros((48, 320), dtype=np.uint8)) is None
+    63	    assert stroke_ratio(_gray(_strokes(60, count=2))) is None
+
+
+===== FILE: tests/unit/test_warning.py (current text at 3d9bdad, line-numbered) =====
+     1	import textwrap
+     2	
+     3	from app.pipeline.warning import (
+     4	    CANONICAL,
+     5	    build_report,
+     6	    classify_difference,
+     7	    find_warning,
+     8	    word_diff,
+     9	)
+    10	from app.schemas import Status
+    11	
+    12	from tests.unit.conftest import make_lines
+    13	
+    14	MISMATCH = 0.80
+    15	
+    16	
+    17	def wrapped(text: str, width: int = 60) -> list[str]:
+    18	    return textwrap.wrap(text, width=width)
+    19	
+    20	
+    21	def report(lines):
+    22	    return build_report(lines, mismatch_similarity=MISMATCH)
+    23	
+    24	
+    25	def test_exact_warning_across_wrapped_lines_is_exact():
+    26	    lines = make_lines(["Product of USA", *wrapped(CANONICAL), "12345 67890"])
+    27	    r = report(lines)
+    28	    assert r.present and r.exact
+    29	    assert r.anchor_caps is Status.match
+    30	    assert r.diff is None
+    31	    assert len(r.evidence) == len(wrapped(CANONICAL))
+    32	
+    33	
+    34	def test_find_warning_stops_at_the_end_of_the_statement():
+    35	    lines = make_lines([*wrapped(CANONICAL), "Bottled by Old Tom Distillery, Bardstown, KY"])
+    36	    span = find_warning(lines)
+    37	    assert span is not None
+    38	    assert "Bottled by" not in span.text
+    39	
+    40	
+    41	def test_missing_warning_is_reported_as_absent():
+    42	    r = report(make_lines(["OLD TOM DISTILLERY", "Kentucky Straight Bourbon Whiskey", "750 mL"]))
+    43	    assert not r.present
+    44	    assert r.anchor_caps is Status.not_found
+    45	    assert "mandatory" in r.notes[0]
+    46	
+    47	
+    48	def test_title_case_anchor_is_flagged_for_review():
+    49	    text = CANONICAL.replace("GOVERNMENT WARNING:", "Government Warning:")
+    50	    r = report(make_lines(wrapped(text)))
+    51	    assert r.present and r.exact  # the wording is exact; the format check is what fails
+    52	    assert r.anchor_caps is Status.needs_review
+    53	    assert "not all capitals" in r.notes[1] or "not all capitals" in " ".join(r.notes)
+    54	
+    55	
+    56	def test_warning_read_from_a_rotated_image_accumulates_its_vertical_lines():
+    57	    """A sideways photo, or a label that prints the statement vertically along its edge, is read
+    58	    from a rotated array; mapped back, its lines are vertical strips stacked left to right. The
+    59	    column filter must follow the text direction or the span stops after the anchor."""
+    60	    from app.schemas import OcrLine
+    61	
+    62	    lines = []
+    63	    for i, text in enumerate(wrapped(CANONICAL)):
+    64	        x = 1800 + 40 * i  # each line is a tall narrow box; consecutive lines step right
+    65	        lines.append(
+    66	            OcrLine(image_index=0, text=text, confidence=0.99, box=((x, 170), (x + 36, 170), (x + 36, 1300), (x, 1300)))
+    67	        )
+    68	    r = report(lines)
+    69	    assert r.present and r.exact, (r.assessment, r.similarity, r.diff)
+    70	
+    71	
+    72	def test_anchor_split_over_two_lines_is_found():
+    73	    """Seen on real labels: "GOVERNMENT" and "WARNING:" set large on two lines, the statement below."""
+    74	    head = "GOVERNMENT WARNING: "
+    75	    lines = make_lines(["Distilled and Bottled by", "GOVERNMENT", "WARNING:", *wrapped(CANONICAL[len(head) :], 40)])
+    76	    r = report(lines)
+    77	    assert r.present and r.exact, (r.assessment, r.similarity, r.diff)
+    78	    assert r.anchor_caps is Status.match
+    79	    # the reading order can slip an unrelated neighbour between the two words; it must be left out
+    80	    lines = make_lines(["GOVERNMENT", "LLC Lebanon IN", "WARNING:", *wrapped(CANONICAL[len(head) :], 40)])
+    81	    r = report(lines)
+    82	    assert r.present and r.exact, (r.assessment, r.similarity, r.diff)
+    83	
+    84	
+    85	def test_tight_column_lines_keep_top_to_bottom_order():
+    86	    """Seen on real labels: a narrow column of small type whose OCR boxes overlap vertically, with a
+    87	    few pixels of jitter on the left edge. Two lines must not swap places (that turned an exact
+    88	    statement into "wording" with the same words deleted and re-inserted)."""
+    89	    from tests.unit.conftest import make_line
+    90	
+    91	    texts = wrapped(CANONICAL, 24)
+    92	    lines = [make_line(t, y=100 + i * 28, x=1393 + (i % 2) * 3, h=60) for i, t in enumerate(texts)]
+    93	    r = report(lines)
+    94	    assert r.exact, r.diff
+    95	
+    96	
+    97	def test_body_printed_in_capitals_is_exact():
+    98	    """16.22 requires capitals only for the anchor; approved labels commonly print the remainder in
+    99	    capitals too (docs/EVAL_REAL.md). Letter case is typography, not wording."""
+   100	    head = "GOVERNMENT WARNING: "
+   101	    text = head + CANONICAL[len(head) :].upper()
+   102	    r = report(make_lines(wrapped(text)))
+   103	    assert r.exact and r.assessment == "exact" and r.diff is None
+   104	    assert r.anchor_caps is Status.match
+   105	
+   106	
+   107	def test_spacing_around_punctuation_is_exact():
+   108	    text = CANONICAL.replace("WARNING: (1)", "WARNING :(1)").replace("General, women", "General ,women")
+   109	    assert report(make_lines(wrapped(text))).exact
+   110	
+   111	
+   112	def test_capitals_with_a_dropped_comma_is_noise_with_a_short_diff():
+   113	    text = CANONICAL.upper().replace("GENERAL, WOMEN", "GENERAL WOMEN")
+   114	    r = report(make_lines(wrapped(text)))
+   115	    assert not r.exact and r.assessment == "noise"
+   116	    assert r.diff and "General," in r.diff and len(r.diff) < 60  # case alone must not flood the diff
+   117	
+   118	
+   119	def test_one_word_substitution_is_a_wording_change_not_noise():
+   120	    text = CANONICAL.replace("may cause health problems", "can cause health problems")
+   121	    assert classify_difference(CANONICAL, text) == "wording"
+   122	    r = report(make_lines(wrapped(text)))
+   123	    assert r.present and not r.exact
+   124	    assert r.assessment == "wording"  # the verdict treats this as an issue, not a review item
+   125	    assert "-may" in r.diff and "+can" in r.diff
+   126	
+   127	
+   128	def test_missing_clause_number_is_a_wording_change():
+   129	    text = CANONICAL.replace("(2) Consumption", "Consumption")
+   130	    assert classify_difference(CANONICAL, text) == "wording"
+   131	
+   132	
+   133	def test_dropped_colon_or_comma_is_noise():
+   134	    assert classify_difference(CANONICAL, CANONICAL.replace("WARNING:", "WARNING")) == "noise"
+   135	    assert classify_difference(CANONICAL, CANONICAL.replace("General,", "General")) == "noise"
+   136	    r = report(make_lines(wrapped(CANONICAL.replace("WARNING:", "WARNING"))))
+   137	    assert r.present and not r.exact
+   138	    assert r.assessment == "noise"
+   139	
+   140	
+   141	def test_ocr_confusable_inside_a_word_is_noise():
+   142	    text = CANONICAL.replace("Surgeon", "Surge0n").replace("machinery", "machlnery")
+   143	    assert classify_difference(CANONICAL, text) == "noise"
+   144	
+   145	
+   146	def test_small_print_slips_seen_on_approved_labels_are_noise():
+   147	    """From the real-label sample: a transposition, an added or dropped letter in a four-letter word,
+   148	    and a lot number swept in from the next line. All Needs review with a diff, none an issue."""
+   149	    assert classify_difference(CANONICAL, CANONICAL.replace("Surgeon", "Suregon")) == "noise"
+   150	    assert classify_difference(CANONICAL, CANONICAL.replace("your ability", "yours ability")) == "noise"
+   151	    assert classify_difference(CANONICAL, CANONICAL.replace("to drive", "to rive")) == "noise"
+   152	    assert classify_difference(CANONICAL, CANONICAL.replace("women", "woman")) == "noise"
+   153	    assert classify_difference(CANONICAL, CANONICAL.replace("(2) Consumption", "26 (2) Consumption")) == "noise"
+   154	    # still wording: a word replaced or dropped
+   155	    assert classify_difference(CANONICAL, CANONICAL.replace("may cause", "can cause")) == "wording"
+   156	    assert classify_difference(CANONICAL, CANONICAL.replace("of the risk", "of risk")) == "wording"
+   157	
+   158	
+   159	def test_hyphenated_line_break_in_capitals_is_repaired():
+   160	    head = "GOVERNMENT WARNING: "
+   161	    caps = head + CANONICAL[len(head) :].upper()
+   162	    lines = make_lines(
+   163	        [
+   164	            "GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON GENERAL,",
+   165	            "WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREG-",
+   166	            "NANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMP-",
+   167	            "TION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE",
+   168	            "A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.",
+   169	        ]
+   170	    )
+   171	    assert report(lines).exact, caps
+   172	
+   173	
+   174	def test_hyphenated_line_break_does_not_break_exactness():
+   175	    lines = make_lines(
+   176	        [
+   177	            "GOVERNMENT WARNING: (1) According to the Surgeon General,",
+   178	            "women should not drink alcoholic beverages during preg-",
+   179	            "nancy because of the risk of birth defects. (2) Consumption",
+   180	            "of alcoholic beverages impairs your ability to drive a car or",
+   181	            "operate machinery, and may cause health problems.",
+   182	        ]
+   183	    )
+   184	    assert report(lines).exact
+   185	
+   186	
+   187	def test_word_diff_is_compact():
+   188	    assert word_diff(CANONICAL, CANONICAL) is None
+   189	    d = word_diff("a b c", "a x c")
+   190	    assert d == "-b | +x"
+   191	
+   192	
+   193	def test_small_text_misreads_are_noise_not_wording():
+   194	    """Seen on real OCR output: '(1)' read as '(i)', 'drive' read with one wrong letter."""
+   195	    text = CANONICAL.replace("(1)", "(i)").replace("drive", "driv\u010d")
+   196	    assert classify_difference(CANONICAL, text) == "noise"
+   197	    r = report(make_lines(wrapped(text)))
+   198	    assert r.assessment == "noise" and not r.exact
+   199	
+   200	
+   201	def test_accented_letter_in_the_read_is_noise_not_exact():
+   202	    """The regulation text has no accents; 'alcoholi\u010d' is almost certainly a recognition artifact,
+   203	    but exact means exact, so the agent confirms it."""
+   204	    r = report(make_lines(wrapped(CANONICAL.replace("alcoholic beverages during", "alcoholi\u010d beverages during"))))
+   205	    assert not r.exact and r.assessment == "noise"
+   206	
+   207	
+   208	def test_missing_warning_has_absent_assessment():
+   209	    assert report(make_lines(["OLD TOM DISTILLERY"])).assessment == "absent"
+   210	
+   211	
+   212	def test_warning_alone_is_not_an_anchor():
+   213	    lines = make_lines(["WARNING: keep out of reach of children.", "Contains sulfites."])
+   214	    assert find_warning(lines) is None
+   215	    assert report(lines).assessment == "absent"
+   216	
+   217	
+   218	def test_continuation_lines_must_share_the_anchor_column():
+   219	    from tests.unit.conftest import make_line
+   220	
+   221	    left = wrapped(CANONICAL, 50)
+   222	    lines = [make_line(t, y=100 + i * 44, x=100, h=34) for i, t in enumerate(left)]
+   223	    # a second column of unrelated text at the same heights must not be swept into the span
+   224	    lines += [make_line("Tasting notes: oak, vanilla, caramel", y=100 + i * 44, x=1600, h=34) for i in range(len(left))]
+   225	    r = report(lines)
+   226	    assert r.exact, r.diff
+   227	
+   228	
+   229	def test_word_boundary_changes_are_never_exact():
+   230	    """Spacing is ignored only next to punctuation. A boundary moved between letters changes the
+   231	    words: it is a slip for a person to check, never a pass (review 005, item 1.1)."""
+   232	    moved = report(make_lines(wrapped(CANONICAL.replace("women should", "womens hould"))))
+   233	    assert not moved.exact and moved.assessment == "noise" and moved.diff and "womens" in moved.diff
+   234	    merged = report(make_lines(wrapped(CANONICAL.replace("a car", "acar"))))
+   235	    assert not merged.exact and merged.assessment == "noise"
+   236	    split = report(make_lines(wrapped(CANONICAL.replace("GOVERNMENT WARNING", "GOVERN MENT WARNING"))))
+   237	    assert split.present and not split.exact
+   238	
+   239	
+   240	def test_barcode_digits_glued_to_a_word_are_noise_not_wording():
+   241	    """A barcode printed against the statement reads as digits glued to the word it lands on
+   242	    ('or' -> 'OR88 186"223932' on a real Sonoma back label). Review with the diff, not an issue."""
+   243	    text = CANONICAL.upper().replace("A CAR OR OPERATE", 'A CAR OR88 186"223932 OPERATE')
+   244	    r = report(make_lines(wrapped(text)))
+   245	    assert r.present and not r.exact and r.assessment == "noise", r
+   246	    assert "OR88" in (r.diff or "")
+   247	    # a genuinely different word glued to digits is still wording
+   248	    assert classify_difference(CANONICAL, CANONICAL.replace("a car or operate", "a car nor88 operate")) == "wording"
+   249	
+   250	
+   251	def _weighted(head, tail, body):
+   252	    """A statement whose heading line carries head/tail weights and whose other lines carry body."""
+   253	    lines = make_lines(wrapped(CANONICAL))
+   254	    out = [lines[0].model_copy(update={"weight": head, "weight_head": head, "weight_tail": tail})]
+   255	    out += [ln.model_copy(update={"weight": body}) for ln in lines[1:]]
+   256	    return out
+   257	
+   258	
+   259	def test_type_weight_bold_heading_over_regular_body_matches():
+   260	    r = report(_weighted(0.145, 0.118, 0.118))
+   261	    assert r.exact and r.anchor_bold is Status.match and r.body_not_bold is Status.match
+   262	    assert "heavier" in r.notes[2]
+   263	
+   264	
+   265	def test_type_weight_same_weight_is_review_on_both_counts():
+   266	    """All bold, or a heading that is not bold: the measurement cannot tell them apart, so both
+   267	    format rows ask the person, with one note saying why."""
+   268	    all_bold = report(_weighted(0.146, 0.141, 0.141))
+   269	    assert all_bold.anchor_bold is Status.needs_review and all_bold.body_not_bold is Status.needs_review
+   270	    assert "same weight" in all_bold.notes[2] and "whole statement" in all_bold.notes[2]
+   271	    light = report(_weighted(0.115, 0.113, 0.113))
+   272	    assert light.anchor_bold is Status.needs_review and light.body_not_bold is Status.needs_review
+   273	
+   274	
+   275	def test_type_weight_unmeasured_or_inconclusive_is_not_checked():
+   276	    r = report(_weighted(None, None, None))
+   277	    assert r.anchor_bold is Status.not_checked and r.body_not_bold is Status.not_checked
+   278	    assert "could not be measured" in r.notes[2]
+   279	    r2 = report(_weighted(0.160, 0.145, 0.145))  # ratio 1.10: between "same" (1.05) and "heavier" (1.15)
+   280	    assert r2.anchor_bold is Status.not_checked and "confidence" in r2.notes[2]
+   281	
+   282	
+   283	def test_type_weight_heading_alone_on_its_line_compares_stroke_pixels_with_the_other_lines():
+   284	    lines = make_lines(["GOVERNMENT WARNING:", *wrapped(CANONICAL[len("GOVERNMENT WARNING: ") :], 60)])
+   285	    out = [lines[0].model_copy(update={"weight": 0.20, "weight_head": 0.20, "weight_tail": None})]
+   286	    out += [ln.model_copy(update={"weight": 0.13}) for ln in lines[1:]]
+   287	    r = report(out)
+   288	    assert r.anchor_bold is Status.match and "other lines" in r.notes[2]
+   289	    same = [out[0].model_copy(update={"weight": 0.13, "weight_head": 0.13}), *out[1:]]
+   290	    assert report(same).anchor_bold is Status.needs_review
+
+
+===== FILE: app/config.py (current text at 3d9bdad, line-numbered) =====
+     1	"""Application settings, loaded from environment variables (prefix TTB_).
+     2	
+     3	Every limit that a reviewer might probe is here, named, and documented in LIMITS.md.
+     4	"""
+     5	
+     6	from __future__ import annotations
+     7	
+     8	import os
+     9	from functools import lru_cache
+    10	from pathlib import Path
+    11	
+    12	from pydantic import Field
+    13	from pydantic_settings import BaseSettings, SettingsConfigDict
+    14	
+    15	REPO_ROOT = Path(__file__).resolve().parents[1]
+    16	MODELS_DIR = REPO_ROOT / "app" / "models"
+    17	STATIC_DIR = REPO_ROOT / "app" / "static"
+    18	
+    19	
+    20	class Settings(BaseSettings):
+    21	    model_config = SettingsConfigDict(env_prefix="TTB_", env_file=".env", extra="ignore")
+    22	
+    23	    # --- deployment identity
+    24	    app_name: str = "Label Check (prototype)"
+    25	    agency_name: str | None = Field(default=None, description="Optional agency name for internal branding")
+    26	    git_sha: str = Field(default_factory=lambda: os.environ.get("GIT_SHA", "dev"))
+    27	    trust_proxy: bool = Field(default=False, description="Trust the first X-Forwarded-For hop for client identity")
+    28	
+    29	    # --- OCR engine
+    30	    ocr_workers: int = Field(default_factory=lambda: max(1, min(8, os.cpu_count() or 1)))
+    31	    ocr_intra_op_threads: int = 1
+    32	    ocr_det_limit_side_len: int = 640
+    33	    ocr_rec_batch_num: int = 16
+    34	    ocr_use_cls: bool = False
+    35	    ocr_ascii_alphabet: bool = Field(
+    36	        default=True,
+    37	        description="Decode with the recognizer's alphabet restricted to printable ASCII (English label text)",
+    38	    )
+    39	    ocr_max_side: int = Field(default=1280, description="Images are downscaled to this longest side before OCR")
+    40	    ocr_low_conf_retry: float = Field(default=0.80, description="Mean confidence below which a 90-degree retry runs")
+    41	    ocr_min_lines_retry: int = Field(default=3, description="Fewer detected lines than this also triggers the retry")
+    42	    warning_rescue: bool = Field(
+    43	        default=True,
+    44	        description="Interactive requests only: when no usable warning statement is found, one more round "
+    45	        "of reads (at most one per worker, in parallel): the images turned sideways, since small labels "
+    46	        "print the statement vertically along an edge, and large artwork once at full resolution. "
+    47	        "Batch requests read every image exactly once",
+    48	    )
+    49	    warning_rescue_below: float = Field(
+    50	        default=0.5,
+    51	        description="Similarity of the best upright statement below which the extra round runs "
+    52	        "(a garbled but present statement scores higher and would not be helped)",
+    53	    )
+    54	    warning_rescue_max_side: int = Field(
+    55	        default=2048,
+    56	        description="Longest side for the one full-resolution re-read of large artwork whose statement "
+    57	        "was unreadable at the working size",
+    58	    )
+    59	    # --- type weight of the warning statement (docs/DECISIONS.md D-044; calibrated on the synthetic
+    60	    # corpus, where a bold heading over a regular body measures 1.18-1.28 and all-bold 1.04; strokes under
+    61	    # 3.5 px or type under 24 px are not measured, see app/pipeline/typeface.py)
+    62	    type_weight_heading_min_ratio: float = Field(
+    63	        default=1.15, description="Heading stroke weight over body stroke weight at or above which the heading is bold"
+    64	    )
+    65	    type_weight_same_max_ratio: float = Field(
+    66	        default=1.05, description="At or below this ratio the heading and the body are the same weight"
+    67	    )
+    68	    models_dir: Path = MODELS_DIR
+    69	
+    70	    # --- request limits (see LIMITS.md)
+    71	    max_image_bytes: int = 10 * 1024 * 1024
+    72	    max_request_bytes: int = 40 * 1024 * 1024
+    73	    max_image_pixels: int = 25_000_000
+    74	    max_images_per_application: int = 6
+    75	    max_compare_items: int = 100
+    76	    max_csv_rows: int = 5000
+    77	    max_csv_bytes: int = 2 * 1024 * 1024
+    78	    per_client_inflight: int = 4
+    79	    global_inflight: int = Field(default=24, description="Concurrent metered requests across all clients")
+    80	    interactive_wait_seconds: float = Field(
+    81	        default=8.0, description="How long an interactive request may wait for a worker slot"
+    82	    )
+    83	
+    84	    # --- matching thresholds (tuned against tests/fixtures and real labels; see docs/EVAL_REAL.md)
+    85	    match_review_threshold: int = Field(
+    86	        default=80,
+    87	        description="Fuzzy score at/above which a non-exact match is Needs review rather than a mismatch "
+    88	        "(decorative fonts on real labels read at 80-89 while genuinely different names score under 70)",
+    89	    )
+    90	    match_mismatch_threshold: int = Field(default=70, description="Below this the best candidate counts as Not found")
+    91	    warning_mismatch_similarity: float = Field(
+    92	        default=0.80, description="Below this the warning is treated as wording differs"
+    93	    )
+    94	    net_contents_tolerance: float = Field(default=0.01, description="Relative tolerance for unit-conversion rounding")
+    95	
+    96	    @property
+    97	    def static_dir(self) -> Path:
+    98	        return STATIC_DIR
+    99	
+   100	
+   101	@lru_cache
+   102	def get_settings() -> Settings:
+   103	    return Settings()
+
+
+===== FILE: AGENTS.md (current text at 3d9bdad, line-numbered) =====
+     1	# Conventions for agents working in this repository
+     2	
+     3	This codebase is developed by a human directing AI coding agents (Claude Code as builder,
+     4	Codex as reviewer). These conventions keep that workflow safe and legible. `CLAUDE.md` points here.
+     5	
+     6	## Roles
+     7	- **Builder** writes application code, tests, docs. One builder at a time.
+     8	- **Reviewer** reads and reports. Reviewers write only under `docs/reviews/` and
+     9	  `tools/adversarial/`. Reviewers never edit application code directly; findings are filed and
+    10	  the builder acts on them.
+    11	- **Human** decides scope, approves deploys, and owns every decision in `docs/DECISIONS.md`.
+    12	
+    13	## Non-negotiable rules (all enforced by tests where possible)
+    14	1. **No outbound network calls in the verification path.** OCR runs in-process. Models are baked
+    15	   into the image at build time. `tests/test_no_egress.py` blocks sockets and must stay green.
+    16	2. **Nothing is stored.** No database, no upload directory, no logging of label text, filenames,
+    17	   or application data. Images live in memory for the duration of one request.
+    18	3. **The tool recommends; the agent decides.** No code path approves or rejects an application.
+    19	   Statuses are Match / Needs review / Mismatch / Not found; verdicts are recommendations.
+    20	4. **Heuristic findings are never failures.** Caps, bold, size, contrast, standards of fill,
+    21	   inferred beverage type: report Needs review with evidence. Only clear text or numeric
+    22	   mismatches are Mismatch.
+    23	5. **No external assets in the frontend.** No CDN scripts, fonts, or styles. Everything is
+    24	   served from `app/static/`.
+    25	6. **No official seals or government branding.** The header shows a prototype banner. The
+    26	   `AGENCY_NAME` / `AGENCY_LOGO` slot is for internal deployment by the agency, not for us.
+    27	7. **Every response is deterministic** for the same input and model version. No sampling
+    28	   anywhere in the core path.
+    29	
+    30	## Layout
+    31	```
+    32	app/            FastAPI application (routes/, ocr/, pipeline/, static/)
+    33	tests/          unit/ (fast, no OCR)  integration/ (OCR on fixtures)  browser/ (Playwright, manual)  fixtures/ (committed PNGs)
+    34	tools/          make_labels.py  evaluate.py  loadtest.py  ocr_eval2.py  vendor_models.py  container_smoke.py
+    35	docs/           APPROACH.md  REQUIREMENTS_TRACE.md  LIMITS.md  SECURITY.md  DECISIONS.md  DEPLOY.md
+    36	                REGULATIONS.md (+ regs/ XML)  EVAL.md  LOADTEST.md  OCR_EVAL.md  BAKEOFF.md  reviews/
+    37	samples/        bundled demo labels + sample CSV (fictional brands only)
+    38	```
+    39	
+    40	## Commands
+    41	```
+    42	python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt
+    43	.venv/Scripts/pip install --no-deps -r requirements-ocr.txt   # never let rapidocr pull desktop opencv-python
+    44	uvicorn app.main:app --reload            # run locally on :8000
+    45	pytest -m "not integration and not slow" # fast tests
+    46	pytest                                    # everything
+    47	ruff check . && ruff format --check . && mypy
+    48	python tools/make_labels.py --out tests/fixtures/labels --seed 42 --degraded --problems
+    49	python tools/evaluate.py                  # accuracy + latency table
+    50	python tools/loadtest.py --url http://localhost:8000 --n 200 --concurrency 8
+    51	docker build -t ttb-label-check . && docker run --rm -p 8000:8000 --network none ttb-label-check
+    52	```
+    53	
+    54	## Style
+    55	- Python 3.12+, type hints everywhere, `mypy --strict` clean. Pydantic models for every request
+    56	  and response. Small pure functions in `app/pipeline/`; I/O only in `app/routes/`.
+    57	- Frontend: vanilla ES modules, JSDoc types, no build step. Text from users or OCR is rendered
+    58	  with `textContent`, never `innerHTML`.
+    59	- Tests name the behavior: `test_case_only_difference_is_match_with_note`.
+    60	- Docs are plain language. English docs use spaced hyphens, no em-dashes.
+    61	- Commits: small, imperative, descriptive. No "wip". Builder commits carry the agent trailer.
+    62	
+    63	## Definition of Done for a change
+    64	Tests added or updated, fast suite green, `ruff` and `mypy` clean, docs touched if behavior
+    65	changed, `docs/DECISIONS.md` updated if a decision was made, and the deployed URL still works.
+
+
+===== EXCERPT: docs/DECISIONS.md (D-044) =====
+| D-044 | 2026-09-04 | Bold type of the warning statement is measured from the pixels. Each OCR line carries the thickness of its ink strokes relative to its type height (`app/pipeline/typeface.py`: Otsu ink, distance transform, four times the mean distance); a line that carries the heading is measured as heading and remainder separately, splitting the box in proportion to the characters. The check compares the heading with the rest of its own line (same size, same face, same box) or, when the heading stands alone, its stroke thickness in pixels with the other lines'. A ratio of 1.15 or more is a Match on both format rows; 1.05 or less is Needs review on both, because the measurement cannot tell a heading that is not bold from a statement that is all bold; between is inconclusive, and print under 24 pixels tall or with strokes under 3.8 pixels at the working size is Not checked with that reason. Never a failure. | The author asked why bold was "Not checked". Calibration: on the synthetic corpus a bold heading over a regular body measures 1.17 to 1.24, the planted all-bold defect 0.99, blur 1.12 to 1.13 (inconclusive) and shrunken labels are not measured; on the 150 real approved labels 34 statements were measurable, 29 read as a heavier heading, 5 were inconclusive, none was flagged, and 16 were too small (most registry artwork of small labels is). Comparing the heading with the other lines instead of its own line was wrong on two real labels (box heights differ), and a first size gate let shrunken print through; both were caught by looking at the labels. The estimator overstates strokes under about 3 pixels, evenly for heading and body, which is why the gate is on stroke pixels. | `docs/EVAL.md` (all-bold defect now assessed); `docs/EVAL_REAL.md` (type-weight rows); `tests/unit/test_typeface.py`, `tests/unit/test_warning.py`, `tests/integration/test_verify_api.py`. |
+
+
+===== EXCERPT: docs/LIMITS.md (item 1) =====
+1. **Bold type is measured, not read.** 27 CFR 16.22 requires "GOVERNMENT WARNING" in bold and the
+   rest not in bold. The tool measures the thickness of the ink strokes in the heading and in the
+   body of the statement, relative to the type height (`app/pipeline/typeface.py`, decision D-044).
+   A heading clearly heavier than the body is a Match on both counts; heading and body of the same
+   weight is Needs review on both, because the measurement cannot tell a heading that is not bold
+   from a statement that is all bold; a small difference is inconclusive. Print under about 24
+   pixels tall or with strokes under 3.5 pixels at the working size is "Not checked" with that
+   reason, which covers most registry artwork of small labels; the synthetic corpus and large
+   artwork measure well. Never a failure: it is a measurement of print, and the crop is shown.
+2. **Physical type size and characters per inch are not assessed.** They need a known scale.
+
+
+===== EXCERPT: docs/EVAL.md =====
+# Evaluation
+
+_Generated by `tools/evaluate.py` on the committed synthetic corpus (10 fictional applications; front + back per case). Numbers are from the real pipeline on the machine that ran it; deployed numbers are in the README._
+
+_Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 of 18710 classes suppressed); det PP-OCRv6_det_small.onnx (sha256 090f04abcd9d); rec PP-OCRv6_rec_small.onnx (sha256 6f327246b503); workers: 2._
+
+## Artwork tier (10 cases)
+
+- Per-application latency (two images, parallel): median 2524 ms, p95 2922 ms
+
+| Field | Match | Needs review | Mismatch / not found | Match rate |
+|---|---:|---:|---:|---:|
+| brand_name | 10 | 0 | 0 | 100% |
+| class_type | 10 | 0 | 0 | 100% |
+| alcohol_content | 10 | 0 | 0 | 100% |
+| net_contents | 10 | 0 | 0 | 100% |
+| bottler | 10 | 0 | 0 | 100% |
+| country_of_origin | 10 | 0 | 0 | 100% |
+| warning exact | 10 | 0 | 0 | 100% |
+
+- Verdicts: {<Verdict.ready_for_approval: 'ready_for_approval'>: 10}
+- **False-alarm rate on clean artwork: 0.0%** (0 of 60 field checks not reported as Match)
+
+## Degraded tier (20 cases)
+
+- Per-application latency (two images, parallel): median 2375 ms, p95 6453 ms
+
+| Field | Match | Needs review | Mismatch / not found | Match rate |
+|---|---:|---:|---:|---:|
+| brand_name | 19 | 1 | 0 | 95% |
+| class_type | 20 | 0 | 0 | 100% |
+| alcohol_content | 20 | 0 | 0 | 100% |
+| net_contents | 20 | 0 | 0 | 100% |
+| bottler | 20 | 0 | 0 | 100% |
+| country_of_origin | 19 | 1 | 0 | 95% |
+| warning exact | 18 | 2 | 0 | 90% |
+
+- Verdicts: {<Verdict.needs_review: 'needs_review'>: 2, <Verdict.ready_for_approval: 'ready_for_approval'>: 17, <Verdict.issues_found: 'issues_found'>: 1}
+
+| Degradation | cases | verdicts | median ms |
+|---|---:|---|---:|
+| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2369 |
+| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2227 |
+| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2254 |
+| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2394 |
+| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2324 |
+| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2483 |
+| rotate90 | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 6566 |
+| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2128 |
+
+## Problem tier (6 cases)
+
+- Per-application latency (two images, parallel): median 2538 ms, p95 3718 ms
+
+| Planted defect | detected | note |
+|---|---|---|
+| wrong_abv (APP-001) | yes |  |
+| titlecase (APP-002) | yes |  |
+| allbold (APP-003) | yes |  |
+| altered (APP-004) | yes |  |
+| tiny (APP-005) | n/a | NOT ASSESSED by design: physical type size |
+| missing (APP-006) | yes |  |
+
+- Detection rate over the defects the tool assesses: 5/5; 1 planted defects are outside this build's checks and are listed as n/a
+
+
+===== EXCERPT: docs/EVAL_REAL.md (rows) =====
+
+| | spirits (n=50) | wine (n=50) | malt (n=50) | all (n=150) |
+|---|---:|---:|---:|---:|
+| Brand name: match | 56% | 64% | 48% | 56% |
+| Brand name: match or needs review | 86% | 96% | 82% | 88% |
+| Class/type (registry description): match | 10% | 0% | 16% | 9% |
+| Class/type (registry description): match or needs review | 54% | 8% | 68% | 43% |
+| Applicant name: match | 66% | 86% | 58% | 70% |
+| Applicant name: match or needs review | 100% | 100% | 100% | 100% |
+| Country of origin found (imports only) | 88% | 94% | 100% | 92% |
+| Warning statement located (heading found) | 100% | 98% | 98% | 99% |
+| Warning exact (of all) | 62% | 62% | 60% | 61% |
+| Warning exact (of located) | 62% | 63% | 61% | 62% |
+| Warning heading all capitals (of located) | 98% | 100% | 98% | 99% |
+| Warning heading measured heavier than the body (of located) | 46% | 59% | 24% | 43% |
+| Warning type weight not measured, small print or inconclusive (of located) | 54% | 41% | 78% | 57% |
+| Alcohol statement read | 70% | 90% | 84% | 81% |
+| Net contents read | 90% | 92% | 58% | 80% |
+| All images readable | 98% | 100% | 100% | 99% |
+| Images per record, median | 2 | 2 | 1 | 2 |
+| Longest image side, median px | 1470 | 1278 | 1063 | 1232 |
+| Latency per record, median | 3579 ms | 3610 ms | 3748 ms | 3598 ms |
+| Latency per record, p95 | 8408 ms | 7462 ms | 7105 ms | 7462 ms |
+
+## Warning assessment, all records
+
+
+
+===== FILE: split_experiment.py (the builder measurement script) =====
+     1	"""Two measurements on the bold detector (D-044), through the product's own engine and functions.
+     2	
+     3	A. The heading / remainder split. The product splits the heading line at the character share of
+     4	   the heading (m.end() / len(text)); capitals set bold are wider than lowercase, so the heading's
+     5	   true share of the width is larger. For every heading-carrying line of a located statement, find
+     6	   the change point of the per-column stroke thickness (the pixel evidence of where bold stops) and
+     7	   report: the product's split, the tail crop's start (1.08 x split), the change point, how much of
+     8	   the tail crop is still heading ("contamination"), and the head/tail ratio both ways.
+     9	B. The heading-alone path compares stroke pixels with the other lines' without normalizing by type
+    10	   size. For every statement whose heading stands alone, report the heading's box height against
+    11	   the median of the other lines'.
+    12	
+    13	    python split_experiment.py            # synthetic back labels
+    14	    python split_experiment.py --real     # the real corpus (tests/fixtures/real)
+    15	"""
+    16	
+    17	from __future__ import annotations
+    18	
+    19	import csv
+    20	import statistics
+    21	import sys
+    22	from pathlib import Path
+    23	
+    24	import cv2
+    25	import numpy as np
+    26	
+    27	sys.path.insert(0, "C:/Projects/treasury-takehome/ttb-label-check")
+    28	
+    29	from app.config import Settings  # noqa: E402
+    30	from app.ocr.rapid import RapidEngine  # noqa: E402
+    31	from app.pipeline.images import decode_image  # noqa: E402
+    32	from app.pipeline.typeface import _ANCHOR, _crop, stroke_ratio, to_gray  # noqa: E402
+    33	from app.pipeline.warning import find_warning, type_weight_ratio  # noqa: E402
+    34	from app.services import _to_lines  # noqa: E402
+    35	
+    36	REPO = Path("C:/Projects/treasury-takehome/ttb-label-check")
+    37	settings = Settings(ocr_workers=1)
+    38	engine = RapidEngine(settings)
+    39	
+    40	
+    41	def column_stroke(gray: np.ndarray) -> np.ndarray:
+    42	    """Per-column stroke estimate (4 x mean distance over the ink pixels of that column); NaN where
+    43	    the column carries no ink."""
+    44	    _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    45	    ink = bw == 0
+    46	    if ink.mean() > 0.5:
+    47	        ink = ~ink
+    48	    dt = cv2.distanceTransform(ink.astype(np.uint8), cv2.DIST_L2, 5)
+    49	    out = np.full(gray.shape[1], np.nan)
+    50	    for c in range(gray.shape[1]):
+    51	        col = dt[:, c][ink[:, c]]
+    52	        if col.size:
+    53	            out[c] = 4.0 * float(col.mean())
+    54	    return out
+    55	
+    56	
+    57	def change_point(prof: np.ndarray, lo: float = 0.12, hi: float = 0.7) -> int | None:
+    58	    """Single step change point of a noisy profile: the split minimizing the within-segment sum of
+    59	    squares, searched between lo and hi of the width. NaN columns are ignored."""
+    60	    n = prof.size
+    61	    valid = ~np.isnan(prof)
+    62	    if valid.sum() < 20:
+    63	        return None
+    64	    v = np.where(valid, prof, 0.0)
+    65	    cnt = np.cumsum(valid.astype(float))
+    66	    s1 = np.cumsum(v)
+    67	    s2 = np.cumsum(v * v)
+    68	    best, best_s = None, np.inf
+    69	    for s in range(int(n * lo), int(n * hi)):
+    70	        nl, nr = cnt[s - 1], cnt[-1] - cnt[s - 1]
+    71	        if nl < 8 or nr < 8:
+    72	            continue
+    73	        sl, sr = s1[s - 1], s1[-1] - s1[s - 1]
+    74	        ql, qr = s2[s - 1], s2[-1] - s2[s - 1]
+    75	        cost = (ql - sl * sl / nl) + (qr - sr * sr / nr)
+    76	        if cost < best_s:
+    77	            best, best_s = s, cost
+    78	    return best
+    79	
+    80	
+    81	def analyse(path: Path, tag: str) -> None:
+    82	    dec = decode_image(path.read_bytes(), max_pixels=settings.max_image_pixels, max_side=settings.ocr_max_side, filename=path.name)
+    83	    raw = engine.recognize(dec.array)
+    84	    h, w = dec.array.shape[:2]
+    85	    lines = _to_lines(raw, dec, 0, 0, w, h, dec.array)
+    86	    span = find_warning(lines)
+    87	    if span is None:
+    88	        return
+    89	    by_id = {id(ln): r for ln, r in zip(lines, raw, strict=True)}
+    90	    gray = to_gray(dec.array)
+    91	    heading = next((ln for ln in span.lines if _ANCHOR.search(ln.text)), None)
+    92	    if heading is None:
+    93	        print(f"{tag} no heading line in span")
+    94	        return
+    95	    r = by_id[id(heading)]
+    96	    xs = [float(p[0]) for p in r.box]
+    97	    ys = [float(p[1]) for p in r.box]
+    98	    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    99	    bh = y1 - y0
+   100	    m = _ANCHOR.search(r.text)
+   101	    alone = m is not None and m.end() >= len(r.text.strip()) - 2
+   102	    measured = type_weight_ratio(span)
+   103	    prod = f"{measured[0]:.2f} ({measured[1]})" if measured else "unmeasured"
+   104	    if alone:
+   105	        others = [ln for ln in span.lines if ln is not heading]
+   106	        hs = []
+   107	        for ln in others:
+   108	            rr = by_id[id(ln)]
+   109	            yy = [float(p[1]) for p in rr.box]
+   110	            hs.append(max(yy) - min(yy))
+   111	        med = statistics.median(hs) if hs else 0.0
+   112	        rel = bh / med if med else 0.0
+   113	        print(f"{tag} B heading-alone: h={bh:.0f} others_median_h={med:.0f} size_ratio={rel:.2f} product={prod}  {r.text[:40]!r}")
+   114	        return
+   115	    if bh < 24:
+   116	        print(f"{tag} A too small (h={bh:.0f}) product={prod}")
+   117	        return
+   118	    frac = m.end() / max(1, len(r.text))
+   119	    split = x0 + (x1 - x0) * frac
+   120	    tail_start = x0 + (split - x0) * 1.08
+   121	    crop = _crop(gray, x0, y0, x1, y1, pad=0)
+   122	    if crop is None:
+   123	        print(f"{tag} A crop failed")
+   124	        return
+   125	    prof = column_stroke(crop)
+   126	    win = max(3, int(bh / 3))
+   127	    kernel = np.ones(win) / win
+   128	    sm = np.convolve(np.nan_to_num(prof, nan=np.nanmean(prof)), kernel, mode="same")
+   129	    cp = change_point(sm)
+   130	    if cp is None:
+   131	        print(f"{tag} A no change point product={prod}")
+   132	        return
+   133	    x_cp = x0 + cp
+   134	    width = x1 - x0
+   135	    contamination = max(0.0, x_cp - tail_start) / max(1.0, x1 - tail_start)
+   136	    hc = _crop(gray, x0, y0, x0 + (split - x0) * 0.95, y1)
+   137	    tc = _crop(gray, tail_start, y0, x1, y1)
+   138	    hp = stroke_ratio(hc) if hc is not None else None
+   139	    tp = stroke_ratio(tc) if tc is not None else None
+   140	    margin = bh * 0.15
+   141	    hc2 = _crop(gray, x0, y0, x_cp - margin, y1)
+   142	    tc2 = _crop(gray, x_cp + margin, y0, x1, y1)
+   143	    h2 = stroke_ratio(hc2) if hc2 is not None else None
+   144	    t2 = stroke_ratio(tc2) if tc2 is not None else None
+   145	    r_prop = hp / tp if hp and tp else None
+   146	    r_cp = h2 / t2 if h2 and t2 else None
+   147	    left = np.nanmean(prof[: max(1, cp - int(margin))])
+   148	    right = np.nanmean(prof[cp + int(margin) :])
+   149	    print(
+   150	        f"{tag} A h={bh:.0f} w={width:.0f} chars={len(r.text)} prop={frac:.2f} tail_start={(tail_start - x0) / width:.2f} "
+   151	        f"cp={cp / width:.2f} contam={contamination:.2f} ratio_prop={r_prop if r_prop is None else round(r_prop, 2)} "
+   152	        f"ratio_cp={r_cp if r_cp is None else round(r_cp, 2)} colstroke L/R={left:.1f}/{right:.1f} product={prod}  {r.text[:48]!r}"
+   153	    )
+   154	
+   155	
+   156	if "--real" in sys.argv:
+   157	    real = REPO / "tests/fixtures/real"
+   158	    rows = list(csv.DictReader((real / "cola.csv").open(encoding="utf-8")))
+   159	    for row in rows:
+   160	        for name in row["images"].split(";"):
+   161	            p = real / name.strip()
+   162	            if p.exists():
+   163	                try:
+   164	                    analyse(p, f"{row['ttbid']} {name.strip():30s}")
+   165	                except Exception as e:  # keep going; report
+   166	                    print(f"{row['ttbid']} {name.strip():30s} ERROR {e!r}")
+   167	                sys.stdout.flush()
+   168	else:
+   169	    labels = REPO / "tests/fixtures/labels"
+   170	    for p in sorted(labels.glob("*_back_*.png")):
+   171	        analyse(p, f"{p.name:30s}")
+   172	        sys.stdout.flush()
+
+
+===== OUTPUT: split_synth.log (synthetic corpus) =====
+APP-001_back_blur.png          A h=36 w=750 chars=48 prop=0.40 tail_start=0.43 cp=0.49 contam=0.11 ratio_prop=1.12 ratio_cp=1.16 colstroke L/R=6.6/5.3 product=1.12 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-001_back_clean.png         A h=35 w=750 chars=48 prop=0.40 tail_start=0.43 cp=0.53 contam=0.18 ratio_prop=1.17 ratio_cp=1.25 colstroke L/R=5.2/4.3 product=1.17 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-002_back_clean.png         A h=36 w=705 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.19 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.19 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-002_back_lowcontrast.png   A h=36 w=705 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.19 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.19 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-002_back_titlecase.png     A h=34 w=757 chars=57 prop=0.33 tail_start=0.36 cp=0.37 contam=0.02 ratio_prop=1.24 ratio_cp=1.27 colstroke L/R=5.6/4.4 product=1.24 (the rest of its line)  'Government Warning: (1) According to the Surgeon'
+APP-003_back_allbold.png       A h=35 w=681 chars=40 prop=0.47 tail_start=0.51 cp=0.13 contam=0.00 ratio_prop=0.99 ratio_cp=1.0 colstroke L/R=5.1/5.2 product=0.99 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the'
+APP-003_back_clean.png         A h=35 w=752 chars=48 prop=0.40 tail_start=0.43 cp=0.53 contam=0.18 ratio_prop=1.18 ratio_cp=1.25 colstroke L/R=5.2/4.3 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-003_back_small.png         A too small (h=13) product=unmeasured
+APP-004_back_altered.png       A h=38 w=706 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.19 ratio_cp=1.28 colstroke L/R=5.7/4.4 product=1.19 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-004_back_clean.png         A h=36 w=706 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.21 ratio_cp=1.29 colstroke L/R=5.7/4.4 product=1.21 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-005_back_blur.png          A h=37 w=750 chars=48 prop=0.40 tail_start=0.43 cp=0.49 contam=0.11 ratio_prop=1.13 ratio_cp=1.16 colstroke L/R=6.6/5.3 product=1.13 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-005_back_clean.png         A h=34 w=750 chars=48 prop=0.40 tail_start=0.43 cp=0.53 contam=0.18 ratio_prop=1.17 ratio_cp=1.24 colstroke L/R=5.2/4.3 product=1.17 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-005_back_tiny.png          A too small (h=21) product=unmeasured
+APP-006_back_clean.png         A h=36 w=706 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.18 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-006_back_lowcontrast.png   A h=36 w=706 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.18 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-007_back_clean.png         A h=35 w=750 chars=48 prop=0.40 tail_start=0.43 cp=0.53 contam=0.18 ratio_prop=1.17 ratio_cp=1.24 colstroke L/R=5.2/4.3 product=1.17 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-007_back_small.png         A too small (h=17) product=unmeasured
+APP-008_back_clean.png         A h=36 w=706 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.18 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-009_back_blur.png          A h=39 w=754 chars=48 prop=0.40 tail_start=0.43 cp=0.49 contam=0.12 ratio_prop=1.13 ratio_cp=1.16 colstroke L/R=6.6/5.3 product=1.13 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-009_back_clean.png         A h=34 w=752 chars=48 prop=0.40 tail_start=0.43 cp=0.53 contam=0.18 ratio_prop=1.17 ratio_cp=1.24 colstroke L/R=5.1/4.3 product=1.17 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-010_back_clean.png         A h=36 w=705 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.18 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+APP-010_back_lowcontrast.png   A h=36 w=705 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.10 ratio_prop=1.18 ratio_cp=1.27 colstroke L/R=5.7/4.4 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+
+
+===== OUTPUT: split_real.log (real corpus, 150 approved labels) =====
+26241001000033 26241001000033_1_front.png     B heading-alone: h=17 others_median_h=16 size_ratio=1.06 product=unmeasured  'GOVERNMENT WARNING:'
+26239001000078 26239001000078_1_front.png     A h=44 w=848 chars=40 prop=0.47 tail_start=0.51 cp=0.51 contam=0.00 ratio_prop=1.15 ratio_cp=1.16 colstroke L/R=5.9/5.0 product=1.15 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE'
+26243001000003 26243001000003_1_front.jpg     B heading-alone: h=27 others_median_h=32 size_ratio=0.84 product=1.35 (the other lines)  'GOVERNMENT WARNING:'
+26238001000770 26238001000770_2_back.jpg      A h=39 w=588 chars=33 prop=0.58 tail_start=0.62 cp=0.65 contam=0.08 ratio_prop=1.53 ratio_cp=1.56 colstroke L/R=6.8/4.3 product=1.53 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING'
+17059001000308 17059001000308_1_front.jpg     A h=27 w=581 chars=48 prop=0.40 tail_start=0.43 cp=0.39 contam=0.00 ratio_prop=1.1 ratio_cp=1.1 colstroke L/R=4.4/4.1 product=1.10 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26236001000471 26236001000471_2_strip.jpg     A h=49 w=939 chars=58 prop=0.34 tail_start=0.37 cp=0.34 contam=0.00 ratio_prop=1.22 ratio_cp=1.21 colstroke L/R=6.9/5.4 product=1.22 (the rest of its line)  'GOVERNMENT WARNING : (1) ACCORDING TO THE SURGEO'
+26240001000519 26240001000519_1_front.jpg     B heading-alone: h=27 others_median_h=23 size_ratio=1.17 product=1.39 (the other lines)  'GOVERNMENT WARNING:'
+26239001000487 26239001000487_2_back.jpg      A h=40 w=1017 chars=70 prop=0.27 tail_start=0.29 cp=0.32 contam=0.03 ratio_prop=1.46 ratio_cp=1.49 colstroke L/R=7.9/5.2 product=1.46 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26239001000107 26239001000107_3_strip.jpg     A h=49 w=908 chars=58 prop=0.34 tail_start=0.37 cp=0.36 contam=0.00 ratio_prop=1.24 ratio_cp=1.24 colstroke L/R=6.9/5.6 product=1.24 (the rest of its line)  'GOVERNMENT WARNING : (1) ACCORDING TO THE SURGEO'
+26236001000151 26236001000151_2_back.jpg      A h=33 w=473 chars=40 prop=0.47 tail_start=0.51 cp=0.51 contam=0.00 ratio_prop=1.17 ratio_cp=1.18 colstroke L/R=4.8/4.1 product=1.17 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE'
+26238001000722 26238001000722_1_front.jpg     A h=33 w=544 chars=57 prop=0.33 tail_start=0.36 cp=0.37 contam=0.02 ratio_prop=1.24 ratio_cp=1.25 colstroke L/R=5.1/4.1 product=1.24 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26241001000022 26241001000022_1_front.png     B heading-alone: h=16 others_median_h=17 size_ratio=0.94 product=unmeasured  'GOVERNMENT WARNING:'
+26235001000127 26235001000127_1_front.jpg     A h=24 w=663 chars=63 prop=0.30 tail_start=0.33 cp=0.30 contam=0.00 ratio_prop=1.11 ratio_cp=1.11 colstroke L/R=4.6/4.1 product=1.11 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26237001000036 26237001000036_2_neck.jpg      A h=44 w=202 chars=23 prop=0.83 tail_start=0.89 cp=0.12 contam=0.00 ratio_prop=1.2 ratio_cp=None colstroke L/R=4.5/4.8 product=1.20 (the rest of its line)  'GOVERNMENT WARNING: (1)'
+26238001000440 26238001000440_1_front.jpg     A too small (h=20) product=unmeasured
+26239001000040 26239001000040_1_front.png     A h=49 w=859 chars=40 prop=0.47 tail_start=0.51 cp=0.49 contam=0.00 ratio_prop=1.48 ratio_cp=1.47 colstroke L/R=8.4/5.3 product=1.48 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE'
+26239001000245 26239001000245_1_front.png     A h=36 w=798 chars=47 prop=0.40 tail_start=0.44 cp=0.40 contam=0.00 ratio_prop=1.24 ratio_cp=1.24 colstroke L/R=5.6/4.4 product=1.24 (the rest of its line)  'GOVERNMENT WARNING:(1) ACCORDING TO THE SURGEON'
+26236001000703 26236001000703_2_back.png      A too small (h=19) product=unmeasured
+26237001000032 26237001000032_2_neck.jpg      A h=42 w=200 chars=23 prop=0.83 tail_start=0.89 cp=0.12 contam=0.00 ratio_prop=1.21 ratio_cp=None colstroke L/R=4.5/4.8 product=1.21 (the rest of its line)  'GOVERNMENT WARNING: (1)'
+26238001000387 26238001000387_2_back.jpg      A h=28 w=495 chars=48 prop=0.40 tail_start=0.43 cp=0.44 contam=0.02 ratio_prop=1.4 ratio_cp=1.43 colstroke L/R=5.8/4.1 product=1.40 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26238001000661 26238001000661_1_front.jpg     A h=43 w=936 chars=57 prop=0.33 tail_start=0.36 cp=0.36 contam=0.00 ratio_prop=1.19 ratio_cp=1.19 colstroke L/R=5.7/4.4 product=1.19 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26238001000350 26238001000350_1_front.jpg     A h=37 w=815 chars=57 prop=0.33 tail_start=0.36 cp=0.45 contam=0.14 ratio_prop=1.18 ratio_cp=1.3 colstroke L/R=6.6/4.7 product=1.18 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26226001000621 26226001000621_2_back.png      A too small (h=20) product=unmeasured
+26233001000427 26233001000427_2_back.png      A too small (h=16) product=unmeasured
+26239001000434 26239001000434_2_back.jpg      A too small (h=22) product=unmeasured
+26236001000475 26236001000475_2_back.png      B heading-alone: h=31 others_median_h=29 size_ratio=1.07 product=1.26 (the other lines)  'GOVERNMENTWARNING:'
+26239001000110 26239001000110_3_strip.jpg     A h=49 w=908 chars=58 prop=0.34 tail_start=0.37 cp=0.36 contam=0.00 ratio_prop=1.24 ratio_cp=1.24 colstroke L/R=6.9/5.6 product=1.24 (the rest of its line)  'GOVERNMENT WARNING : (1) ACCORDING TO THE SURGEO'
+26229001000731 26229001000731_2_back.jpg      A too small (h=14) product=unmeasured
+26215001000109 26215001000109_1_front.png     A h=26 w=410 chars=48 prop=0.40 tail_start=0.43 cp=0.40 contam=0.00 ratio_prop=1.24 ratio_cp=1.24 colstroke L/R=5.0/4.1 product=1.24 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26240001000567 26240001000567_2_back.png      A h=46 w=501 chars=34 prop=0.53 tail_start=0.57 cp=0.54 contam=0.00 ratio_prop=1.23 ratio_cp=1.22 colstroke L/R=6.6/5.3 product=1.23 (the rest of its line)  'GOVERNMENTWARNING:(1) ACCORDING TO'
+26235001000114 26235001000114_2_strip.jpg     A h=25 w=663 chars=63 prop=0.30 tail_start=0.33 cp=0.30 contam=0.00 ratio_prop=1.11 ratio_cp=1.11 colstroke L/R=4.6/4.1 product=1.11 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26238001000494 26238001000494_2_strip.png     A h=35 w=1018 chars=90 prop=0.22 tail_start=0.24 cp=0.23 contam=0.00 ratio_prop=1.25 ratio_cp=1.24 colstroke L/R=5.7/4.6 product=1.25 (the rest of its line)  'GOVERNMENT WARNING :(1) ACCORDING TO THE SURGEON'
+26242001000088 26242001000088_2_back.jpg      A h=40 w=865 chars=57 prop=0.33 tail_start=0.36 cp=0.44 contam=0.13 ratio_prop=1.2 ratio_cp=1.32 colstroke L/R=6.2/4.7 product=1.20 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26236001000110 26236001000110_2_back.png      B heading-alone: h=34 others_median_h=36 size_ratio=0.94 product=1.24 (the other lines)  'GOVERNMENT WARNING:'
+26229001000728 26229001000728_2_back.jpg      A too small (h=14) product=unmeasured
+26240001000533 26240001000533_1_front.jpg     B heading-alone: h=20 others_median_h=16 size_ratio=1.25 product=unmeasured  'GOVERNMENTWARNING3'
+26242001000083 26242001000083_2_back.jpg      A h=31 w=505 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.09 ratio_prop=1.22 ratio_cp=1.24 colstroke L/R=5.4/4.2 product=1.22 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26233001000452 26233001000452_2_back.png      A too small (h=16) product=unmeasured
+26233001000430 26233001000430_2_back.png      A h=32 w=983 chars=70 prop=0.27 tail_start=0.29 cp=0.28 contam=0.00 ratio_prop=1.36 ratio_cp=1.36 colstroke L/R=6.9/5.2 product=1.36 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26229001000790 26229001000790_1_front.jpg     A h=40 w=914 chars=74 prop=0.26 tail_start=0.28 cp=0.33 contam=0.07 ratio_prop=1.09 ratio_cp=1.1 colstroke L/R=5.9/5.3 product=1.09 (the rest of its line)  'GOVERNMENT WARNING: (I) ACCORDING TO THE SURGEON'
+26229001000041 26229001000041_1_front.png     A h=27 w=347 chars=48 prop=0.40 tail_start=0.43 cp=0.48 contam=0.09 ratio_prop=1.12 ratio_cp=1.15 colstroke L/R=4.8/4.1 product=1.12 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26241001000034 26241001000034_1_front.png     B heading-alone: h=17 others_median_h=16 size_ratio=1.03 product=unmeasured  'GOVERNMENT WARNING:'
+26232001000625 26232001000625_2_back.jpg      B heading-alone: h=56 others_median_h=40 size_ratio=1.40 product=1.69 (the other lines)  'GOVERNMENT WARNING'
+26239001000029 26239001000029_1_front.png     B heading-alone: h=20 others_median_h=20 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26236001000664 26236001000664_2_back.jpg      A h=24 w=355 chars=36 prop=0.53 tail_start=0.57 cp=0.58 contam=0.02 ratio_prop=1.27 ratio_cp=1.28 colstroke L/R=5.3/4.1 product=1.27 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO'
+26226001000373 26226001000373_2_back.jpg      A h=39 w=727 chars=48 prop=0.40 tail_start=0.43 cp=0.45 contam=0.04 ratio_prop=1.3 ratio_cp=1.29 colstroke L/R=5.3/4.2 product=1.30 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26241001000020 26241001000020_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26233001000574 26233001000574_2_back.png      A h=35 w=1002 chars=70 prop=0.27 tail_start=0.29 cp=0.29 contam=0.00 ratio_prop=1.32 ratio_cp=1.32 colstroke L/R=6.7/5.2 product=1.32 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26238001000670 26238001000670_1_front.jpg     ERROR ImageError('This image is 5252 x 6868 pixels, above the 25 megapixel limit.')
+26239001000445 26239001000445_1_front.png     A too small (h=23) product=unmeasured
+26239001000012 26239001000012_1_front.jpg     A h=35 w=492 chars=40 prop=0.47 tail_start=0.51 cp=0.56 contam=0.09 ratio_prop=1.23 ratio_cp=1.25 colstroke L/R=5.9/4.6 product=1.23 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the'
+26238001000702 26238001000702_1_front.jpg     A h=841 w=29 chars=100 prop=0.19 tail_start=0.21 cp=1.14 contam=1.17 ratio_prop=None ratio_cp=None colstroke L/R=4.1/nan product=unmeasured  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26239001000133 26239001000133_1_front.jpg     A h=37 w=929 chars=63 prop=0.30 tail_start=0.33 cp=0.39 contam=0.09 ratio_prop=1.1 ratio_cp=1.14 colstroke L/R=4.7/4.3 product=1.10 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26238001000616 26238001000616_1_front.png     A h=42 w=1058 chars=74 prop=0.26 tail_start=0.28 cp=0.29 contam=0.01 ratio_prop=1.3 ratio_cp=1.3 colstroke L/R=5.7/4.3 product=1.30 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26231001000524 26231001000524_2_back.jpg      A too small (h=20) product=unmeasured
+26239001000140 26239001000140_1_front.jpg     A h=52 w=1185 chars=90 prop=0.21 tail_start=0.23 cp=0.22 contam=0.00 ratio_prop=1.22 ratio_cp=1.21 colstroke L/R=6.7/5.7 product=1.22 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26239001000343 26239001000343_2_strip.jpg     B heading-alone: h=27 others_median_h=30 size_ratio=0.90 product=1.17 (the other lines)  'GOVERNMENT WARNING:'
+26236001000043 26236001000043_2_back.png      B heading-alone: h=21 others_median_h=20 size_ratio=1.08 product=unmeasured  'GOVERNMENT WARNING:'
+26237001000248 26237001000248_2_back.png      A h=47 w=777 chars=48 prop=0.40 tail_start=0.43 cp=0.46 contam=0.06 ratio_prop=1.22 ratio_cp=1.27 colstroke L/R=6.6/5.3 product=1.22 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26240001000385 26240001000385_1_front.png     B heading-alone: h=23 others_median_h=26 size_ratio=0.88 product=unmeasured  'GOVERNMENT WARNING:'
+26236001000394 26236001000394_1_front.png     B heading-alone: h=16 others_median_h=19 size_ratio=0.84 product=unmeasured  'GOVERNMENT WARNING:'
+26233001000485 26233001000485_2_back.png      A h=33 w=989 chars=70 prop=0.27 tail_start=0.29 cp=0.28 contam=0.00 ratio_prop=1.25 ratio_cp=1.25 colstroke L/R=6.0/4.9 product=1.25 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26215001000240 26215001000240_3_back.png      A h=30 w=395 chars=36 prop=0.53 tail_start=0.57 cp=0.60 contam=0.08 ratio_prop=1.25 ratio_cp=1.24 colstroke L/R=5.3/4.3 product=1.25 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO'
+26233001000639 26233001000639_2_other.jpg     A h=55 w=836 chars=33 prop=0.58 tail_start=0.62 cp=0.59 contam=0.00 ratio_prop=1.31 ratio_cp=1.31 colstroke L/R=7.9/6.0 product=1.31 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING'
+26237001000750 26237001000750_1_front.jpg     A too small (h=22) product=unmeasured
+26239001000148 26239001000148_1_front.png     A too small (h=16) product=unmeasured
+26238001000584 26238001000584_1_front.jpg     A too small (h=17) product=unmeasured
+26230001000252 26230001000252_1_front.jpg     A h=33 w=480 chars=48 prop=0.40 tail_start=0.43 cp=0.42 contam=0.00 ratio_prop=1.23 ratio_cp=1.24 colstroke L/R=6.2/4.9 product=1.23 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26239001000182 26239001000182_1_front.jpg     A h=24 w=329 chars=40 prop=0.47 tail_start=0.51 cp=0.26 contam=0.00 ratio_prop=0.99 ratio_cp=1.06 colstroke L/R=6.1/5.6 product=0.99 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE'
+26231001000655 26231001000655_2_back.jpg      B heading-alone: h=23 others_median_h=23 size_ratio=1.00 product=unmeasured  'GOVERNMENTWARNING:'
+26238001000694 26238001000694_1_front.jpg     A h=842 w=30 chars=100 prop=0.19 tail_start=0.21 cp=1.10 contam=1.13 ratio_prop=None ratio_cp=None colstroke L/R=4.1/nan product=unmeasured  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26243001000090 26243001000090_1_front.jpg     B heading-alone: h=26 others_median_h=20 size_ratio=1.30 product=unmeasured  'GOVERNMENT WARNING:'
+26224001000558 26224001000558_1_front.png     A h=49 w=365 chars=43 prop=0.40 tail_start=0.43 cp=0.44 contam=0.02 ratio_prop=1.18 ratio_cp=1.18 colstroke L/R=5.7/4.7 product=1.18 (the rest of its line)  'GOVERNMENTWARNING(1) ACCORDING TOTHESURGEON'
+26238001000795 26238001000795_2_back.jpg      B heading-alone: h=26 others_median_h=28 size_ratio=0.93 product=1.10 (the other lines)  'GOVERNMENT WARNING:'
+26239001000497 26239001000497_1_front.png     A h=24 w=441 chars=57 prop=0.33 tail_start=0.36 cp=0.35 contam=0.00 ratio_prop=1.09 ratio_cp=1.09 colstroke L/R=4.5/4.1 product=1.09 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26237001000013 26237001000013_2_back.jpg      A h=33 w=662 chars=63 prop=0.30 tail_start=0.33 cp=0.32 contam=0.00 ratio_prop=1.24 ratio_cp=1.25 colstroke L/R=5.4/4.4 product=1.24 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26055001000058 26055001000058_2_back.jpg      B heading-alone: h=26 others_median_h=28 size_ratio=0.93 product=1.10 (the other lines)  'GOVERNMENT WARNING:'
+26240001000492 26240001000492_1_front.png     A too small (h=13) product=unmeasured
+26239001000405 26239001000405_2_back.png      A h=29 w=605 chars=57 prop=0.33 tail_start=0.36 cp=0.33 contam=0.00 ratio_prop=1.22 ratio_cp=1.22 colstroke L/R=5.1/4.1 product=1.22 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26238001000375 26238001000375_1_front.png     B heading-alone: h=36 others_median_h=38 size_ratio=0.95 product=1.57 (the other lines)  'GOVERNMENT WARNING:'
+26238001000375 26238001000375_2_back.png      ERROR ImageError('This image is 6545 x 5356 pixels, above the 25 megapixel limit.')
+26236001000726 26236001000726_2_back.jpg      A h=30 w=626 chars=57 prop=0.33 tail_start=0.36 cp=0.35 contam=0.00 ratio_prop=1.19 ratio_cp=1.19 colstroke L/R=5.5/4.5 product=1.19 (the rest of its line)  'GOVERNMENT WARNING: (I) ACCORDING TO THE SURGEON'
+26216001000611 26216001000611_1_front.png     A h=34 w=836 chars=57 prop=0.33 tail_start=0.36 cp=0.35 contam=0.00 ratio_prop=1.27 ratio_cp=1.25 colstroke L/R=5.9/4.6 product=1.27 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26240001000390 26240001000390_1_front.jpg     B heading-alone: h=39 others_median_h=32 size_ratio=1.22 product=1.33 (the other lines)  'GOVERNMENT WARNING:'
+26240001000601 26240001000601_1_front.jpg     B heading-alone: h=26 others_median_h=28 size_ratio=0.91 product=1.37 (the other lines)  'GOVERNMENT WARNING:'
+26240001000193 26240001000193_1_front.jpg     A too small (h=20) product=unmeasured
+26241001000091 26241001000091_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=0.97 product=unmeasured  'GOVERNMENT WARNING:'
+26243001000002 26243001000002_1_front.jpg     B heading-alone: h=27 others_median_h=32 size_ratio=0.84 product=1.35 (the other lines)  'GOVERNMENT WARNING:'
+26236001000606 26236001000606_2_back.jpg      A h=33 w=780 chars=57 prop=0.33 tail_start=0.36 cp=0.40 contam=0.06 ratio_prop=1.21 ratio_cp=1.24 colstroke L/R=5.5/4.4 product=1.21 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26233001000438 26233001000438_2_back.png      A h=32 w=999 chars=70 prop=0.27 tail_start=0.29 cp=0.28 contam=0.00 ratio_prop=1.34 ratio_cp=1.34 colstroke L/R=6.8/5.1 product=1.34 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26226001000664 26226001000664_3_back.png      A h=34 w=777 chars=57 prop=0.33 tail_start=0.36 cp=0.46 contam=0.16 ratio_prop=1.12 ratio_cp=1.2 colstroke L/R=4.8/4.1 product=1.12 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26238001000478 26238001000478_1_front.png     B heading-alone: h=23 others_median_h=17 size_ratio=1.35 product=unmeasured  'GOVERNMENT WARNING:'
+26225001000752 26225001000752_2_back.jpg      A too small (h=19) product=unmeasured
+26235001000125 26235001000125_1_front.jpg     A h=24 w=663 chars=63 prop=0.30 tail_start=0.33 cp=0.30 contam=0.00 ratio_prop=1.11 ratio_cp=1.11 colstroke L/R=4.6/4.1 product=1.11 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26243001000007 26243001000007_1_front.jpg     B heading-alone: h=27 others_median_h=32 size_ratio=0.84 product=1.35 (the other lines)  'GOVERNMENT WARNING:'
+26240001000510 26240001000510_1_front.jpg     A too small (h=13) product=unmeasured
+26207001000081 26207001000081_1_front.jpg     A h=26 w=806 chars=64 prop=0.30 tail_start=0.32 cp=0.32 contam=0.00 ratio_prop=1.09 ratio_cp=1.09 colstroke L/R=4.6/4.2 product=1.09 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORIDING TO THE SURGEO'
+26222001000197 26222001000197_1_front.png     A h=25 w=530 chars=48 prop=0.40 tail_start=0.43 cp=0.47 contam=0.08 ratio_prop=1.21 ratio_cp=1.25 colstroke L/R=6.1/4.7 product=1.21 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26216001000370 26216001000370_2_back.jpg      A h=34 w=721 chars=70 prop=0.27 tail_start=0.29 cp=0.31 contam=0.02 ratio_prop=1.34 ratio_cp=1.35 colstroke L/R=5.6/4.2 product=1.34 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26242001000098 26242001000098_1_front.jpg     B heading-alone: h=17 others_median_h=17 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26198001000605 26198001000605_1_front.jpg     A too small (h=23) product=unmeasured
+26231001000516 26231001000516_2_back.jpg      A too small (h=20) product=unmeasured
+26235001000119 26235001000119_1_front.jpg     A h=25 w=663 chars=63 prop=0.30 tail_start=0.33 cp=0.30 contam=0.00 ratio_prop=1.11 ratio_cp=1.11 colstroke L/R=4.6/4.1 product=1.11 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26235001000104 26235001000104_2_strip.jpg     A h=25 w=663 chars=63 prop=0.30 tail_start=0.33 cp=0.30 contam=0.00 ratio_prop=1.11 ratio_cp=1.11 colstroke L/R=4.6/4.1 product=1.11 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26226001000073 26226001000073_2_back.png      A too small (h=19) product=unmeasured
+26241001000099 26241001000099_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26233001000682 26233001000682_2_back.png      B heading-alone: h=39 others_median_h=39 size_ratio=1.00 product=1.34 (the other lines)  'GOVERNMENT WARNING:'
+26240001000266 26240001000266_1_front.jpg     A h=286 w=25 chars=40 prop=0.47 tail_start=0.51 cp=0.44 contam=0.00 ratio_prop=None ratio_cp=None colstroke L/R=4.0/nan product=unmeasured  'GOVERNMENT WARNING: (1) According to the'
+26231001000528 26231001000528_2_back.jpg      A too small (h=23) product=unmeasured
+26235001000100 26235001000100_2_strip.jpg     A h=25 w=663 chars=63 prop=0.30 tail_start=0.33 cp=0.30 contam=0.00 ratio_prop=1.11 ratio_cp=1.11 colstroke L/R=4.6/4.1 product=1.11 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON'
+26239001000865 26239001000865_1_front.jpg     B heading-alone: h=26 others_median_h=20 size_ratio=1.30 product=unmeasured  'GOVERNMENT WARNING:'
+26241001000102 26241001000102_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26241001000040 26241001000040_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26240001000461 26240001000461_1_front.jpg     B heading-alone: h=20 others_median_h=16 size_ratio=1.25 product=unmeasured  'GOVERNMENTWARNING3'
+26239001000863 26239001000863_1_front.png     B heading-alone: h=10 others_median_h=10 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26238001000483 26238001000483_1_front.png     B heading-alone: h=23 others_median_h=17 size_ratio=1.35 product=unmeasured  'GOVERNMENT WARNING:'
+26240001000571 26240001000571_1_front.png     A crop failed
+26225001000252 26225001000252_2_back.jpg      B heading-alone: h=20 others_median_h=26 size_ratio=0.77 product=unmeasured  'GOVERNMENT WARNING:'
+26243001000165 26243001000165_1_front.jpg     B heading-alone: h=23 others_median_h=23 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26243001000008 26243001000008_1_front.jpg     B heading-alone: h=27 others_median_h=32 size_ratio=0.84 product=1.35 (the other lines)  'GOVERNMENT WARNING:'
+26241001000094 26241001000094_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=1.00 product=unmeasured  'GOVERNMENT WARNING:'
+26236001000417 26236001000417_1_front.jpg     B heading-alone: h=24 others_median_h=23 size_ratio=1.04 product=unmeasured  'GOVERNMENT WARNING:'
+26241001000037 26241001000037_1_front.png     B heading-alone: h=16 others_median_h=17 size_ratio=0.94 product=unmeasured  'GOVERNMENT WARNING:'
+26231001000594 26231001000594_2_back.png      A h=38 w=731 chars=48 prop=0.40 tail_start=0.43 cp=0.45 contam=0.04 ratio_prop=1.32 ratio_cp=1.38 colstroke L/R=5.5/4.1 product=1.32 (the rest of its line)  'GOVERNMENT WARNING: (1) According to the Surgeon'
+26233001000659 26233001000659_2_back.png      A h=36 w=473 chars=36 prop=0.53 tail_start=0.57 cp=0.59 contam=0.04 ratio_prop=1.32 ratio_cp=1.34 colstroke L/R=6.0/4.4 product=1.32 (the rest of its line)  'GOVERNMENT WARNING: (1) ACCORDING TO'
+26241001000096 26241001000096_1_front.png     B heading-alone: h=16 others_median_h=16 size_ratio=0.97 product=unmeasured  'GOVERNMENT WARNING:'
+</stdin>
+codex
+1. **The estimator.**
+
+   Sound enough as a same-line ranking heuristic above the gate, not as an absolute 3–8 px stroke-width measurement. The \(4\times\) identity is exact only for ideal parallel strips; real glyph topology and Otsu segmentation violate it (`app/pipeline/typeface.py:39-64`).
+
+   - Thin strokes: biased high from pixel quantization; anti-aliasing and JPEG can move the Otsu boundary by a large fraction of the stroke.
+   - Dense lowercase: counters and terminals bias low; junctions bias high. The net is text-dependent, usually lower than simple capitals.
+   - Capitals: generally closer to the ideal-strip estimate and relatively high versus lowercase, creating a case/glyph-composition confound.
+   - Textured ground: fine texture usually biases low by adding many one-pixel “ink” samples; broad dark texture biases high. The direction is uncontrolled once the minority-class assumption missegments the ground (`app/pipeline/typeface.py:47-58`).
+
+   Do not switch immediately. Robustness per engineering hour:
+
+   1. Current distance transform, with split/validity fixes.
+   2. Ink area ÷ skeleton length, after removing small components; best alternative to shadow-test.
+   3. Morphological-opening granulometry; simple but scale-quantized and structuring-element dependent.
+   4. Stroke-width transform; potentially sounder, but costly and sensitive to weak/JPEG-corrupted gradients.
+   5. Horizontal-run mode; cheapest but confounds glyph width, horizontal bars, orientation, and counters.
+
+   The present bar tests validate only ideal strips, not those biases (`tests/unit/test_typeface.py:9-28`).
+
+2. **The split (P3).**
+
+   Prefer a semantic pixel boundary: find the connected-component/projection gap immediately after the printed colon, within a character-derived search window; use the stroke change point to score or refine candidate gaps. A free change-point optimizer always returns *something* when enough pixels exist—there is currently no “valid step” test (`split_experiment.py:57-78`). The all-bold sample’s spurious 0.13 split demonstrates this (`split_synth.log:6`).
+
+   Require a positive left-to-right stroke drop, minimum ink on both sides, material SSE improvement/effect size, and ratio stability over nearby candidate splits. A character-share fallback may support Needs review, but must never produce a heading Match by itself.
+
+   - `(1)` belongs wholly to the tail; otherwise its thin numeral can manufacture the transition.
+   - Keep the colon in the heading, but exclude it with the margin.
+   - Title case is fine empirically: 0.33 prior versus 0.37 pixel boundary (`split_synth.log:5`).
+   - OCR-added/dropped characters damage only the prior; the pixel gap should remain authoritative.
+   - A different face can create a stroke step without a weight change; treat that result as weaker evidence.
+   - Two-line `GOVERNMENT` / `WARNING:` is currently located but cannot be weight-measured because the weight path requires both words on one line (`app/pipeline/warning.py:54-67`, `app/pipeline/warning.py:268-270`; `app/pipeline/typeface.py:26,96-106`). Measure both heading fragments and compare them with later body lines.
+   - If only one body word follows the heading, the tail is too short; use compatible later body lines or abstain.
+
+   The 0.8–1.6 prior window covers the observed synthetic boundaries, but clamp it to valid geometry and minimum segment content. A 0.15×type-height margin is a reasonable starting value; require at least one estimated stroke width and shrink it only when both resulting samples remain adequate (`split_experiment.py:140-148`).
+
+3. **Geometry (P2).**
+
+   The short **edge** of the raw OCR quadrilateral—not the short axis-aligned extent—is the type height for upright, 90°/270° retry, vertical-strip, and full-resolution-rescue reads. Compute opposing edge lengths or rectify the quad. The current min/max extents become wrong for skewed text, and the current x-axis split cannot handle a vertical line (`app/pipeline/typeface.py:87-105`; `app/pipeline/warning.py:75-91`). The malformed vertical cases in the experiment confirm this (`split_real.log:52,71,108`).
+
+   Canonical stroke pixels should be `stroke_read / dec.scale`; that is geometrically scale-safe because canonical boxes use the same division (`app/pipeline/images.py:48-52,143-150`). Working-size versus rescue comparisons will still have rasterization error from Lanczos/Otsu, so validate tolerance rather than expect equality (`app/pipeline/images.py:111-115`, `app/services.py:254-264`). Using the unpadded box height as denominator corrects the present documentation/code mismatch, although padding can still alter which pixels enter the stroke estimate (`app/pipeline/typeface.py:67-74,90-94`).
+
+   `_adopt` appends every rescued-span line and removes only kept-read lines overlapping those lines; non-overlapping kept lines remain (`app/services.py:229-246`). Thus the adopted span itself is single-read, but a later `find_warning` can form a hybrid span from rescued and retained lines. Preserve canonical stroke and type height per line—or pin the final span to one read—because `OcrLine` currently records neither source read nor scale (`app/schemas.py:64-74`).
+
+4. **The matrix (P4–P6).**
+
+   “Remainder not bold” cannot be asserted from this relative measurement. Extra-bold over bold is indistinguishable from bold over regular. P4’s `Not checked` is therefore correct; the current dual Match is unsafe (`app/pipeline/warning.py:303-310`).
+
+   An absolute “body ratio below X means regular” gate is not defensible without broad, manually labelled font/weight calibration. Font design, capitalization, counters, box fit, Otsu, and resampling all move `stroke/type-height`. An unusually heavy body may justify Needs review, never Match or failure (`AGENTS.md:20-22`).
+
+   P5’s ±25% size tolerance is too wide: an equal-weight heading 25% larger can generate a 1.25 stroke-pixel ratio and cross a 1.15 threshold solely from size. Require roughly ±10%, or normalize stroke by a validated type-height estimate. Real examples already combine 17–22% size differences with ratios of 1.33–1.39 (`split_real.log:7,84`).
+
+   Provisionally use **1.20 for clearly heavier and retain 1.05 for same weight**, widening the inconclusive band to 1.05–1.20. After the corrected split, clean synthetic positives are 1.24–1.29, blurred positives only 1.16, and the sole all-bold negative is 1.00 (`split_synth.log:1-22`). Calling 1.16 Match leaves essentially no noise margin; do not raise the same-weight boundary until there are more all-bold, regular/regular, and bold/bold negatives.
+
+5. **Validation.**
+
+   D-045 must freeze the algorithm, corpus revision, font assets, thresholds, validity test, orientation handling, and exact denominators. Publish machine-readable rows, not only percentages.
+
+   - Synthetic: counts and ratio distributions for regular/regular, bold/regular, bold/bold, extra-bold/bold, different faces, different sizes, title case, two-line headings, short tails, blur, JPEG, low contrast, scaling, and texture.
+   - For every condition: eligible, measured, gap-split, change-point-split, fallback, rejected by each gate, Match, Needs review, and Not checked.
+   - Report manual-boundary error, change-point effect/SSE improvement, raw and canonical stroke, type height, size ratio, head/body ratio, and classification.
+   - Real: all 150 records and the 148 located warnings as counts; stratify same-line, standalone, split-heading, vertical, retry, rescue, measurable, and every abstention reason. Manually label a review subset for heading bold/body regular; approval alone is not pixel-level ground truth.
+   - A false alarm is a bold-generated Needs review on a manually confirmed compliant approved label. Not checked is an abstention and must be reported separately. Also report unsafe false Matches on planted noncompliant labels.
+
+   Honest summary: **“The heuristic detects a clear relative stroke increase in sufficiently large, comparable print and flags absence of that increase; it often abstains and cannot verify that the body itself is regular.”**
+
+   Current evidence is inconsistent:
+
+   - D-044 says 34 measurable/29 heavier/5 inconclusive/16 small, while `EVAL_REAL` reports about 64 heavier and 84 unmeasured-or-inconclusive among 148 located warnings (`docs/DECISIONS.md:D-044`; `docs/EVAL_REAL.md`, type-weight rows).
+   - The real script is not the production pipeline: it performs one upright read, silently omits no-span images, and iterates images rather than records (`split_experiment.py:81-88,156-167`). Its log contains decode errors, vertical-axis failures, and a crop failure (`split_real.log:49,52,71,81,108,117`).
+   - The synthetic log has 22 emitted rows—19 measurable and 3 too small—and no separately identified JPEG row, so the summarized category counts are not reproducible from that artifact (`split_synth.log:1-22`).
+   - One all-bold negative is insufficient to validate either operating point.
+
+6. **Tests.**
+
+   Add these in order:
+
+   - Bundled proportional regular/bold font: assert the recovered colon boundary and bold/regular ratio against known rendered coordinates.
+   - Same proportional font, all bold: both rows Needs review; never a heading or body Match.
+   - Extra-bold heading over bold body: heading may Match, body must remain Not checked.
+   - Parameterized blur/JPEG/low-contrast/downscale tests for both bold/regular and all-bold.
+   - Textured, gradient, inverted, and border-touching grounds: abstain rather than produce an unsafe Match.
+   - `(1)` and the colon remain on opposite sides of the split.
+   - OCR text with inserted/dropped characters but unchanged pixels yields the same pixel boundary/status.
+   - Title-case heading and mixed-case body exercise glyph-composition bias.
+   - Different heading/body faces cannot Match unless the configured evidence rule is satisfied.
+   - `GOVERNMENT` / `WARNING: (1) ...` on two lines measures both heading fragments.
+   - Heading plus only one body word uses later body lines or abstains.
+   - Upright, 90°, 270°, and vertical-strip versions preserve short-edge height and classification.
+   - Working-size and full-resolution rescue produce comparable canonical stroke values.
+   - `_adopt` hybrid retained/rescued lines preserve per-line scale/source or are rejected.
+   - Standalone-heading size tolerance tests just inside and outside its allowed range.
+   - Padding and image-edge placement do not change the denominator.
+
+   Existing tests use bars or inject ratios directly, so they do not exercise these paths (`tests/unit/test_typeface.py:44-55`; `tests/unit/test_warning.py:251-290`).
+
+7. **Risks.**
+
+   - **P5 can create new false Matches through size alone.** Tighten to about ±10% or normalize and validate.
+   - **P3 can hallucinate a transition and its character fallback preserves the known defect.** Use colon-gap candidates, explicit step validity, minimum content, and prohibit fallback-derived Matches (`split_experiment.py:57-78`).
+   - **P2 still fails vertical/skewed lines if implemented with min/max x/y.** Rectify the quadrilateral and operate along its long axis (`app/pipeline/typeface.py:87-105`).
+   - **P1 can create unmeasured or mixed-read final spans and may retain large arrays longer.** Select and measure a read-local span before adoption; store canonical measurement provenance. It also remains synchronous while the OCR slot is held unless moved outside that scope (`app/services.py:162-168`).
+   - **P4 reduces automatic coverage.** That is the correct tradeoff; ensure UI/verdict logic does not translate body `Not checked` into an implicit formatting Match.
+   - **P6 at 1.15 becomes more permissive after removing tail contamination.** Use 1.20 provisionally and publish the wider abstention count.
+   - **A failed change-point must not erase useful same-weight evidence.** Use a reliable semantic gap when available; otherwise report Not checked rather than manufacturing a boundary.
+tokens used
+67,524
+1. **The estimator.**
+
+   Sound enough as a same-line ranking heuristic above the gate, not as an absolute 3–8 px stroke-width measurement. The \(4\times\) identity is exact only for ideal parallel strips; real glyph topology and Otsu segmentation violate it (`app/pipeline/typeface.py:39-64`).
+
+   - Thin strokes: biased high from pixel quantization; anti-aliasing and JPEG can move the Otsu boundary by a large fraction of the stroke.
+   - Dense lowercase: counters and terminals bias low; junctions bias high. The net is text-dependent, usually lower than simple capitals.
+   - Capitals: generally closer to the ideal-strip estimate and relatively high versus lowercase, creating a case/glyph-composition confound.
+   - Textured ground: fine texture usually biases low by adding many one-pixel “ink” samples; broad dark texture biases high. The direction is uncontrolled once the minority-class assumption missegments the ground (`app/pipeline/typeface.py:47-58`).
+
+   Do not switch immediately. Robustness per engineering hour:
+
+   1. Current distance transform, with split/validity fixes.
+   2. Ink area ÷ skeleton length, after removing small components; best alternative to shadow-test.
+   3. Morphological-opening granulometry; simple but scale-quantized and structuring-element dependent.
+   4. Stroke-width transform; potentially sounder, but costly and sensitive to weak/JPEG-corrupted gradients.
+   5. Horizontal-run mode; cheapest but confounds glyph width, horizontal bars, orientation, and counters.
+
+   The present bar tests validate only ideal strips, not those biases (`tests/unit/test_typeface.py:9-28`).
+
+2. **The split (P3).**
+
+   Prefer a semantic pixel boundary: find the connected-component/projection gap immediately after the printed colon, within a character-derived search window; use the stroke change point to score or refine candidate gaps. A free change-point optimizer always returns *something* when enough pixels exist—there is currently no “valid step” test (`split_experiment.py:57-78`). The all-bold sample’s spurious 0.13 split demonstrates this (`split_synth.log:6`).
+
+   Require a positive left-to-right stroke drop, minimum ink on both sides, material SSE improvement/effect size, and ratio stability over nearby candidate splits. A character-share fallback may support Needs review, but must never produce a heading Match by itself.
+
+   - `(1)` belongs wholly to the tail; otherwise its thin numeral can manufacture the transition.
+   - Keep the colon in the heading, but exclude it with the margin.
+   - Title case is fine empirically: 0.33 prior versus 0.37 pixel boundary (`split_synth.log:5`).
+   - OCR-added/dropped characters damage only the prior; the pixel gap should remain authoritative.
+   - A different face can create a stroke step without a weight change; treat that result as weaker evidence.
+   - Two-line `GOVERNMENT` / `WARNING:` is currently located but cannot be weight-measured because the weight path requires both words on one line (`app/pipeline/warning.py:54-67`, `app/pipeline/warning.py:268-270`; `app/pipeline/typeface.py:26,96-106`). Measure both heading fragments and compare them with later body lines.
+   - If only one body word follows the heading, the tail is too short; use compatible later body lines or abstain.
+
+   The 0.8–1.6 prior window covers the observed synthetic boundaries, but clamp it to valid geometry and minimum segment content. A 0.15×type-height margin is a reasonable starting value; require at least one estimated stroke width and shrink it only when both resulting samples remain adequate (`split_experiment.py:140-148`).
+
+3. **Geometry (P2).**
+
+   The short **edge** of the raw OCR quadrilateral—not the short axis-aligned extent—is the type height for upright, 90°/270° retry, vertical-strip, and full-resolution-rescue reads. Compute opposing edge lengths or rectify the quad. The current min/max extents become wrong for skewed text, and the current x-axis split cannot handle a vertical line (`app/pipeline/typeface.py:87-105`; `app/pipeline/warning.py:75-91`). The malformed vertical cases in the experiment confirm this (`split_real.log:52,71,108`).
+
+   Canonical stroke pixels should be `stroke_read / dec.scale`; that is geometrically scale-safe because canonical boxes use the same division (`app/pipeline/images.py:48-52,143-150`). Working-size versus rescue comparisons will still have rasterization error from Lanczos/Otsu, so validate tolerance rather than expect equality (`app/pipeline/images.py:111-115`, `app/services.py:254-264`). Using the unpadded box height as denominator corrects the present documentation/code mismatch, although padding can still alter which pixels enter the stroke estimate (`app/pipeline/typeface.py:67-74,90-94`).
+
+   `_adopt` appends every rescued-span line and removes only kept-read lines overlapping those lines; non-overlapping kept lines remain (`app/services.py:229-246`). Thus the adopted span itself is single-read, but a later `find_warning` can form a hybrid span from rescued and retained lines. Preserve canonical stroke and type height per line—or pin the final span to one read—because `OcrLine` currently records neither source read nor scale (`app/schemas.py:64-74`).
+
+4. **The matrix (P4–P6).**
+
+   “Remainder not bold” cannot be asserted from this relative measurement. Extra-bold over bold is indistinguishable from bold over regular. P4’s `Not checked` is therefore correct; the current dual Match is unsafe (`app/pipeline/warning.py:303-310`).
+
+   An absolute “body ratio below X means regular” gate is not defensible without broad, manually labelled font/weight calibration. Font design, capitalization, counters, box fit, Otsu, and resampling all move `stroke/type-height`. An unusually heavy body may justify Needs review, never Match or failure (`AGENTS.md:20-22`).
+
+   P5’s ±25% size tolerance is too wide: an equal-weight heading 25% larger can generate a 1.25 stroke-pixel ratio and cross a 1.15 threshold solely from size. Require roughly ±10%, or normalize stroke by a validated type-height estimate. Real examples already combine 17–22% size differences with ratios of 1.33–1.39 (`split_real.log:7,84`).
+
+   Provisionally use **1.20 for clearly heavier and retain 1.05 for same weight**, widening the inconclusive band to 1.05–1.20. After the corrected split, clean synthetic positives are 1.24–1.29, blurred positives only 1.16, and the sole all-bold negative is 1.00 (`split_synth.log:1-22`). Calling 1.16 Match leaves essentially no noise margin; do not raise the same-weight boundary until there are more all-bold, regular/regular, and bold/bold negatives.
+
+5. **Validation.**
+
+   D-045 must freeze the algorithm, corpus revision, font assets, thresholds, validity test, orientation handling, and exact denominators. Publish machine-readable rows, not only percentages.
+
+   - Synthetic: counts and ratio distributions for regular/regular, bold/regular, bold/bold, extra-bold/bold, different faces, different sizes, title case, two-line headings, short tails, blur, JPEG, low contrast, scaling, and texture.
+   - For every condition: eligible, measured, gap-split, change-point-split, fallback, rejected by each gate, Match, Needs review, and Not checked.
+   - Report manual-boundary error, change-point effect/SSE improvement, raw and canonical stroke, type height, size ratio, head/body ratio, and classification.
+   - Real: all 150 records and the 148 located warnings as counts; stratify same-line, standalone, split-heading, vertical, retry, rescue, measurable, and every abstention reason. Manually label a review subset for heading bold/body regular; approval alone is not pixel-level ground truth.
+   - A false alarm is a bold-generated Needs review on a manually confirmed compliant approved label. Not checked is an abstention and must be reported separately. Also report unsafe false Matches on planted noncompliant labels.
+
+   Honest summary: **“The heuristic detects a clear relative stroke increase in sufficiently large, comparable print and flags absence of that increase; it often abstains and cannot verify that the body itself is regular.”**
+
+   Current evidence is inconsistent:
+
+   - D-044 says 34 measurable/29 heavier/5 inconclusive/16 small, while `EVAL_REAL` reports about 64 heavier and 84 unmeasured-or-inconclusive among 148 located warnings (`docs/DECISIONS.md:D-044`; `docs/EVAL_REAL.md`, type-weight rows).
+   - The real script is not the production pipeline: it performs one upright read, silently omits no-span images, and iterates images rather than records (`split_experiment.py:81-88,156-167`). Its log contains decode errors, vertical-axis failures, and a crop failure (`split_real.log:49,52,71,81,108,117`).
+   - The synthetic log has 22 emitted rows—19 measurable and 3 too small—and no separately identified JPEG row, so the summarized category counts are not reproducible from that artifact (`split_synth.log:1-22`).
+   - One all-bold negative is insufficient to validate either operating point.
+
+6. **Tests.**
+
+   Add these in order:
+
+   - Bundled proportional regular/bold font: assert the recovered colon boundary and bold/regular ratio against known rendered coordinates.
+   - Same proportional font, all bold: both rows Needs review; never a heading or body Match.
+   - Extra-bold heading over bold body: heading may Match, body must remain Not checked.
+   - Parameterized blur/JPEG/low-contrast/downscale tests for both bold/regular and all-bold.
+   - Textured, gradient, inverted, and border-touching grounds: abstain rather than produce an unsafe Match.
+   - `(1)` and the colon remain on opposite sides of the split.
+   - OCR text with inserted/dropped characters but unchanged pixels yields the same pixel boundary/status.
+   - Title-case heading and mixed-case body exercise glyph-composition bias.
+   - Different heading/body faces cannot Match unless the configured evidence rule is satisfied.
+   - `GOVERNMENT` / `WARNING: (1) ...` on two lines measures both heading fragments.
+   - Heading plus only one body word uses later body lines or abstains.
+   - Upright, 90°, 270°, and vertical-strip versions preserve short-edge height and classification.
+   - Working-size and full-resolution rescue produce comparable canonical stroke values.
+   - `_adopt` hybrid retained/rescued lines preserve per-line scale/source or are rejected.
+   - Standalone-heading size tolerance tests just inside and outside its allowed range.
+   - Padding and image-edge placement do not change the denominator.
+
+   Existing tests use bars or inject ratios directly, so they do not exercise these paths (`tests/unit/test_typeface.py:44-55`; `tests/unit/test_warning.py:251-290`).
+
+7. **Risks.**
+
+   - **P5 can create new false Matches through size alone.** Tighten to about ±10% or normalize and validate.
+   - **P3 can hallucinate a transition and its character fallback preserves the known defect.** Use colon-gap candidates, explicit step validity, minimum content, and prohibit fallback-derived Matches (`split_experiment.py:57-78`).
+   - **P2 still fails vertical/skewed lines if implemented with min/max x/y.** Rectify the quadrilateral and operate along its long axis (`app/pipeline/typeface.py:87-105`).
+   - **P1 can create unmeasured or mixed-read final spans and may retain large arrays longer.** Select and measure a read-local span before adoption; store canonical measurement provenance. It also remains synchronous while the OCR slot is held unless moved outside that scope (`app/services.py:162-168`).
+   - **P4 reduces automatic coverage.** That is the correct tradeoff; ensure UI/verdict logic does not translate body `Not checked` into an implicit formatting Match.
+   - **P6 at 1.15 becomes more permissive after removing tail contamination.** Use 1.20 provisionally and publish the wider abstention count.
+   - **A failed change-point must not erase useful same-weight evidence.** Use a reliable semantic gap when available; otherwise report Not checked rather than manufacturing a boundary.

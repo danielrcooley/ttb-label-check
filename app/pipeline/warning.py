@@ -25,6 +25,7 @@ from app.schemas import Evidence, OcrLine, Status, WarningReport
 
 from .match import reading_order
 from .normalize import collapse_ws, fold, join_hyphenated, unify_punctuation
+from .typeface import heading_match
 
 # Verbatim text of 27 CFR 16.21, verified against the eCFR API on 2026-09-03 (docs/REGULATIONS.md).
 CANONICAL = (
@@ -258,68 +259,98 @@ def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
     )
 
 
-def type_weight_ratio(span: WarningSpan) -> tuple[float, str] | None:
+@dataclass(frozen=True)
+class TypeWeight:
+    ratio: float | None  # heading stroke over body stroke, when comparable
+    basis: str  # what was compared, or why nothing was
+    split: str | None = None  # "gap" or "share" for a same-line comparison, "alone" for a standalone heading
+
+
+SIZE_TOLERANCE = 0.10  # a standalone heading is compared only when its type height is within this of the body's
+
+
+def type_weight_ratio(span: WarningSpan) -> TypeWeight:
     """Heading stroke weight over body stroke weight, and what it was measured against. The sound
     comparison is the heading against the rest of its own line: same size, same face, same box, so
-    the normalization cancels (real labels: a semibold heading reads 1.15, a bold one 1.24, all-bold
-    0.99). When the heading stands alone on its line, its stroke thickness in pixels is compared
-    with the median of the other lines' (the box heights differ, so ratios would not). None when
-    the print was too small or faint to measure."""
-    heading = next((ln for ln in span.lines if _ANCHOR_RE.search(ln.text) and ln.weight_head is not None), None)
-    if heading is None or heading.weight_head is None:
-        return None
+    the normalization cancels. When the heading stands alone on its line, its stroke thickness in
+    pixels (canonical, so reads at different scales compare) is set against the median of the other
+    lines', but only when the type heights agree within SIZE_TOLERANCE: a larger size has thicker
+    strokes at the same weight (consult 008). No ratio when the print was too small or faint."""
+    heading = next((ln for ln in span.lines if heading_match(ln.text)), None)
+    if heading is None:
+        return TypeWeight(None, "no heading line")
+    if heading.weight_head is None:
+        return TypeWeight(None, "too small")
     if heading.weight_tail:
-        return heading.weight_head / heading.weight_tail, "the rest of its line"
-
-    def height(ln: OcrLine) -> float:
-        _, _, y0, y1 = _extent(ln)
-        return max(1.0, y1 - y0)
-
-    others = [ln for ln in span.lines if ln is not heading and ln.weight is not None]
-    if len(others) < 2:
-        return None
-    head_px = heading.weight_head * height(heading)
-    body_px = statistics.median(ln.weight * height(ln) for ln in others if ln.weight is not None)
-    return (head_px / body_px if body_px else 0.0), "the other lines"
+        return TypeWeight(heading.weight_head / heading.weight_tail, "the rest of its line", heading.weight_split)
+    others = [ln for ln in span.lines if ln is not heading and ln.stroke_px and ln.type_px]
+    if len(others) < 2 or not heading.stroke_px or not heading.type_px:
+        return TypeWeight(None, "too small", "alone")
+    body_type = statistics.median(ln.type_px for ln in others if ln.type_px)
+    if body_type <= 0 or abs(heading.type_px / body_type - 1.0) > SIZE_TOLERANCE:
+        return TypeWeight(None, "size differs", "alone")
+    body_px = statistics.median(ln.stroke_px for ln in others if ln.stroke_px)
+    return TypeWeight(heading.stroke_px / body_px if body_px else None, "the other lines", "alone")
 
 
 def type_weight_status(
     span: WarningSpan, *, heading_min_ratio: float, same_max_ratio: float
-) -> tuple[Status, Status, str]:
+) -> tuple[Status, Status, str, TypeWeight]:
     """Bold type from the stroke weights measured on the pixels (app/pipeline/typeface.py): the
     heading must be bold and the rest must not be (27 CFR 16.22(a)(2)). A heading clearly heavier
-    is a Match on both counts; heading and body of the same weight is Needs review on both, because
-    the measurement cannot tell a heading that is not bold from a statement that is all bold; a
-    small difference is inconclusive, and print too small or faint to measure is Not checked.
-    Never a failure: it measures print, not wording."""
-    measured = type_weight_ratio(span)
-    if measured is None:
+    than the body is a Match on the heading row; the body row stays Not checked, because a relative
+    measurement cannot tell a regular body under a bold heading from a bold body under a heavier
+    one. Heading and body of the same weight is Needs review on both rows (either the heading is
+    not bold or the whole statement is). A small difference is inconclusive; a boundary found only
+    by counting characters never yields a Match; print too small, too faint, or set in a different
+    size is Not checked with the reason. Never a failure: it measures print, not wording."""
+    tw = type_weight_ratio(span)
+    rule = "(27 CFR 16.22(a)(2))"
+    if tw.ratio is None:
+        reason = {
+            "too small": "the print is too small or too faint at the working size",
+            "no heading line": "the heading was not read as its own words",
+            "size differs": (
+                "the heading is set in a different size from the statement, and a larger size has thicker "
+                "strokes at the same weight"
+            ),
+        }.get(tw.basis, tw.basis)
         return (
             Status.not_checked,
             Status.not_checked,
-            "Bold type could not be measured: the print is too small or too faint at the working size. "
-            "Check it on the image (27 CFR 16.22(a)(2)).",
+            f"Bold type could not be measured: {reason}. Check it on the image {rule}.",
+            tw,
         )
-    ratio, basis = measured
-    if ratio >= heading_min_ratio:
-        return (
-            Status.match,
-            Status.match,
-            f"The heading is set about {ratio:.1f} times heavier than {basis}: bold heading, remainder not bold "
-            "(27 CFR 16.22(a)(2)).",
-        )
-    if ratio <= same_max_ratio:
+    if tw.ratio <= same_max_ratio:
         return (
             Status.needs_review,
             Status.needs_review,
-            f"The heading and {basis} measure the same weight: either the heading is not in bold, or the whole "
-            "statement is. Only the heading may be bold (27 CFR 16.22(a)(2)). Confirm on the image.",
+            f"The heading and {tw.basis} measure the same weight: either the heading is not in bold, or the whole "
+            f"statement is. Only the heading may be bold {rule}. Confirm on the image.",
+            tw,
+        )
+    if tw.ratio >= heading_min_ratio and tw.split == "share":
+        return (
+            Status.not_checked,
+            Status.not_checked,
+            "The heading measures heavier than the rest of its line, but the boundary between them could not be "
+            f"found in the print, so it is not counted. Check it on the image {rule}.",
+            TypeWeight(tw.ratio, "boundary uncertain", tw.split),
+        )
+    if tw.ratio >= heading_min_ratio:
+        return (
+            Status.match,
+            Status.not_checked,
+            f"The heading is set about {tw.ratio:.1f} times heavier than {tw.basis}: bold heading {rule}. The "
+            "remainder measures lighter than the heading; whether it is itself regular weight is not measured.",
+            tw,
         )
     return (
         Status.not_checked,
         Status.not_checked,
         f"Bold type could not be judged with confidence from this image (the heading measures only slightly "
-        f"heavier than {basis}); check it on the image (27 CFR 16.22(a)(2)).",
+        f"heavier than {tw.basis}); check it on the image {rule}.",
+        tw,
     )
 
 
@@ -327,7 +358,7 @@ def build_report(
     lines: list[OcrLine],
     *,
     mismatch_similarity: float,
-    heading_min_ratio: float = 1.15,
+    heading_min_ratio: float = 1.20,
     same_max_ratio: float = 1.05,
 ) -> WarningReport:
     """Assess the warning statement. ``assessment`` drives the verdict:
@@ -355,7 +386,7 @@ def build_report(
         )
     exact, similarity = compare_warning(span.text)
     caps_status, caps_note = anchor_caps_status(span.anchor_text)
-    bold_status, body_status, bold_note = type_weight_status(
+    bold_status, body_status, bold_note, tw = type_weight_status(
         span, heading_min_ratio=heading_min_ratio, same_max_ratio=same_max_ratio
     )
     if exact:
@@ -385,6 +416,8 @@ def build_report(
         anchor_caps=caps_status,
         anchor_bold=bold_status,
         body_not_bold=body_status,
+        type_weight_ratio=round(tw.ratio, 3) if tw.ratio is not None else None,
+        type_weight_basis=tw.basis + (f" ({tw.split})" if tw.split in ("gap", "share") else ""),
         evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],
         notes=[notes[assessment], caps_note, bold_note],
     )

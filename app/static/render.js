@@ -122,7 +122,8 @@ function renderDiff(diff) {
 export function renderWarning(container, w, onSelect) {
   const notRequired = w.assessment === "not_required"; // under 0.5% alcohol: absence is not a finding
   const overall = notRequired ? (w.present ? "info" : "not_checked")
-    : !w.present ? "not_found" : w.assessment === "exact" && w.anchor_caps === "match" ? "match"
+    : !w.present ? "not_found"
+    : w.assessment === "exact" && w.anchor_caps === "match" && w.anchor_bold !== "needs_review" && w.body_not_bold !== "needs_review" ? "match"
     : w.assessment === "wording" ? "mismatch" : "needs_review";
   const headline = notRequired ? (w.present ? "Not required at this alcohol content; a statement is present" : "Not required at this alcohol content")
     : !w.present ? "No warning statement found" : w.exact ? "Wording is exact" : "Wording is not exact";
@@ -272,10 +273,19 @@ export function issueTexts(result) {
 /** Approve / Reject / Flag with a note. getCurrent() reads the live decision {decision, note} so a
  * press never works from a stale copy; onChange(next) receives the whole new object. The pressed
  * button carries a check mark in its text as well as a dark fill (Windows contrast themes drop fills). */
+export const DECISION_WORD = { approve: "Approve", reject: "Reject", flag: "Flag" };
+
+/** One sentence for the printout: what was decided and the note, or that nothing was. */
+export function decisionSummary(d) {
+  if (!d?.decision) return "No decision recorded.";
+  return `Decision: ${DECISION_WORD[d.decision]}.${d.note ? ` Note: ${d.note}` : ""}`;
+}
+
 export function decisionControls(getCurrent, onChange, noteLabel = "Note") {
   const d = getCurrent() || {};
   const btn = (val, label) => el("button", { type: "button", class: `usa-button usa-button--outline${d.decision === val ? " is-on" : ""}`,
     text: d.decision === val ? `✓ ${label}` : label,
+    "data-decision": val,
     "aria-pressed": d.decision === val ? "true" : "false",
     title: d.decision === val ? `${label}: press again to clear` : label,
     onclick: () => { const cur = getCurrent() || {}; onChange({ ...cur, decision: cur.decision === val ? null : val }); } });
@@ -294,7 +304,7 @@ export function exportRow({ application, key, result, status, error, decision, f
   const st = (id) => result?.checks.find((c) => c.id === id)?.status || "";
   const w = result?.warning;
   return [application?.application_id || key || "", application?.brand_name || "", application?.class_type || "",
-    result?.verdict || status || "", result ? (issueTexts(result).join("; ") || "All checks match") : "", result?.summary || error || "",
+    result?.verdict || (status === "done" ? "extract_only" : status) || "", result ? (issueTexts(result).join("; ") || "All checks match") : "", result?.summary || error || "",
     st("brand_name"), st("class_type"), st("alcohol_content"), st("net_contents"), st("bottler"), st("country_of_origin"),
     w ? w.present : "", w ? w.exact : "", w ? w.anchor_caps : "", decision?.decision || "", decision?.note || "",
     (files || []).map((f) => f.name).join(";"), elapsedMs ?? "", new Date().toISOString()];
@@ -302,7 +312,7 @@ export function exportRow({ application, key, result, status, error, decision, f
 
 export function csvCell(v) {
   let s = v == null ? "" : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // neutralize spreadsheet formulas
+  if (/^[\s\u0000-\u001f]*[=+\-@]/.test(s)) s = "'" + s; // neutralize spreadsheet formulas, also behind leading blanks or control characters
   return `"${s.replace(/"/g, '""')}"`;
 }
 
@@ -310,8 +320,10 @@ export function csvCell(v) {
 export function downloadCsv(filename, rows) {
   const lines = [EXPORT_HEAD.map(csvCell).join(","), ...rows.map((row) => row.map(csvCell).join(","))];
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = el("a", { href: URL.createObjectURL(blob), download: filename });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: filename });
   document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000); // the browser has taken the file by then; do not keep it in memory
 }
 
 export function exportStamp() {

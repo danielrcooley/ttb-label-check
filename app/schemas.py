@@ -66,12 +66,19 @@ class OcrLine(BaseModel):
     text: str = Field(max_length=1000)
     confidence: float = Field(ge=0, le=1)
     box: Quad
-    # Type weight measured from the pixels (stroke width over type height; app/pipeline/typeface.py).
-    # None when the print was too small or faint to measure. head/tail split a line that carries
-    # the warning heading into the heading and the rest.
+    # Type weight measured from the pixels of the warning statement's lines only (stroke width over
+    # type height; app/pipeline/typeface.py, D-044 / D-045). None when the line is not part of a
+    # located statement or the print was too small or faint to measure. head/tail split a line that
+    # carries the warning heading into the heading and the rest; weight_split says how the boundary
+    # was found ("gap": the word gap after the heading in the print; "share": the heading's share of
+    # the characters, a weaker basis). stroke_px and type_px are the whole line's stroke and type
+    # height in the image's own pixels, so lines from reads at different scales compare.
     weight: float | None = Field(default=None, ge=0, le=2)
     weight_head: float | None = Field(default=None, ge=0, le=2)
     weight_tail: float | None = Field(default=None, ge=0, le=2)
+    weight_split: str | None = Field(default=None, max_length=8)
+    stroke_px: float | None = Field(default=None, ge=0)
+    type_px: float | None = Field(default=None, ge=0)
 
 
 class Evidence(BaseModel):
@@ -106,6 +113,14 @@ class WarningReport(BaseModel):
     anchor_caps: Status
     anchor_bold: Status
     body_not_bold: Status
+    type_weight_ratio: float | None = Field(
+        default=None, description="Heading stroke weight over the body's, when measured (D-044 / D-045)"
+    )
+    type_weight_basis: str | None = Field(
+        default=None,
+        description="What the ratio compares, or why there is none: 'the rest of its line' (gap or share), "
+        "'the other lines', 'too small', 'size differs', 'no heading line', 'boundary uncertain'",
+    )
     evidence: list[Evidence] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     rule: str = "27 CFR 16.21 (text), 16.22 (format)"

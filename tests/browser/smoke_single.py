@@ -41,13 +41,23 @@ def main() -> int:
         browser = p.chromium.launch()
         ctx = browser.new_context(viewport={"width": 1366, "height": 900})
         page = ctx.new_page()
+        expecting = {"error": False}  # set while a request is meant to fail
         page.on(
             "console",
-            lambda m: problems.append(f"console.{m.type}: {m.text}") if m.type in ("error", "warning") else None,
+            lambda m: (
+                problems.append(f"console.{m.type}: {m.text}")
+                if m.type in ("error", "warning") and not expecting["error"]
+                else None
+            ),
         )
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url} {r.failure}"))
-        page.on("response", lambda r: problems.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
+        page.on(
+            "response",
+            lambda r: (
+                problems.append(f"http {r.status}: {r.url}") if r.status >= 400 and not expecting["error"] else None
+            ),
+        )
         page.on(
             "dialog", lambda d: d.accept() if d.type == "beforeunload" else d.dismiss()
         )  # leave-page prompt on reload
@@ -84,7 +94,27 @@ def main() -> int:
             lines = f.read().splitlines()
         if len(lines) != 2 or '"approve"' not in lines[1] or "checked the heading" not in lines[1]:
             problems.append("single: export lacks the decision or the note")
-        print("single: decision recorded and exported")
+        if "Decision recorded: Approve" not in page.inner_text("#decision-live"):
+            problems.append("single: the decision was not announced to assistive technology")
+        if page.evaluate("document.activeElement?.dataset?.decision") not in ("approve", None):
+            problems.append("single: focus left the decision buttons after a press")
+        print("single: decision recorded, announced and exported")
+
+        # A failed re-check must not leave the previous result and its export on screen (review 007)
+        expecting["error"] = True
+        page.set_input_files("#file-input", {"name": "bad.png", "mimeType": "image/png", "buffer": b"not an image"})
+        page.click("#check-btn")
+        page.wait_for_timeout(500)
+        for _ in range(120):  # the status line empties on failure, so poll its class rather than wait for text
+            if "is-busy" not in (page.get_attribute("#status", "class") or ""):
+                break
+            page.wait_for_timeout(500)
+        page.wait_for_timeout(300)
+        expecting["error"] = False
+        if not page.is_hidden("#results"):
+            problems.append("single: a failed check left the previous result on screen")
+        print("single: a failed re-check clears the previous result")
+        page.click("#clear-files")
 
         # Accessibility page: the display choice applies at once, survives a reload, and restores.
         page.click("a[data-view=accessibility]")
@@ -115,6 +145,15 @@ def main() -> int:
         mobile.screenshot(path=f"{OUT}/ui_mobile.png", full_page=True)
         if mobile.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth"):
             problems.append("mobile: page scrolls horizontally")
+
+        # 200 percent zoom on a 1366-px screen is a 683-px viewport: the result must reflow, not scroll sideways
+        zoomed = browser.new_context(viewport={"width": 683, "height": 450}).new_page()
+        zoomed.goto(BASE + "/", wait_until="networkidle")
+        zoomed.click("[data-sample=problem]")
+        zoomed.wait_for_selector("#results:not([hidden]) .verdict", timeout=60000)
+        if zoomed.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth"):
+            problems.append("200% zoom: page scrolls horizontally")
+        print("zoom: no horizontal scroll at 683 px")
         browser.close()
 
     print("\nPROBLEMS:" if problems else "\nno problems detected")

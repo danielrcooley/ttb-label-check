@@ -36,8 +36,11 @@ main { flex: 1 0 auto; }
 .file-list .file-name { font-weight: 600; word-break: break-word; }
 .file-list .file-meta { color: #565c65; font-size: .9rem; }
 
-.radio-row { display: grid; gap: .5rem; }
-@media (min-width: 40em) { .radio-row { grid-template-columns: repeat(3, 1fr); } }
+.radio-row { display: grid; gap: .5rem; min-width: 0; }
+/* three across when the column is wide enough, else two and one, never wider than the column: at 200
+   percent zoom the form's two columns are about 300 px each, and 1fr tiles cannot shrink below their text */
+@media (min-width: 40em) { .radio-row { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); } }
+.radio-row .usa-radio, .radio-row .usa-radio__label { min-width: 0; overflow-wrap: anywhere; }
 /* the three tiles share one height whatever their label length */
 .radio-row .usa-radio { display: flex; }
 .radio-row .usa-radio__input--tile + .usa-radio__label { margin-top: 0; flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
@@ -49,7 +52,7 @@ main { flex: 1 0 auto; }
   border: 3px solid #d9e8f6; border-top-color: #005ea2; border-radius: 50%; animation: lc-spin .9s linear infinite;
 }
 @keyframes lc-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .status-line.is-busy::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .status-line.is-busy::before { animation: none; } .progress__bar span { transition: none; } }
 
 /* Results */
 .results:focus { outline: none; }
@@ -148,8 +151,11 @@ main { flex: 1 0 auto; }
   }
 }
 
+.print-only { display: none; }
 @media print {
-  header, footer, .sample-bar, .submit-row, .usa-site-alert, #dropzone, details, .decision-actions { display: none !important; }
+  header, footer, .sample-bar, .submit-row, .usa-site-alert, #dropzone, details, .decision-actions,
+  .decision-block .decision-btns, .decision-block .note-input { display: none !important; }
+  .print-only { display: block; } /* the decision and note as one static line, instead of live controls */
   .results { margin-top: 0; }
 }
 
@@ -162,7 +168,7 @@ main { flex: 1 0 auto; }
 :root[data-theme="dark"] h1, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3, :root[data-theme="dark"] h4,
 :root[data-theme="dark"] .usa-legend, :root[data-theme="dark"] .usa-label, :root[data-theme="dark"] .usa-intro,
 :root[data-theme="dark"] .usa-prose, :root[data-theme="dark"] .usa-fieldset, :root[data-theme="dark"] legend { color: inherit; }
-:root[data-theme="dark"] .usa-hint, :root[data-theme="dark"] .text-base, :root[data-theme="dark"] .usa-radio__label-description { color: #b6bcc2; }
+:root[data-theme="dark"] .usa-hint, :root[data-theme="dark"] .text-base, :root[data-theme="dark"] .text-base-dark, :root[data-theme="dark"] .usa-radio__label-description { color: #b6bcc2; }
 :root[data-theme="dark"] .text-secondary-dark { color: #f2938c; }
 :root[data-theme="dark"] a, :root[data-theme="dark"] .usa-button--unstyled { color: #8fc3ff; }
 :root[data-theme="dark"] a:visited { color: #c1a9ff; }
@@ -187,7 +193,7 @@ main { flex: 1 0 auto; }
 :root[data-theme="dark"] input[type=text], :root[data-theme="dark"] input[type=search], :root[data-theme="dark"] select,
 :root[data-theme="dark"] textarea, :root[data-theme="dark"] .note-input { background-color: #1a1f24; color: #f0f0f0; border-color: #b6bcc2; }
 :root[data-theme="dark"] .usa-input::placeholder, :root[data-theme="dark"] .note-input::placeholder { color: #9da3a9; }
-:root[data-theme="dark"] .usa-radio__input--tile + .usa-radio__label { background: #1a1f24; color: #f0f0f0; border-color: #565c65; }
+:root[data-theme="dark"] .usa-radio__input--tile + .usa-radio__label { background: #1a1f24; color: #f0f0f0; border-color: #8a9199; }
 :root[data-theme="dark"] .usa-radio__input--tile:checked + .usa-radio__label { background: #16232f; border-color: #8fc3ff; }
 :root[data-theme="dark"] .usa-checkbox__label, :root[data-theme="dark"] .usa-radio__label { color: #f0f0f0; }
 :root[data-theme="dark"] .usa-button--outline { color: #8fc3ff; box-shadow: inset 0 0 0 2px #8fc3ff; background: transparent; }
@@ -232,3 +238,14 @@ main { flex: 1 0 auto; }
 :root[data-theme="dark"] .usa-alert__body, :root[data-theme="dark"] .usa-site-alert .usa-alert__body { background-color: transparent; color: #f0f0f0; }
 :root[data-theme="dark"] .usa-alert__body::before { filter: invert(1); }
 :root[data-theme="dark"] .usa-checkbox, :root[data-theme="dark"] .usa-radio { background: transparent; }
+/* controls whose state is a fill: the batch filters and the progress bar (3:1 against their ground) */
+:root[data-theme="dark"] .filter-bar .usa-button.is-on { background: #f0f0f0; color: #0f1216; box-shadow: none; }
+:root[data-theme="dark"] .progress__bar span { background: #8fc3ff; }
+
+/* Under a Windows contrast theme the pressed state keeps the user's own palette whatever the display
+   choice: these rules come after the dark block so they win there too (review 007). */
+@media (forced-colors: active) {
+  :root[data-theme="dark"] .decision-btns .usa-button.is-on, :root[data-theme="dark"] .filter-bar .usa-button.is-on {
+    background: Highlight; color: HighlightText; box-shadow: none;
+  }
+}

@@ -23,6 +23,7 @@ from app.schemas import (
     WarningReport,
 )
 
+from .countries import country_named
 from .match import best_span, status_for
 from .normalize import company_forms, fold, fold_company, has_responsibility_prefix, split_registered_party
 from .parsers import (
@@ -96,15 +97,37 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
         if found_lines and check.status is Status.match and check.found != expected:
             check.note = f"Label says '{check.found}'."
     if check.status in (Status.mismatch, Status.not_found):
-        # A hard issue needs positive evidence: an origin statement on the label naming something
-        # else. A country not read anywhere is a heuristic miss and goes to the person (D-041).
+        # A hard issue needs positive evidence: an origin statement on the label naming ANOTHER
+        # COUNTRY. A statement that names no country the tool knows ("Bottled in Napa, CA"), or a
+        # country not read anywhere, is a heuristic miss and goes to the person (D-041, D-045).
+        want = country_named(expected)
         origin_lines = [ln for ln in lines if _ORIGIN_PREFIX.match(ln.text)]
-        if origin_lines:
-            ln = origin_lines[0]
+        named = [(ln, country_named(_ORIGIN_PREFIX.sub("", ln.text))) for ln in origin_lines]
+        same = next((ln for ln, c in named if c and c == want), None)
+        other = next(((ln, c) for ln, c in named if c and c != want), None)
+        if same is not None:
+            check.status = Status.match
+            check.found = same.text
+            check.score = 100.0
+            check.evidence = [Evidence(image_index=same.image_index, box=same.box, text=same.text)]
+            check.note = f"Label says '{same.text}'."
+        elif other is not None and want is not None:
+            ln, country = other
             check.status = Status.mismatch
             check.found = ln.text
             check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)]
-            check.note = f"The label's origin statement reads '{ln.text}'; the application says '{expected}'."
+            check.note = (
+                f"The label's origin statement reads '{ln.text}' ({country}); the application says '{expected}'."
+            )
+        elif origin_lines:
+            ln = origin_lines[0]
+            check.status = Status.needs_review
+            check.found = ln.text
+            check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)]
+            check.note = (
+                f"The label's origin line reads '{ln.text}', which the tool cannot match to a country; "
+                f"the application says '{expected}'. Confirm on the image."
+            )
         else:
             check.status = Status.needs_review
             check.note = (
@@ -118,14 +141,35 @@ _BOTTLER_RULE = "27 CFR 5.66 / 4.35 / 7.66"
 _STATUS_RANK = {Status.match: 0, Status.needs_review: 1, Status.mismatch: 2, Status.not_found: 3}
 
 
-def _address_on_label(city: str | None, state_forms: tuple[str, ...], lines: list[OcrLine]) -> bool:
-    """Whether the registered city and state were both read somewhere on the label."""
+def _near(lines: list[OcrLine], found: list[OcrLine], before: int = 2, after: int = 3) -> list[OcrLine]:
+    """The found lines and their neighbours in reading order on the same image: the responsibility
+    block, where a label prints the bottler's city and state. Not the whole label, where a state
+    name is also an appellation or a marketing line (review 007)."""
+    idx = [i for i, ln in enumerate(lines) if any(ln is f for f in found)]
+    if not idx:
+        return list(found)
+    images = {ln.image_index for ln in found}
+    lo, hi = max(0, min(idx) - before), min(len(lines), max(idx) + after + 1)
+    return [ln for ln in lines[lo:hi] if ln.image_index in images]
+
+
+def _address_on_label(
+    city: str | None, state_forms: tuple[str, ...], near: list[OcrLine], everywhere: list[OcrLine]
+) -> bool:
+    """Whether the registered city and state were read as the bottler's address: either both within
+    the responsibility block (``near``), or together on one line anywhere on the label ("Costa Mesa,
+    CA" is an address line wherever it is printed, often on the other side of the package). A bare
+    state name far from the name is not enough: on a wine label it is the appellation."""
     if not city or not state_forms:
         return False
-    texts = [fold(ln.text) for ln in lines]
-    city_found = any(fold(city) in t for t in texts)
-    state_found = any(re.search(rf"\b{re.escape(form)}\b", t) for form in state_forms for t in texts)
-    return city_found and state_found
+
+    def has_state(t: str) -> bool:
+        return any(re.search(rf"\b{re.escape(form)}\b", t) for form in state_forms)
+
+    if any(fold(city) in t and has_state(t) for t in (fold(ln.text) for ln in everywhere)):
+        return True
+    texts = [fold(ln.text) for ln in near]
+    return any(fold(city) in t for t in texts) and any(has_state(t) for t in texts)
 
 
 def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
@@ -145,7 +189,12 @@ def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
     for cand in (expected, *party.names):
         c = _text_check("bottler", fold_company(cand), folded, s, rule=_BOTTLER_RULE)
         folded_name = fold_company(cand)
-        if c.status is Status.needs_review and c.found and folded_name and folded_name in fold_company(c.found):
+        if (
+            c.status is Status.needs_review
+            and c.found
+            and folded_name
+            and re.search(rf"(?<![a-z0-9]){re.escape(folded_name)}(?![a-z0-9])", fold_company(c.found))
+        ):
             # The name is printed whole inside a longer line, with its address after it: that is how
             # labels print it ("VINTED & BOTTLED BY: RIVER ROAD FAMILY VINEYARDS AND WINERY, SEBASTOPOL, CA").
             c.status = Status.match
@@ -163,11 +212,15 @@ def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
                 f"Same name, but the corporate form differs: the application says "
                 f"{', '.join(sorted(want))}, the label says {', '.join(sorted(got))}. Confirm on the image."
             )
-        elif party.city and party.state and not _address_on_label(party.city, party.state_forms(), lines):
+        elif (
+            party.city
+            and party.state
+            and not _address_on_label(party.city, party.state_forms(), _near(lines, found_lines), lines)
+        ):
             check.status = Status.needs_review
             check.note = (
                 f"The name matches ('{check.found}'), but the registered city and state ({party.city}, "
-                f"{party.state}) were not read on the label. Confirm the address on the image."
+                f"{party.state}) were not read next to it. Confirm the address on the image."
             )
         elif fold(check.found or "") != fold(expected):
             check.note = f"Label says '{check.found}'."
@@ -357,8 +410,15 @@ def _net_contents_check(app: ApplicationFields, lines: list[OcrLine], s: Setting
             rule=fill_rule(app.beverage_type),
         )
     if best_vol is None:
+        # An unread statement is a heuristic miss, not a proven defect (the same rule as an unread
+        # alcohol statement, D-041): Needs review with the reason, never an issue on its own.
         return Check(
-            status=Status.not_found, note="No net contents statement could be read on the label.", **base
+            status=Status.needs_review,
+            note=(
+                f"No net contents statement was read on the label; the application states {app.net_contents}. "
+                "It is required on every label and is often in small print. Check the image."
+            ),
+            **base,
         ), fill_check
     ev = [Evidence(image_index=best_line.image_index, box=best_line.box, text=best_line.text)] if best_line else []
     if volumes_match(exp_ml, best_vol.ml, tolerance=s.net_contents_tolerance):
