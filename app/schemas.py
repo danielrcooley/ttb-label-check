@@ -48,7 +48,12 @@ class ApplicationFields(BaseModel):
     alcohol_content: str | None = Field(
         default=None, max_length=100, description='As written, e.g. "45% Alc./Vol. (90 Proof)"'
     )
-    net_contents: str = Field(min_length=1, max_length=100, description='As written, e.g. "750 mL"')
+    net_contents: str | None = Field(
+        default=None,
+        max_length=100,
+        description='As written, e.g. "750 mL". May be blank (the COLA form carries none): the result then '
+        "shows what the label says and asks the agent to confirm it",
+    )
     bottler: str | None = Field(
         default=None, max_length=300, description="Name and address of bottler/producer/importer"
     )

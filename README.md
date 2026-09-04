@@ -63,7 +63,8 @@ flowchart LR
   failures; only clear text or numeric differences are.
 - **Numbers are compared as numbers.** "45% Alc./Vol. (90 Proof)" in the application and
   "45% ALC/VOL" on the label agree; proof is cross-checked against percent; "12 FL OZ (355 mL)"
-  agrees with "355 mL".
+  agrees with "355 mL". Net contents may be left blank (the COLA form itself carries none); the
+  result then shows what the label says and asks for confirmation instead of a match.
 - **The warning check is literal.** The recognizer decodes with an English (printable ASCII) alphabet, so
   there is one transcript, and every word and punctuation mark of it is compared with the regulation's text;
   only letter case and the spacing next to punctuation are ignored. The canonical text, the format rules

@@ -215,13 +215,31 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
 
 
 def _net_contents_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) -> tuple[Check, Check | None]:
-    expected = parse_volumes(app.net_contents)
     base: dict[str, Any] = {
         "id": "net_contents",
         "label": _LABELS["net_contents"],
-        "expected": app.net_contents,
+        "expected": app.net_contents or None,
         "rule": "27 CFR 5.70 / 4.37 / 7.70",
     }
+    if not app.net_contents:
+        # The application gives no value (the COLA form itself carries none). Show what the label
+        # says and leave the confirmation to the agent: Needs review, never Ready on its own (D-040).
+        read = next(((ln, v) for ln in lines for v in parse_volumes(ln.text)), None)
+        if read is None:
+            return Check(
+                status=Status.needs_review,
+                note="The application gives no net contents and none was read from the label. Check the image.",
+                **base,
+            ), None
+        ln, vol = read
+        return Check(
+            status=Status.needs_review,
+            found=vol.raw,
+            evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)],
+            note=f"The application gives no net contents. The label reads {vol.raw} ({vol.ml:g} mL); confirm it.",
+            **base,
+        ), None
+    expected = parse_volumes(app.net_contents)
     if not expected:
         return Check(
             status=Status.needs_review,

@@ -350,3 +350,40 @@ def test_bottler_with_a_different_corporate_form_is_review_not_match():
         "Green Cheek Beer Company, Orange, CA", make_lines(["BREWED BY GREEN CHEEK BEER CO.", "ORANGE, CA"]), s
     )
     assert same.status == "match", same
+
+
+def test_blank_net_contents_is_review_with_the_label_value_never_ready():
+    """The COLA form carries no net contents, so the application may leave it blank (D-040): the
+    result shows what the label says and asks the agent to confirm it; Ready is impossible."""
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    app = ApplicationFields(
+        beverage_type="spirits",
+        brand_name="OLD TOM DISTILLERY",
+        class_type="Kentucky Straight Bourbon Whiskey",
+        alcohol_content="45% Alc./Vol. (90 Proof)",
+        net_contents=None,
+    )
+    import textwrap
+
+    from app.pipeline.warning import CANONICAL
+
+    front = make_lines(
+        ["OLD TOM DISTILLERY", "Kentucky Straight Bourbon Whiskey", "45% Alc./Vol. (90 Proof)", "750 mL"]
+    )
+    back = make_lines(textwrap.wrap(CANONICAL, 60), image_index=1)
+    res = compare(app, front + back, [], s)
+    net = next(c for c in res.checks if c.id == "net_contents")
+    assert net.status == "needs_review" and net.found == "750 mL" and net.expected is None
+    assert "confirm" in (net.note or "") and len(net.evidence) == 1
+    assert res.verdict == "needs_review", res.summary
+    blank = ApplicationFields(beverage_type="spirits", brand_name="X", class_type="Vodka", net_contents="")
+    assert blank.net_contents == ""  # whitespace-stripped blank from a form is treated as absent
+    none_read = compare(blank, make_lines(["X", "VODKA"]), [], s)
+    net2 = next(c for c in none_read.checks if c.id == "net_contents")
+    assert net2.status == "needs_review" and net2.found is None

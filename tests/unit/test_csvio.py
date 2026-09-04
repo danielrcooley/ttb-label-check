@@ -55,3 +55,12 @@ def test_imported_flag_variants():
     data = b"brand_name,class_type,net_contents,beverage_type,imported,country_of_origin\nA,Vodka,750 mL,spirits,Yes,France\nB,Vodka,750 mL,spirits,,\n"
     rows = parse_csv(data, max_rows=10).rows
     assert rows[0].application.imported is True and rows[1].application.imported is False
+
+
+def test_row_without_net_contents_is_accepted():
+    """Registry exports carry no net contents column value; the row must still become an application."""
+    data = b"application_id,beverage_type,brand_name,class_type,net_contents,images\nA1,malt,PERMANENTLY TEMPORARY,Ale,,A1_front.png\n"
+    res = parse_csv(data, max_rows=10)
+    row = res.rows[0]
+    assert row.errors == [] and row.application is not None
+    assert row.application.net_contents is None

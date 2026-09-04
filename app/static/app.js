@@ -95,7 +95,7 @@ function readApplication() {
     brand_name: val("brand_name"),
     class_type: val("class_type"),
     alcohol_content: val("alcohol_content") || null,
-    net_contents: val("net_contents"),
+    net_contents: val("net_contents") || null,
     bottler: val("bottler") || null,
     country_of_origin: val("country_of_origin") || null,
     imported: form.querySelector("#imported").checked,
@@ -121,7 +121,6 @@ function validate(app) {
   if (!state.files.length) missing.push("at least one label image");
   if (!app.brand_name) missing.push("the brand name");
   if (!app.class_type) missing.push("the class / type");
-  if (!app.net_contents) missing.push("the net contents");
   return missing;
 }
 

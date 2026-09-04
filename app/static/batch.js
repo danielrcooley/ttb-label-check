@@ -63,10 +63,12 @@ async function setCsv(file) {
     state.csv = body;
     state.inputVersion++;
     const bad = body.rows.filter((r) => r.errors.length);
+    const none = bad.length > 0 && bad.length === body.rows.length;
+    const count = `${body.rows.length} row${body.rows.length === 1 ? "" : "s"}`;
     box.replaceChildren(...[
-      el("p", { class: "text-bold margin-0", text: `${file.name}: ${body.rows.length} row${body.rows.length === 1 ? "" : "s"}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
+      el("p", { class: `text-bold margin-0${none ? " text-secondary-dark" : ""}`, text: none ? `${file.name}: ${count}, none usable (every row has a problem).` : `${file.name}: ${count}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
       body.warnings.length ? el("ul", { class: "usa-list usa-list--unstyled text-secondary-dark" }, body.warnings.map((w) => el("li", { text: w }))) : null,
-      bad.length ? el("details", {}, [el("summary", { text: "Rows with problems (they will be skipped)" }),
+      bad.length ? el("details", none ? { open: "" } : {}, [el("summary", { text: "Rows with problems (they will be skipped)" }),
         el("ul", { class: "usa-list" }, bad.slice(0, 20).map((r) => el("li", { text: `Row ${r.row_number}: ${r.errors.join("; ")}` })))]) : null,
     ].filter(Boolean));
   } catch (e) {
@@ -237,7 +239,15 @@ async function start() {
   showError("");
   if (!state.items.length || state.builtVersion !== state.inputVersion || state.items.every((i) => i.status === "done")) buildItems();
   const pending = state.items.filter((i) => i.status === "pending" || i.status === "error");
-  if (!pending.length && !state.items.length) { showError("Add images first."); return; }
+  if (!state.items.length) {
+    if (state.csv) {
+      const bad = state.csv.rows.filter((r) => r.errors.length).length;
+      showError(`The spreadsheet has no usable rows: ${bad} of ${state.csv.rows.length} have problems (listed under the spreadsheet). Fix them, or remove the spreadsheet to read the images on their own.`);
+    } else {
+      showError("Add images first.");
+    }
+    return;
+  }
   try { const h = await health(); state.maxConcurrency = Math.max(1, Math.min(4, h.max_concurrency)); } catch { state.maxConcurrency = 2; }
   state.concurrency = state.maxConcurrency;
   state.running = true;
