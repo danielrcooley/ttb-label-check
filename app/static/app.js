@@ -28,7 +28,17 @@ function showView(name) {
     if (a.dataset.view === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
 }
-function routeFromHash() { showView(["check", "batch", "about"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "check"); }
+function routeFromHash() { showView(["check", "batch", "about", "accessibility"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "check"); }
+
+// ------------------------------------------------------------------ display theme
+function wireTheme() {
+  // theme.js applied the stored choice before the first paint; here the radios reflect it and change it.
+  const choice = document.documentElement.dataset.themeChoice || "light";
+  document.querySelectorAll("input[name=theme]").forEach((r) => {
+    r.checked = r.value === choice;
+    r.addEventListener("change", () => { if (window.lcApplyTheme) window.lcApplyTheme(r.value); });
+  });
+}
 
 // ------------------------------------------------------------------ files
 function setStatus(text, busy = false) {
@@ -199,6 +209,7 @@ async function runCheck() {
 async function boot() {
   await loadSprite();
   wireDropzone();
+  wireTheme();
   routeFromHash();
   window.addEventListener("hashchange", routeFromHash);
   $("#check-form").addEventListener("submit", (e) => { e.preventDefault(); runCheck(); });

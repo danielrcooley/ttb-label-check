@@ -48,7 +48,7 @@ def main() -> int:
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url} {r.failure}"))
         page.on("response", lambda r: problems.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
-        page.on("dialog", lambda d: d.dismiss())
+        page.on("dialog", lambda d: d.accept() if d.type == "beforeunload" else d.dismiss())  # leave-page prompt on reload
         page.goto(BASE + "/", wait_until="networkidle")
         print("title:", page.title())
         page.screenshot(path=f"{OUT}/ui_home.png", full_page=True)
@@ -69,6 +69,26 @@ def main() -> int:
             page.screenshot(path=f"{OUT}/ui_{sample}.png", full_page=True)
             page.locator(".checklist tbody tr").first.click()
             print("   active polygons after row click:", page.locator(".overlay polygon.is-active").count())
+
+        # Accessibility page: the display choice applies at once, survives a reload, and restores.
+        page.click("a[data-view=accessibility]")
+        page.wait_for_selector("#view-accessibility:not([hidden])", timeout=5000)
+        page.click("label[for=theme-dark]")
+        if page.get_attribute("html", "data-theme") != "dark":
+            problems.append("theme: Dark did not apply")
+        page.reload(wait_until="networkidle")
+        if page.get_attribute("html", "data-theme") != "dark" or not page.is_checked("#theme-dark"):
+            problems.append("theme: Dark did not persist across a reload")
+        page.click("a[data-view=check]")
+        page.click("[data-sample=problem]")
+        page.wait_for_selector("#status:not(.is-busy)", timeout=60000)
+        page.wait_for_selector("#results:not([hidden]) .verdict", timeout=60000)
+        page.screenshot(path=f"{OUT}/ui_dark.png", full_page=True)
+        page.click("a[data-view=accessibility]")
+        page.click("label[for=theme-light]")
+        if page.get_attribute("html", "data-theme") != "light":
+            problems.append("theme: Light did not restore")
+        print("theme: dark applied, persisted, restored")
 
         mobile = browser.new_context(
             viewport={"width": 390, "height": 844}, device_scale_factor=2, bypass_csp=True

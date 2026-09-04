@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
   <title>Label Check (prototype)</title>
   <meta name="description" content="Prototype: checks alcohol beverage label artwork against COLA application data. The tool recommends; the compliance agent decides.">
   <link rel="icon" href="data:,">
+  <script src="/static/theme.js"></script>
   <link rel="stylesheet" href="/static/uswds/css/uswds.min.css">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/uswds/js/uswds-init.min.js"></script>
@@ -36,6 +37,7 @@
           <li class="usa-nav__primary-item"><a href="#check" class="usa-nav-link usa-current" data-view="check"><span>Check a label</span></a></li>
           <li class="usa-nav__primary-item"><a href="#batch" class="usa-nav-link" data-view="batch"><span>Batch</span></a></li>
           <li class="usa-nav__primary-item"><a href="#about" class="usa-nav-link" data-view="about"><span>About this tool</span></a></li>
+          <li class="usa-nav__primary-item"><a href="#accessibility" class="usa-nav-link" data-view="accessibility"><span>Accessibility</span></a></li>
         </ul>
       </nav>
     </div>
@@ -250,10 +252,34 @@
         </ul>
         <h2>How it decides</h2>
         <p><strong>Match</strong> means the label says the same thing, allowing for letter case and accents. <strong>Needs review</strong> means it is close but you should look, which is usually OCR noise. <strong>Mismatch</strong> and <strong>Not found</strong> mean the label disagrees or the item could not be read. For the warning statement, only an exact match passes.</p>
-        <h2>Accessibility</h2>
-        <p>Built with the U.S. Web Design System. Target: WCAG 2.1 AA and Section 508. Every status is shown as an icon, a word and a color, never a color alone. The page works with keyboard only, at 200% zoom, and in Windows High Contrast Mode. If something does not work for you, please say so in the project repository.</p>
         <h2>For engineers</h2>
-        <p>API description: <a href="/api/v1/openapi.json">/api/v1/openapi.json</a>. Health and capacity: <a href="/api/v1/health">/api/v1/health</a>. Source code and documentation: <a id="repo-link" href="#">repository</a>.</p>
+        <p>API description: <a href="/api/v1/openapi.json">/api/v1/openapi.json</a>. Health and capacity: <a href="/api/v1/health">/api/v1/health</a>. Source code and documentation: <a id="repo-link" href="https://github.com/danielrcooley/ttb-label-check">repository</a>.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ Accessibility -->
+    <section id="view-accessibility" class="usa-section padding-top-4" data-view-panel="accessibility" hidden>
+      <div class="grid-container usa-prose">
+        <h1 class="margin-top-0">Accessibility</h1>
+        <fieldset class="usa-fieldset">
+          <legend class="usa-legend usa-legend--large">Display</legend>
+          <p class="usa-hint" id="theme-hint">Your choice is kept in this browser only. Nothing about labels or applications is stored anywhere.</p>
+          <div class="radio-row" role="group" aria-labelledby="theme-legend" aria-describedby="theme-hint">
+            <span id="theme-legend" class="usa-sr-only">Display theme</span>
+            <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="theme-light" type="radio" name="theme" value="light" checked><label class="usa-radio__label" for="theme-light">Light<span class="usa-radio__label-description">The standard look</span></label></div>
+            <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="theme-dark" type="radio" name="theme" value="dark"><label class="usa-radio__label" for="theme-dark">Dark<span class="usa-radio__label-description">Light text on a dark page</span></label></div>
+            <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="theme-system" type="radio" name="theme" value="system"><label class="usa-radio__label" for="theme-system">Match my device<span class="usa-radio__label-description">Follows the operating system's setting</span></label></div>
+          </div>
+        </fieldset>
+        <h2>How this tool is built to be usable</h2>
+        <ul>
+          <li>Built with the U.S. Web Design System. Target: WCAG 2.1 AA and Section 508.</li>
+          <li>Every status is an icon, a word and a color, never a color alone. A pressed button carries a check mark in its text.</li>
+          <li>Works with the keyboard alone, at 200 percent zoom, on a phone, and in Windows contrast themes; progress and results are announced to screen readers.</li>
+          <li>No time limits; the only motion is a progress spinner, which stops when your system asks for reduced motion.</li>
+        </ul>
+        <h2>If something does not work for you</h2>
+        <p>Please say so in the <a id="repo-link-a11y" href="https://github.com/danielrcooley/ttb-label-check">project repository</a>, with the page, the browser and what happened.</p>
       </div>
     </section>
   </main>

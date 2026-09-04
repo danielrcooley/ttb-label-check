@@ -38,7 +38,9 @@ main { flex: 1 0 auto; }
 
 .radio-row { display: grid; gap: .5rem; }
 @media (min-width: 40em) { .radio-row { grid-template-columns: repeat(3, 1fr); } }
-.radio-row .usa-radio__input--tile + .usa-radio__label { margin-top: 0; }
+/* the three tiles share one height whatever their label length */
+.radio-row .usa-radio { display: flex; }
+.radio-row .usa-radio__input--tile + .usa-radio__label { margin-top: 0; flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
 
 .submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .status-line { font-weight: 600; color: #005ea2; min-height: 1.5rem; }
@@ -143,3 +145,83 @@ main { flex: 1 0 auto; }
   header, footer, .sample-bar, .submit-row, .usa-site-alert, #dropzone, details { display: none !important; }
   .results { margin-top: 0; }
 }
+
+/* ------------------------------------------------------------------ Dark display (Accessibility page)
+   USWDS is a light design system; this is our own palette over its components, applied by
+   theme.js through html[data-theme="dark"] (a stored choice of Dark, or "match my device" on a
+   dark OS). Colors keep at least 4.5:1 against the surfaces they sit on. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] body { background: #0f1216; color: #f0f0f0; }
+:root[data-theme="dark"] h1, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3, :root[data-theme="dark"] h4,
+:root[data-theme="dark"] .usa-legend, :root[data-theme="dark"] .usa-label, :root[data-theme="dark"] .usa-intro,
+:root[data-theme="dark"] .usa-prose, :root[data-theme="dark"] .usa-fieldset, :root[data-theme="dark"] legend { color: inherit; }
+:root[data-theme="dark"] .usa-hint, :root[data-theme="dark"] .text-base, :root[data-theme="dark"] .usa-radio__label-description { color: #b6bcc2; }
+:root[data-theme="dark"] .text-secondary-dark { color: #f2938c; }
+:root[data-theme="dark"] a, :root[data-theme="dark"] .usa-button--unstyled { color: #8fc3ff; }
+:root[data-theme="dark"] a:visited { color: #c1a9ff; }
+:root[data-theme="dark"] .status-line { color: #8fc3ff; }
+:root[data-theme="dark"] .status-line.is-busy::before { border-color: #3d4551; border-top-color: #8fc3ff; }
+
+/* header, banner, footer */
+:root[data-theme="dark"] .usa-header, :root[data-theme="dark"] .usa-nav, :root[data-theme="dark"] .usa-navbar { background: #0f1216; }
+:root[data-theme="dark"] .usa-header--basic .usa-navbar, :root[data-theme="dark"] .usa-header--basic .usa-nav { border-color: #3d4551; }
+:root[data-theme="dark"] .usa-logo a, :root[data-theme="dark"] .usa-nav__primary .usa-nav-link, :root[data-theme="dark"] .usa-nav__primary .usa-nav-link span { color: #f0f0f0; }
+:root[data-theme="dark"] .usa-nav__primary .usa-nav-link:hover span, :root[data-theme="dark"] .usa-nav__primary .usa-current span { border-bottom-color: #8fc3ff; }
+:root[data-theme="dark"] .usa-nav__close img, :root[data-theme="dark"] .usa-accordion__button { filter: invert(1) hue-rotate(180deg); }
+:root[data-theme="dark"] .usa-site-alert--info .usa-alert { background: #16232f; border-left-color: #8fc3ff; }
+:root[data-theme="dark"] .usa-footer, :root[data-theme="dark"] .usa-footer__primary-section { background: #1a1f24; color: #f0f0f0; }
+
+/* alerts (verdict, errors, notices) keep their colored edge on a raised dark surface */
+:root[data-theme="dark"] .usa-alert { background-color: #1a1f24; color: #f0f0f0; }
+:root[data-theme="dark"] .usa-alert__heading, :root[data-theme="dark"] .usa-alert__text { color: inherit; }
+
+/* forms */
+:root[data-theme="dark"] .usa-input, :root[data-theme="dark"] .usa-select, :root[data-theme="dark"] .usa-textarea,
+:root[data-theme="dark"] input[type=text], :root[data-theme="dark"] input[type=search], :root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea, :root[data-theme="dark"] .batch-table .note-input { background-color: #1a1f24; color: #f0f0f0; border-color: #b6bcc2; }
+:root[data-theme="dark"] .usa-input::placeholder, :root[data-theme="dark"] .note-input::placeholder { color: #9da3a9; }
+:root[data-theme="dark"] .usa-radio__input--tile + .usa-radio__label { background: #1a1f24; color: #f0f0f0; border-color: #565c65; }
+:root[data-theme="dark"] .usa-radio__input--tile:checked + .usa-radio__label { background: #16232f; border-color: #8fc3ff; }
+:root[data-theme="dark"] .usa-checkbox__label, :root[data-theme="dark"] .usa-radio__label { color: #f0f0f0; }
+:root[data-theme="dark"] .usa-button--outline { color: #8fc3ff; box-shadow: inset 0 0 0 2px #8fc3ff; background: transparent; }
+:root[data-theme="dark"] .usa-button--outline:hover, :root[data-theme="dark"] .usa-button--outline:focus { color: #cfe4ff; box-shadow: inset 0 0 0 2px #cfe4ff; background: transparent; }
+:root[data-theme="dark"] .usa-button--outline:disabled { color: #71767a; box-shadow: inset 0 0 0 2px #71767a; }
+:root[data-theme="dark"] .usa-accordion__content { background: transparent; color: inherit; }
+:root[data-theme="dark"] .dropzone { background: #1a1f24; border-color: #9da3a9; }
+:root[data-theme="dark"] .dropzone.is-dragover { background: #16232f; border-color: #8fc3ff; }
+:root[data-theme="dark"] .file-list li { background: #1a1f24; border-color: #3d4551; }
+:root[data-theme="dark"] .file-list img { background: #22282e; }
+:root[data-theme="dark"] .file-list .file-meta { color: #b6bcc2; }
+
+/* results */
+:root[data-theme="dark"] .usa-table th, :root[data-theme="dark"] .usa-table thead th { background: #22282e; color: #f0f0f0; border-color: #3d4551; }
+:root[data-theme="dark"] .usa-table td { background: transparent; color: inherit; border-color: #3d4551; }
+:root[data-theme="dark"] .checklist th, :root[data-theme="dark"] .checklist td { border-color: #3d4551; }
+:root[data-theme="dark"] .checklist th { color: #b6bcc2; }
+:root[data-theme="dark"] .checklist tbody tr:hover, :root[data-theme="dark"] .checklist tbody tr:focus-within { background: #22282e; }
+:root[data-theme="dark"] .checklist tbody tr.is-active { background: #16232f; box-shadow: inset 4px 0 0 #8fc3ff; }
+:root[data-theme="dark"] .checklist .check-note { color: #d0d5da; }
+:root[data-theme="dark"] .checklist .rule, :root[data-theme="dark"] .label-figure figcaption { color: #9da3a9; }
+:root[data-theme="dark"] .warning-card { background: #1a1f24; border-color: #3d4551; }
+:root[data-theme="dark"] .warning-card .found-text { background: #22282e; }
+:root[data-theme="dark"] .label-stage { background: #22282e; border-color: #3d4551; }
+:root[data-theme="dark"] .overlay polygon { stroke: #8fc3ff; fill: rgba(143, 195, 255, .12); }
+:root[data-theme="dark"] .overlay polygon.is-active { stroke: #ffbe2e; fill: rgba(255, 190, 46, .35); }
+
+/* batch */
+:root[data-theme="dark"] .progress__bar { background: #3d4551; }
+:root[data-theme="dark"] .summary-tile { background: #1a1f24; border-color: #3d4551; }
+:root[data-theme="dark"] .summary-tile .lbl, :root[data-theme="dark"] .batch-table th, :root[data-theme="dark"] .batch-table .files { color: #b6bcc2; }
+:root[data-theme="dark"] .batch-table th, :root[data-theme="dark"] .batch-table td { border-color: #3d4551; }
+:root[data-theme="dark"] .batch-table .app-brand { color: #d0d5da; }
+:root[data-theme="dark"] .batch-table tr.detail-row td { background: #1a1f24; }
+:root[data-theme="dark"] .batch-table tr.is-error td { background: #3a1f1d; }
+:root[data-theme="dark"] .batch-table .decision-btns .usa-button.is-on { background: #f0f0f0; color: #0f1216; box-shadow: none; }
+:root[data-theme="dark"] .detail-panel { color: inherit; }
+/* the design system sets a dark text color on tables and accordions themselves, and paints alert
+   bodies; those must follow the theme too */
+:root[data-theme="dark"] .usa-table, :root[data-theme="dark"] .usa-accordion { color: #f0f0f0; }
+:root[data-theme="dark"] .usa-accordion--bordered .usa-accordion__content { border-color: #3d4551; }
+:root[data-theme="dark"] .usa-alert__body, :root[data-theme="dark"] .usa-site-alert .usa-alert__body { background-color: transparent; color: #f0f0f0; }
+:root[data-theme="dark"] .usa-alert__body::before { filter: invert(1); }
+:root[data-theme="dark"] .usa-checkbox, :root[data-theme="dark"] .usa-radio { background: transparent; }
