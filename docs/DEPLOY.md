@@ -136,8 +136,8 @@ az containerapp hostname bind --name $APP --resource-group $RG --hostname $DOMAI
 ```
 
 Certificate issuance takes a few minutes. Test `https://$DOMAIN/api/v1/health`. The prototype is
-bound as `labelcheck.dev` (root, HTTP validation). Every extra hostname, `www` included, needs its
-own `asuid.<host>` TXT record before it can be added.
+bound as `labelcheck.dev` (root, HTTP validation) and `www.labelcheck.dev` (CNAME validation);
+every hostname needs its own `asuid.<host>` TXT record before it can be added.
 
 ## 7. Redeploy
 
