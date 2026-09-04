@@ -63,7 +63,7 @@
             <div class="tablet:grid-col-6">
               <fieldset class="usa-fieldset">
                 <legend class="usa-legend usa-legend--large">1. Label images</legend>
-                <p class="usa-hint" id="drop-hint">Add every label image for this application: front, back, neck. PNG, JPEG, GIF, WebP, TIFF or BMP, up to 10 MB each.</p>
+                <p class="usa-hint" id="drop-hint">Front, back and neck labels, as image files up to 10 MB each.</p>
                 <div id="dropzone" class="dropzone" aria-describedby="drop-hint">
                   <svg class="usa-icon usa-icon--size-4 text-base" aria-hidden="true" role="img"><use href="#upload_file"></use></svg>
                   <p class="margin-y-1">Drag images here, or</p>
@@ -95,14 +95,14 @@
                 <input class="usa-input" id="class_type" name="class_type" type="text" required autocomplete="off" placeholder="Kentucky Straight Bourbon Whiskey">
 
                 <label class="usa-label" for="alcohol_content">Alcohol content</label>
-                <span class="usa-hint" id="alc-hint">As written on the application, for example 45% Alc./Vol. (90 Proof). Optional for beer and table wine.</span>
+                <span class="usa-hint" id="alc-hint">As written on the application. Optional for beer and table wine.</span>
                 <input class="usa-input" id="alcohol_content" name="alcohol_content" type="text" autocomplete="off" aria-describedby="alc-hint" placeholder="45% Alc./Vol. (90 Proof)">
 
                 <label class="usa-label" for="net_contents">Net contents <abbr title="required" class="usa-hint usa-hint--required">*</abbr></label>
                 <input class="usa-input" id="net_contents" name="net_contents" type="text" required autocomplete="off" placeholder="750 mL">
 
                 <label class="usa-label" for="bottler">Name and address of bottler / producer</label>
-                <span class="usa-hint" id="bottler-hint">Optional here, but a required label element; when left blank the result says it was not compared.</span>
+                <span class="usa-hint" id="bottler-hint">Optional. If left blank, the result says it was not compared.</span>
                 <input class="usa-input" id="bottler" name="bottler" type="text" autocomplete="off" aria-describedby="bottler-hint">
 
                 <div class="usa-accordion usa-accordion--bordered margin-top-3">
@@ -164,7 +164,7 @@
     <section id="view-batch" class="usa-section padding-top-4" data-view-panel="batch" hidden>
       <div class="grid-container">
         <h1 class="margin-top-0">Check a batch of applications</h1>
-        <p class="usa-intro measure-6">For the importer who sends 300 at once. Add all the label images, add a spreadsheet of what each application says, and watch the results come in. Images are sent to the server one request at a time to be read and are discarded immediately; the spreadsheet rows are sent for comparison; nothing is stored.</p>
+        <p class="usa-intro measure-6">Add the label images and, if you have one, a spreadsheet of what each application says; results appear as each application is read.</p>
 
         <div class="sample-bar">
           <span class="text-bold">Try it:</span>
@@ -172,10 +172,10 @@
         </div>
 
         <div class="grid-row grid-gap-4">
-          <div class="tablet:grid-col-6">
+          <div class="tablet:grid-col-8">
             <fieldset class="usa-fieldset">
               <legend class="usa-legend usa-legend--large">1. Label images</legend>
-              <p class="usa-hint" id="batch-drop-hint">Drop many images, or choose a whole folder. Name files with the application reference first, for example <code>COLA-123_front.png</code>, and pairing is automatic.</p>
+              <p class="usa-hint" id="batch-drop-hint">Drop the images or choose a folder. Files named with the application reference first, like <code>COLA-123_front.png</code>, pair themselves.</p>
               <div id="batch-dropzone" class="dropzone" aria-describedby="batch-drop-hint">
                 <svg class="usa-icon usa-icon--size-4 text-base" aria-hidden="true" role="img"><use href="#folder_open"></use></svg>
                 <p class="margin-y-1">Drag images here, or</p>
@@ -187,10 +187,10 @@
               <p id="batch-image-count" class="text-bold margin-top-1" aria-live="polite"></p>
             </fieldset>
           </div>
-          <div class="tablet:grid-col-6">
+          <div class="tablet:grid-col-8">
             <fieldset class="usa-fieldset">
-              <legend class="usa-legend usa-legend--large">2. Application spreadsheet (CSV)</legend>
-              <p class="usa-hint">One row per application. <a href="/api/v1/csv/template" download>Download the template</a>. Without a spreadsheet, the tool lists what it can read from each image.</p>
+              <legend class="usa-legend usa-legend--large">2. Spreadsheet (optional)</legend>
+              <p class="usa-hint">One row per application, as CSV (<a href="/api/v1/csv/template" download>download the template</a>). Without it, the tool only lists what it reads from each image.</p>
               <label class="usa-button usa-button--outline margin-top-1" for="batch-csv">Choose CSV</label>
               <input id="batch-csv" type="file" accept=".csv,text/csv" class="usa-sr-only">
               <div id="batch-csv-summary" class="margin-top-1" aria-live="polite"></div>
