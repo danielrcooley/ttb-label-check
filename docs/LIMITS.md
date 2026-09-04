@@ -60,10 +60,12 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 10. **Synthetic test corpus.** Ground truth is exact because the labels are rendered, and that also
     means real-world variety is under-represented. Numbers in `docs/EVAL.md` are an upper bound
     for artwork and a rough guide for photographs.
-11. **The recognizer occasionally emits an accented letter for a plain one** ("alcoholič"). The warning
-    check treats that as noise and asks for confirmation rather than calling the statement exact; on the
-    clean test corpus this happened on 2 of 10 labels. An English-only recognizer avoids it at a
-    measured 60% latency cost and is the first thing to revisit.
+11. **The recognizer's alphabet is restricted to printable ASCII.** The multilingual model occasionally
+    emitted stray accented letters on clean English artwork, so decoding is constrained to the characters
+    English label text can contain (`TTB_OCR_ASCII_ALPHABET`, on by default). A genuinely accented letter
+    on a label, such as a French back label or a brand like Château, is read as its base letter; field
+    comparisons already ignore accents and the evidence crop shows the print. Turn the flag off to read
+    accented text literally, at the cost of the stray-accent false alarms.
 12. **Fuzzy pairing is not attempted.** Images that are not listed in the CSV or named with the
     application reference are shown as unmatched for the agent to assign. Guessing which back label
     belongs to which application would be confidently wrong too often.

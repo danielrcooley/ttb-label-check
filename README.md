@@ -64,8 +64,9 @@ flowchart LR
 - **Numbers are compared as numbers.** "45% Alc./Vol. (90 Proof)" in the application and
   "45% ALC/VOL" on the label agree; proof is cross-checked against percent; "12 FL OZ (355 mL)"
   agrees with "355 mL".
-- **The warning check is literal.** The canonical text, the format rules (capitals, bold, contrast,
-  minimum type size) and the container-size lists are documented with their sources in
+- **The warning check is literal.** The recognizer decodes with an English (printable ASCII) alphabet, so
+  there is one transcript and it is compared character for character. The canonical text, the format rules
+  (capitals, bold, contrast, minimum type size) and the container-size lists are documented with their sources in
   [docs/REGULATIONS.md](docs/REGULATIONS.md). Items the tool cannot assess from an image say
   "Not checked" instead of pretending.
 - **Batch is orchestrated by the browser.** Each image is read once; each application is compared as
@@ -127,11 +128,11 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 
 | What | Result | Where |
 |---|---|---|
-| Field match rate on clean artwork (recall) | 100% on all six fields (60 of 60 checks); warning exact on 8 of 10, the other 2 read with a stray accented letter and land in Needs review (see error analysis below) | [docs/EVAL.md](docs/EVAL.md) |
+| Field match rate on clean artwork (recall) | 100% on all six fields (60 of 60 checks); warning exact on 10 of 10 | [docs/EVAL.md](docs/EVAL.md) |
 | False-alarm rate on clean artwork | 0.0% (0 of 60 field checks) | [docs/EVAL.md](docs/EVAL.md) |
-| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 14 of 20; 13 of 20 cases ready, 4 need review, 3 issues (labels shrunk to a third of their size and one sideways read) | [docs/EVAL.md](docs/EVAL.md) |
+| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 16 of 20; 15 of 20 cases ready, 2 need review, 3 issues (labels shrunk to a third of their size and one sideways read) | [docs/EVAL.md](docs/EVAL.md) |
 | Planted defects detected | 4 of the 4 the tool assesses (wrong ABV, title-case heading, altered wording, missing statement); the other two planted defects (tiny type, all-bold statement) are not assessed in this build and are reported as such | [docs/EVAL.md](docs/EVAL.md) |
-| Per-application latency, local (two images, 2 workers) | median 2,380 ms, p95 2,642 ms | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, local (two images, 2 workers) | median 2,451 ms, p95 2,687 ms | [docs/EVAL.md](docs/EVAL.md) |
 | Per-application latency, deployed | _DEPLOY_LATENCY_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Batch throughput, deployed | _DEPLOY_THROUGHPUT_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |
@@ -139,7 +140,7 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 | 300 sequential extract requests at advertised capacity | 300 of 300 served, p95 1.5 s, zero refusals | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Inside the CI container (GitHub runner, 1 worker, networking disabled) | ready 2.1 s after start; front+back application verified in 3.1 s | CI run 33821661824 |
 
-**Error analysis.** Every warning miss on clean artwork is the same failure: the multilingual recognizer occasionally emits an accented letter for a plain one ("alcoholič", "drivé"). The tool could silently strip accents and report "exact", and an earlier build did; the reviewer was right that a legal status must not hide instrument error, so those cases are "Needs review" with the diff and the evidence crop, a two-second confirmation for the agent. The remaining degraded misses are text shrunk to a third of its size and one sideways image where the rotation retry picked up a partial read. An English-only recognizer would remove the accent failure; it measured about 60% slower single-threaded (`docs/OCR_EVAL.md`), so it was not adopted for this build.
+**Error analysis, and one decision worth reading.** The first evaluation showed the multilingual recognizer occasionally emitting an accented letter for a plain one on clean artwork ("alcoholič", "drivé"), which turned an exact warning into "Needs review" on 2 of 10 labels. An early build stripped accents before the comparison; the independent reviewer rejected that, correctly, because a legal "exact" must not paper over instrument error. I then tested a native-resolution re-read of the warning lines, which did not converge (one label fixed, a different accent on another, and a previously exact label lost a letter). The fix that shipped is a recognizer configuration, not a comparison shortcut: the decoder's alphabet is restricted to printable ASCII for every line, the same choice as using an English recognizer and with none of the latency. There is one transcript and it is compared literally. The consequence, stated in the limits: genuinely accented print is read as its base letter, which the field comparisons already tolerate and the evidence crop shows. The remaining degraded misses are text shrunk to a third of its size and one sideways image where the rotation retry picked up a partial read.
 
 Engine selection and thread scaling are in [docs/BAKEOFF.md](docs/BAKEOFF.md) and
 [docs/OCR_EVAL.md](docs/OCR_EVAL.md). Enforced limits and known weaknesses, stated plainly, are in

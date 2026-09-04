@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     ocr_det_limit_side_len: int = 640
     ocr_rec_batch_num: int = 16
     ocr_use_cls: bool = False
+    ocr_ascii_alphabet: bool = Field(
+        default=True,
+        description="Decode with the recognizer's alphabet restricted to printable ASCII (English label text)",
+    )
     ocr_max_side: int = Field(default=1280, description="Images are downscaled to this longest side before OCR")
     ocr_low_conf_retry: float = Field(default=0.80, description="Mean confidence below which a 90-degree retry runs")
     ocr_min_lines_retry: int = Field(default=3, description="Fewer detected lines than this also triggers the retry")

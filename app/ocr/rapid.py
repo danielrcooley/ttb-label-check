@@ -15,6 +15,7 @@ import numpy as np
 
 from app.config import Settings
 
+from .alphabet import AlphabetConstrainedDecode
 from .base import RawLine
 
 log = logging.getLogger(__name__)
@@ -44,6 +45,12 @@ class RapidEngine:
         if "cls" in models:
             params["Cls.model_path"] = str(models["cls"])
         self._ocr = RapidOCR(params=params)
+        self.alphabet = "full"
+        if settings.ocr_ascii_alphabet:
+            rec: Any = self._ocr.text_rec  # the library types this as CTCLabelDecode; we wrap it
+            rec.postprocess_op = AlphabetConstrainedDecode(rec.postprocess_op)
+            dec = rec.postprocess_op
+            self.alphabet = f"printable ASCII ({dec.suppressed_classes} of {len(dec.character)} classes suppressed)"
         self._models = {role: f"{m['file']} (sha256 {m['sha256'][:12]})" for role, m in manifest["models"].items()}
         try:
             from importlib.metadata import version
@@ -77,4 +84,4 @@ class RapidEngine:
         return lines
 
     def info(self) -> dict[str, str]:
-        return {"engine": self._version, **self._models}
+        return {"engine": self._version, "alphabet": self.alphabet, **self._models}

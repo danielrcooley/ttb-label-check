@@ -47,6 +47,8 @@ jobs:
     name: container builds and answers health (linux/amd64)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      HAS_ACR: ${{ secrets.ACR_LOGIN_SERVER != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -70,14 +72,14 @@ jobs:
       # Publish the verified image to the Azure Container Registry the app pulls from.
       # (ACR's own cloud build is disabled on new subscriptions, so CI is the build farm.)
       - name: Log in to Azure Container Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && env.HAS_ACR == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
       - name: Push image (sha + latest)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && env.HAS_ACR == 'true'
         run: |
           SHORT=${GITHUB_SHA::7}
           docker tag label-check:ci ${{ secrets.ACR_LOGIN_SERVER }}/label-check:$SHORT

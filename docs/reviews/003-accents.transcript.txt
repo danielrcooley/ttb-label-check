@@ -1,0 +1,1152 @@
+Reading additional input from stdin...
+OpenAI Codex v0.153.1
+--------
+workdir: C:\Users\dcwes\AppData\Local\Temp\claude\C--Projects\c9c0f080-f2e8-4108-9668-168ed686c1c6\scratchpad\codex003
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a06a2a-70fd-7810-90b6-09a3c3fbe3fa
+--------
+user
+You are the independent reviewer in a two-agent workflow. Everything you need is in the stdin block appended to this message: the request (docs/reviews/003-accents.request.md), the current warning comparator and engine wrapper, an excerpt of the orchestration, evaluation numbers, and the OCR library's recognizer and CTC decode source. Do not run commands or modify files. Answer the request's five questions in order, terse and concrete, citing functions by name from the attached source. Your final message must be the complete answer in Markdown.
+
+<stdin>
+===== FILE: docs/reviews/003-accents.request.md =====
+---
+id: 003
+type: design-consult
+status: open
+requested_by: Claude (builder), at the author's request
+reviewer: Codex (reviewer)
+date: 2026-09-04
+---
+
+# Request 003: how should we handle stray accented letters in the warning read?
+
+## The problem, with evidence
+The recognizer (PP-OCRv6 "small" multilingual models, Chinese-trained dictionary of ~6,600
+characters, running through rapidocr 3.9.2 on ONNX Runtime) occasionally emits an accented Latin
+letter for a plain one on clean, high-resolution label artwork: "alcoholic" read as "alcoholič",
+"drive" read as "drivé". Everything else on those labels reads perfectly. On the 10-label clean
+corpus this happens on 2 labels, always inside the government warning statement, which is the one
+piece of text where the product's rule is "exact means exact": only a character-for-character match
+with 27 CFR 16.21 may be reported as exact; anything else is at best "Needs review".
+
+Review 002 (yours) correctly rejected my earlier shortcut of stripping accents before the literal
+comparison, on the grounds that a legal status must not paper over instrument error. We reverted
+that. Result: 8 of 10 clean labels report the warning as exact; 2 report "Needs review" with a diff
+and an evidence crop (a two-second confirmation for the agent, but a visible blemish and a real
+false alarm in Dave's sense).
+
+Constraints: no cloud calls; the per-application budget is about five seconds and we are at ~2.4 s
+locally for a front+back pair on two workers; the English PP-OCRv4 recognizer, measured over whole
+labels, is ~60% slower single-threaded than the v6 small multilingual one (docs/OCR_EVAL.md runs
+F/H vs A/D); we have about one day of engineering left before submission.
+
+## Candidate approaches (please rank, critique, and add your own)
+1. **Constrain the decoder alphabet.** The recognizer's final step is a per-timestep probability
+   table over the dictionary followed by CTC greedy decoding. Mask every non-English character to
+   -inf before the argmax so "č" cannot win and "c" does. Same model, same inference, no extra
+   latency. Applied either globally (affects brand names like "Château": the brand comparison
+   already folds accents, but the displayed read would change) or as a *second decode of the same
+   logits* used only for the warning comparison (keep per-line top-k logits, decode twice).
+   Feasibility depends on rapidocr internals; its recognizer and decode source are attached.
+2. **English second-opinion recognizer on the warning lines only.** Keep the fast multilingual
+   read for everything; when the warning span is not exact, crop those 5-6 lines (we have quads)
+   and re-recognize them with a recognition-only English v4 engine. Accept "exact" only if the
+   English read matches. Cost only in the non-exact case; supported library calls.
+3. **Vote across scales.** Re-recognize the disputed lines at 1.0x / 1.15x / 0.85x and take the
+   majority character sequence. No second model; probabilistic.
+4. **Do nothing.** Keep "Needs review" for these cases and report the false-alarm rate honestly.
+
+## Questions
+1. Which approach would you ship for this submission, and why? Consider correctness, honesty of
+   the "exact" status, latency, implementation risk in one day, and how it reads to a reviewer.
+2. For approach 1: from the attached source, where exactly would the mask go, what shape are the
+   predictions, and what could go wrong (blank index, batch padding, char index offsets)?
+3. For approach 2: how would you crop the line quads (warpPerspective vs bounding box), what
+   padding, and how should the English read be reconciled with the original span (anchor caps
+   check, evidence boxes)?
+4. Is there a principled way to state, in the docs, when a status "exact" is legitimate after
+   either approach, without sliding back into the accent-stripping shortcut you rejected?
+5. Anything cheaper we are not seeing?
+
+## Rules
+Read-only; report only. Terse, numbered, concrete. Cite the attached source by function name.
+
+===== FILE: app/pipeline/warning.py =====
+"""Government health warning statement checks (27 CFR Part 16).
+
+Exactness is literal here: the only Pass is a character-for-character match (after collapsing
+whitespace and unifying typographic quotes, which are rendering choices rather than wording).
+Anything else is Needs review or a mismatch, never a Pass. The generic normalizer is not used.
+"""
+
+from __future__ import annotations
+
+import difflib
+import re
+import unicodedata
+from dataclasses import dataclass
+
+from rapidfuzz import fuzz
+from rapidfuzz.distance import Levenshtein
+
+from app.schemas import Evidence, OcrLine, Status, WarningReport
+
+from .match import reading_order
+from .normalize import collapse_ws, fold, join_hyphenated, unify_punctuation
+
+# Verbatim text of 27 CFR 16.21, verified against the eCFR API on 2026-09-03 (docs/REGULATIONS.md).
+CANONICAL = (
+    "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic "
+    "beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic "
+    "beverages impairs your ability to drive a car or operate machinery, and may cause health problems."
+)
+ANCHOR = "GOVERNMENT WARNING"
+_ANCHOR_RE = re.compile(r"g\s*o\s*v\s*e\s*r\s*n\s*m\s*e\s*n\s*t\s*w\s*a\s*r\s*n\s*i\s*n\s*g", re.I)
+_CANON_FOLD = fold(CANONICAL)
+
+
+@dataclass(frozen=True)
+class WarningSpan:
+    text: str
+    lines: tuple[OcrLine, ...]
+    anchor_text: str  # the anchor as OCR read it, for the caps check
+
+
+def _anchor_score(text: str) -> int:
+    """Both words must be present (fuzzily); \"WARNING\" alone is not an anchor."""
+    t = fold(text)
+    return int(min(fuzz.partial_ratio("government", t), fuzz.partial_ratio("warning", t)))
+
+
+def _x_overlap(a: OcrLine, b: OcrLine) -> float:
+    """Horizontal overlap as a fraction of the narrower line."""
+    a0, a1 = min(p[0] for p in a.box), max(p[0] for p in a.box)
+    b0, b1 = min(p[0] for p in b.box), max(p[0] for p in b.box)
+    inter = max(0.0, min(a1, b1) - max(a0, b0))
+    return inter / max(1.0, min(a1 - a0, b1 - b0))
+
+
+def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
+    """Locate the warning statement: an anchor line, then following lines while similarity to the
+    canonical text keeps improving. Returns the best span over all images."""
+    best: WarningSpan | None = None
+    best_sim = -1.0
+    for group in reading_order(lines).values():
+        for i, ln in enumerate(group):
+            if _anchor_score(ln.text) < 80:
+                continue
+            m = _ANCHOR_RE.search(ln.text)
+            anchor_text = m.group(0) if m else ln.text
+            acc: list[OcrLine] = []
+            local_best: tuple[float, list[OcrLine]] | None = None
+            declines = 0
+            for nxt in group[i:]:
+                if nxt is not ln and _x_overlap(ln, nxt) < 0.3:
+                    continue  # a different column or an unrelated block
+                acc.append(nxt)
+                sim = fuzz.ratio(_CANON_FOLD, fold(join_hyphenated([x.text for x in acc]))) / 100
+                if local_best is None or sim > local_best[0]:
+                    local_best = (sim, list(acc))
+                    declines = 0
+                else:
+                    declines += 1
+                    if declines >= 2:
+                        break
+                if "health problems" in fold(nxt.text) and len(acc) > 1:
+                    break
+            if local_best and local_best[0] > best_sim:
+                best_sim = local_best[0]
+                best = WarningSpan(
+                    text=join_hyphenated([x.text for x in local_best[1]]),
+                    lines=tuple(local_best[1]),
+                    anchor_text=anchor_text,
+                )
+    return best
+
+
+def _canon_form(s: str) -> str:
+    # Whitespace and typographic quotes are rendering, not wording; everything else must be literal.
+    return collapse_ws(unify_punctuation(s))
+
+
+def word_diff(expected: str, found: str) -> str | None:
+    """Compact word-level diff, e.g. '-may +can' or '-(2) '. None when identical."""
+    a, b = _canon_form(expected).split(" "), _canon_form(found).split(" ")
+    out: list[str] = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+        if tag == "equal":
+            continue
+        if i2 > i1:
+            out.append("-" + " ".join(a[i1:i2]))
+        if j2 > j1:
+            out.append("+" + " ".join(b[j1:j2]))
+    return " | ".join(out) if out else None
+
+
+def compare_warning(found: str) -> tuple[bool, bool, float]:
+    """Returns (exact, case_only_difference, similarity 0-1)."""
+    canon, got = _canon_form(CANONICAL), _canon_form(found)
+    exact = canon == got
+    case_only = (not exact) and canon.casefold() == got.casefold()
+    similarity = fuzz.ratio(canon.casefold(), got.casefold()) / 100
+    return exact, case_only, similarity
+
+
+_PUNCT_ONLY = re.compile(r"^[^\w]+$")
+_STRIP = re.compile(r"[^\w]")
+# OCR confusables folded to one canonical letter: 0/o, 1/l/i/|/!, 5/s, 8/b, 2/z, 6/g
+_CONFUSABLE = str.maketrans({"0": "o", "1": "l", "i": "l", "|": "l", "!": "l", "5": "s", "8": "b", "2": "z", "6": "g"})
+
+
+def _canon_word(w: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", w)
+    letters = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return _STRIP.sub("", letters).casefold().translate(_CONFUSABLE)
+
+
+def _same_word_modulo_noise(a: str, b: str) -> bool:
+    """True when two tokens differ only by punctuation, case, accents, OCR confusables, or a single
+    character in a word of five or more letters (a real wording change replaces whole words)."""
+    ka, kb = _canon_word(a), _canon_word(b)
+    if ka == kb:
+        return True
+    return len(ka) >= 5 and len(kb) >= 5 and Levenshtein.distance(ka, kb) <= 1
+
+
+def classify_difference(expected: str, found: str) -> str:
+    """'exact' | 'noise' (punctuation, case, confusables) | 'wording' (a word added, dropped or replaced)."""
+    a = _canon_form(expected).split(" ")
+    b = _canon_form(found).split(" ")
+    if a == b:
+        return "exact"
+    verdict = "noise"
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
+        a=[w.casefold() for w in a], b=[w.casefold() for w in b], autojunk=False
+    ).get_opcodes():
+        if tag == "equal":
+            continue
+        left, right = a[i1:i2], b[j1:j2]
+        if tag == "replace" and len(left) == len(right):
+            if all(_same_word_modulo_noise(x, y) for x, y in zip(left, right, strict=True)):
+                continue
+            return "wording"
+        if tag == "replace":
+            # e.g. "Surgeon General," read as "SurgeonGeneral," (merged) or split words
+            if _canon_word("".join(left)) == _canon_word("".join(right)):
+                continue
+            return "wording"
+        # pure insert or delete: punctuation-only tokens are noise; anything with a letter or digit
+        # (a word, or a clause number like "(2)") is a wording change
+        tokens = left or right
+        if all(_PUNCT_ONLY.match(t) for t in tokens):
+            continue
+        return "wording"
+    return verdict
+
+
+def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
+    letters = [c for c in anchor_text if c.isalpha()]
+    if letters and all(c.isupper() for c in letters):
+        return Status.match, "GOVERNMENT WARNING appears in capital letters."
+    return (
+        Status.needs_review,
+        f"Read as '{collapse_ws(anchor_text)}', which is not all capitals. "
+        "Capital letters are required (27 CFR 16.22(a)(2)). Confirm on the image.",
+    )
+
+
+def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> WarningReport:
+    """Assess the warning statement. ``assessment`` drives the verdict:
+    exact -> pass; case/noise -> Needs review; wording/absent -> issue."""
+    span = find_warning(lines)
+    if span is None:
+        return WarningReport(
+            present=False,
+            exact=False,
+            assessment="absent",
+            similarity=0.0,
+            found_text=None,
+            diff=None,
+            anchor_caps=Status.not_found,
+            anchor_bold=Status.not_checked,
+            body_not_bold=Status.not_checked,
+            notes=[
+                "No GOVERNMENT WARNING statement was found on any image. It is mandatory on all alcoholic "
+                "beverages of 0.5% alcohol or more (27 CFR 16.21). If the warning is on a label image not "
+                "uploaded, add that image."
+            ],
+        )
+    exact, case_only, similarity = compare_warning(span.text)
+    caps_status, caps_note = anchor_caps_status(span.anchor_text)
+    if exact:
+        assessment = "exact"
+    elif case_only:
+        assessment = "case"
+    else:
+        assessment = classify_difference(CANONICAL, span.text)
+        if assessment == "noise" and similarity < mismatch_similarity:
+            assessment = "wording"  # too many differences to call it noise
+    notes = {
+        "exact": "Wording is exact (27 CFR 16.21).",
+        "case": "Wording matches except for letter case. Confirm the statement's capitalization on the image.",
+        "noise": (
+            "Wording matches apart from punctuation, an accent, or single characters as read, which is usually "
+            "OCR noise (a dropped colon, a '1' read as 'i', a stray accent). Compare the diff with the image."
+        ),
+        "wording": (
+            "Wording differs from the required text: a word is missing, added or changed. "
+            "The statement must be word for word (27 CFR 16.21)."
+        ),
+    }
+    return WarningReport(
+        present=True,
+        exact=exact,
+        assessment=assessment,
+        similarity=round(similarity, 4),
+        found_text=span.text,
+        diff=None if exact else word_diff(CANONICAL, span.text),
+        anchor_caps=caps_status,
+        anchor_bold=Status.not_checked,
+        body_not_bold=Status.not_checked,
+        evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],
+        notes=[
+            notes[assessment],
+            caps_note,
+            "Bold type (anchor bold, remainder not bold) is not assessed automatically in this build; "
+            "check it on the image (27 CFR 16.22(a)(2)).",
+        ],
+    )
+
+===== FILE: app/ocr/rapid.py =====
+"""RapidOCR (ONNX Runtime) engine with vendored models and explicit thread settings.
+
+Model files come only from ``settings.models_dir`` (see tools/vendor_models.py and
+app/models/MANIFEST.json). Nothing is downloaded.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from app.config import Settings
+
+from .base import RawLine
+
+log = logging.getLogger(__name__)
+
+
+class RapidEngine:
+    name = "rapidocr-onnxruntime"
+
+    def __init__(self, settings: Settings) -> None:
+        from rapidocr import RapidOCR
+
+        manifest = json.loads((settings.models_dir / "MANIFEST.json").read_text(encoding="utf-8"))
+        models = {role: settings.models_dir / m["file"] for role, m in manifest["models"].items()}
+        for role, path in models.items():
+            if not Path(path).exists():
+                raise FileNotFoundError(f"vendored OCR model missing: {role} -> {path}")
+        params = {
+            "Global.use_cls": settings.ocr_use_cls,
+            "Global.log_level": "warning",
+            "Det.model_path": str(models["det"]),
+            "Rec.model_path": str(models["rec"]),
+            "Det.limit_side_len": settings.ocr_det_limit_side_len,
+            "Rec.rec_batch_num": settings.ocr_rec_batch_num,
+            "EngineConfig.onnxruntime.intra_op_num_threads": settings.ocr_intra_op_threads,
+            "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        }
+        if "cls" in models:
+            params["Cls.model_path"] = str(models["cls"])
+        self._ocr = RapidOCR(params=params)
+        self._models = {role: f"{m['file']} (sha256 {m['sha256'][:12]})" for role, m in manifest["models"].items()}
+        try:
+            from importlib.metadata import version
+
+            self._version = f"rapidocr {version('rapidocr')} / onnxruntime {version('onnxruntime')}"
+        except Exception:  # pragma: no cover - metadata missing in odd environments
+            self._version = "rapidocr"
+
+    def recognize(self, rgb: np.ndarray) -> list[RawLine]:
+        bgr = np.ascontiguousarray(rgb[:, :, ::-1])
+        result: Any = self._ocr(bgr)
+        boxes, txts, scores = (
+            getattr(result, "boxes", None),
+            getattr(result, "txts", None),
+            getattr(result, "scores", None),
+        )
+        if boxes is None or not txts:
+            return []
+        lines: list[RawLine] = []
+        confs = list(scores) if scores is not None else [0.0] * len(txts)
+        for box, text, score in zip(boxes, txts, confs, strict=True):
+            if len(box) != 4 or not text or not str(text).strip():
+                continue
+            quad = (
+                (float(box[0][0]), float(box[0][1])),
+                (float(box[1][0]), float(box[1][1])),
+                (float(box[2][0]), float(box[2][1])),
+                (float(box[3][0]), float(box[3][1])),
+            )
+            lines.append(RawLine(text=str(text).strip(), confidence=float(score), box=quad))
+        return lines
+
+    def info(self) -> dict[str, str]:
+        return {"engine": self._version, **self._models}
+
+===== FILE: app/services.py (excerpt) =====
+"""Orchestration: bytes in, verified result out. The only module that touches both the OCR pool
+and the pure pipeline."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+import uuid
+from dataclasses import dataclass
+
+import numpy as np
+
+from app.config import Settings
+from app.ocr.base import RawLine
+from app.ocr.pool import OcrPool, Runner
+from app.pipeline.compare import compare
+from app.pipeline.extract import extract_fields
+from app.pipeline.images import DecodedImage, decode_image, rotate_array, to_canonical
+from app.schemas import (
+    ApplicationFields,
+    EngineInfo,
+    ExtractResponse,
+    ImageInfo,
+    ImageQuality,
+    OcrLine,
+    Timing,
+    VerifyResponse,
+)
+
+
+def new_request_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+@dataclass
+class Upload:
+    data: bytes
+    filename: str | None
+
+
+@dataclass
+class ProcessedImage:
+    info: ImageInfo
+    lines: list[OcrLine]
+    queue_ms: int
+    ocr_ms: int
+
+
+def _to_lines(raw: list[RawLine], dec: DecodedImage, index: int, degrees: int, rot_w: int, rot_h: int) -> list[OcrLine]:
+    return [
+        OcrLine(
+            image_index=index,
+            text=r.text,
+            confidence=round(r.confidence, 4),
+            box=to_canonical(r.box, scale=dec.scale, degrees=degrees, rot_w=rot_w, rot_h=rot_h),
+        )
+        for r in raw
+    ]
+
+
+def _read_score(raw: list[RawLine]) -> float:
+    """How much confident text was read: sum of confidences of lines at or above 0.5."""
+    return float(sum(r.confidence for r in raw if r.confidence >= 0.5))
+
+
+def _quality(raw: list[RawLine]) -> ImageQuality:
+    if not raw:
+        return ImageQuality(
+            mean_confidence=0.0,
+            line_count=0,
+            readable=False,
+            reason="No text was detected. The image may be blank, too small, or not a label.",
+        )
+    mean = float(np.mean([r.confidence for r in raw]))
+    if mean < 0.6:
+        return ImageQuality(
+            mean_confidence=round(mean, 3),
+            line_count=len(raw),
+            readable=False,
+            reason="Text was detected but read with low confidence. The image may be blurry, "
+            "low contrast, or photographed at an angle. Request a clearer image.",
+        )
+    return ImageQuality(mean_confidence=round(mean, 3), line_count=len(raw), readable=True)
+
+
+async def process_image(
+    up: Upload, index: int, settings: Settings, run: Runner, *, queue_ms: int = 0
+) -> ProcessedImage:
+    """Decode one upload and read it on the given slot, retrying sideways orientations when the
+    first read is poor (the one failure mode the engine does not recover on its own)."""
+    dec = decode_image(
+        up.data, max_pixels=settings.max_image_pixels, max_side=settings.ocr_max_side, filename=up.filename
+    )
+    t0 = time.perf_counter()
+    raw = await run(dec.array)
+    h, w = dec.array.shape[:2]
+    best = (_read_score(raw), raw, 0, w, h)
+    mean = float(np.mean([r.confidence for r in raw])) if raw else 0.0
+    if mean < settings.ocr_low_conf_retry or len(raw) < settings.ocr_min_lines_retry:
+        for degrees in (90, 270):
+            rot = rotate_array(dec.array, degrees)
+            raw2 = await run(rot)
+            if _read_score(raw2) > best[0] * 1.15:
+                best = (_read_score(raw2), raw2, degrees, rot.shape[1], rot.shape[0])
+    ocr_ms = int((time.perf_counter() - t0) * 1000)
+    _, raw_best, degrees, rw, rh = best
+    lines = _to_lines(raw_best, dec, index, degrees, rw, rh)
+    info = ImageInfo(
+        index=index,
+        filename=up.filename,
+        width=dec.width,
+        height=dec.height,
+        format=dec.format,
+        rotated_degrees=degrees,
+        quality=_quality(raw_best),
+    )
+    return ProcessedImage(info=info, lines=lines, queue_ms=queue_ms, ocr_ms=ocr_ms)
+
+
+async def process_images(
+    uploads: list[Upload], settings: Settings, pool: OcrPool, *, interactive: bool
+) -> list[ProcessedImage]:
+    """Interactive: each image takes its own slot so a front+back pair costs one image-time.
+    Batch: one slot is held for all the images of the request, so it can never be refused halfway."""
+    if interactive:
+
+        async def one(i: int, u: Upload) -> ProcessedImage:
+            async with pool.slot(interactive=True) as (run, queue_ms):
+                return await process_image(u, i, settings, run, queue_ms=queue_ms)
+
+        return list(await asyncio.gather(*(one(i, u) for i, u in enumerate(uploads))))
+    async with pool.slot(interactive=False) as (run, queue_ms):
+        return [await process_image(u, i, settings, run, queue_ms=queue_ms) for i, u in enumerate(uploads)]
+
+
+def engine_info(pool: OcrPool) -> EngineInfo:
+    return EngineInfo(name="rapidocr-onnxruntime", models=pool.info(), workers=pool.workers)
+
+
+def _timing(t0: float, processed: list[ProcessedImage]) -> Timing:
+
+===== OCR_EVAL excerpt =====
+# OCR evaluation log (rapidocr 3.9.2, ONNX Runtime 1.29)
+
+_Corpus: 46 synthetic label images (10 fictional applications; clean, degraded and problem variants). Machine: 16-logical-CPU Windows laptop. "Hits" = the application value is recoverable from the OCR text (fuzzy partial ratio >= 85-88); "warning sim" = similarity of the OCR text to the 27 CFR 16.21 statement. Every run appends a block below. Sideways (rotate90) images fail in every configuration by design of the test; the app handles them with a 90-degree retry. The "missing" back label is expected to score ~39._
+
+## Conclusion (2026-09-03)
+
+**Chosen configuration:** bundled PP-OCRv6 small detector + recognizer (Chinese-trained multilingual set, handles Latin text), angle classifier off, `Det.limit_side_len=640`, input downscaled to 1280 px max side, `Rec.rec_batch_num=16`, one ONNX intra-op thread per engine, one engine per worker thread, N workers = vCPUs. Models vendored in `app/models/` with SHA-256 (`MANIFEST.json`); nothing downloads at build or run.
+
+| Run | Config | ms/img (median, single thread unless noted) | brand | class | abv | net | warning sim | notes |
+|---|---|---:|---|---|---|---|---|---|
+| A | v6 small, cls on, all threads | 926 (16 threads) | 95% | 100% | 100% | 90% | 100 | baseline |
+| B | v4 mobile ch, cls off, all threads | 1366 (16 threads) | 100% | 90% | 100% | 95% | 100 | slower, class misses |
+| C | v4 det + v4 EN rec, all threads | 1496 (16 threads) | 100% | 100% | 100% | 100% | 99 | best hits, slowest |
+| D | A config, 1 thread | 2429 | 95% | 100% | 100% | 90% | 100 | single-core truth |
+| E | A config, 2 threads | 1400 | | | | | | 1.7x from 2 threads |
+| F | v6 det + v4 EN rec | 1400 (16 thr) / 3878 (1 thr) | 90% | 100% | 100% | 100% | 99 | EN rec is slow single-threaded |
+| G | **A config + det 640 + side 1280 + batch 16, 1 thread** | **1958** | 95% | 100% | 100% | 90% | 100 | **chosen**; 19% faster than D, same accuracy |
+| H | F config + same levers, 1 thread | 3314 | 95% | 100% | 100% | 100% | 99 | too slow |
+| T2/T4 | A config, 1 thread each, thread pool of 2 / 4 | 2600 / 3069 per img | | | | | | throughput 0.79 / 1.33 img/s (1.84x / 3.1x of one worker) |
+| P2/P4 | same, process pool | 2645 / 3080 per img | | | | | | throughput 0.79 / 1.31 img/s: identical to threads |
+
+The single remaining "miss" in the chosen config is net contents "1 L" on one product, a scoring artifact of fuzzy matching a three-character string; the application parses net contents with a dedicated unit parser, not fuzzy text, so this does not carry into the product. Brand misses are the arched or rotated decorative brand at 83-85 similarity, which the product reports as Needs review rather than a miss.
+
+---
+
+## A-v6small-ch-cls | mode=single workers=1 max_side=1600 cpu=16
+params: `{}`
+- init+warm 1.6 s; per-image ms median 926, p95 1109, max 1198; wall 41.6 s; throughput 1.11 img/s
+- front hits: brand 95%, class 100%, abv 100%, net 90%
+- back: warning sim median 100 (min 39), bottler 100%
+
+===== rapidocr/ch_ppocr_rec/main.py =====
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import math
+import time
+from pathlib import Path
+from typing import Any, Dict
+
+import cv2
+import numpy as np
+
+from rapidocr.inference_engine.base import FileInfo, get_engine
+
+from ..utils.download_file import DownloadFile, DownloadFileInput
+from ..utils.log import logger
+from ..utils.model_resolver import normalize_lang
+from ..utils.utils import reorder_bidi_for_display
+from ..utils.vis_res import VisRes
+from .typings import TextRecInput, TextRecOutput
+from .utils import CTCLabelDecode
+
+DEFAULT_DICT_PATH = Path(__file__).parent.parent / "models" / "ppocr_keys_v1.txt"
+DEFAULT_DICT_URL = "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v2.0.7/paddle/PP-OCRv4/rec/ch_PP-OCRv4_rec_infer/ppocr_keys_v1.txt"
+DEFAULT_MODEL_PATH = Path(__file__).parent.parent / "models"
+
+
+class TextRecognizer:
+    def __init__(self, cfg: Dict[str, Any]):
+        self.session = get_engine(cfg.engine_type)(cfg)
+
+        # onnx has inner character, other engine get or download character_dict_path
+        character, character_dict_path = self.get_character_dict(cfg)
+
+        self.postprocess_op = CTCLabelDecode(
+            character=character, character_path=character_dict_path
+        )
+
+        self.rec_batch_num = cfg["rec_batch_num"]
+        self.rec_image_shape = cfg["rec_img_shape"]
+
+        self.cfg = cfg
+
+        self.RTL_LANGS = {"arabic", "fa", "ur"}
+
+    def get_character_dict(self, cfg):
+        character = None
+        dict_path = cfg.get("rec_keys_path", None)
+        if self.session.have_key():
+            character = self.session.get_character_list()
+            return character, dict_path
+
+        # onnx has character, other engine need dict_path
+        if (not dict_path and not character) or (not Path(dict_path).exists()):
+            dict_download_url = self.session.get_dict_key_url(
+                FileInfo(
+                    engine_type=cfg.engine_type,
+                    ocr_version=cfg.ocr_version,
+                    task_type=cfg.task_type,
+                    lang_type=cfg.lang_type,
+                    model_type=cfg.model_type,
+                )
+            )
+            dict_download_url = (
+                dict_download_url if dict_download_url is not None else DEFAULT_DICT_URL
+            )
+            dict_path = DEFAULT_MODEL_PATH / Path(dict_download_url).name
+            if not Path(dict_path).exists():
+                DownloadFile.run(
+                    DownloadFileInput(
+                        file_url=dict_download_url,
+                        sha256=None,
+                        save_path=dict_path,
+                        logger=logger,
+                    )
+                )
+
+        return character, dict_path
+
+    def __call__(self, args: TextRecInput) -> TextRecOutput:
+        start_time = time.perf_counter()
+
+        img_list = [args.img] if isinstance(args.img, np.ndarray) else args.img
+        return_word_box = args.return_word_box
+
+        width_list = [img.shape[1] / float(img.shape[0]) for img in img_list]
+
+        # Sorting can speed up the recognition process
+        indices = np.argsort(np.array(width_list))
+
+        img_num = len(img_list)
+        rec_res = [("", 0.0)] * img_num
+
+        batch_num = self.rec_batch_num
+        elapse = 0
+        for beg_img_no in range(0, img_num, batch_num):
+            end_img_no = min(img_num, beg_img_no + batch_num)
+
+            # Parameter Alignment for PaddleOCR
+            imgC, imgH, imgW = self.rec_image_shape[:3]
+            max_wh_ratio = imgW / imgH
+            wh_ratio_list = []
+            for ino in range(beg_img_no, end_img_no):
+                h, w = img_list[indices[ino]].shape[0:2]
+                wh_ratio = w * 1.0 / h
+                max_wh_ratio = max(max_wh_ratio, wh_ratio)
+                wh_ratio_list.append(wh_ratio)
+
+            norm_img_batch = []
+            for ino in range(beg_img_no, end_img_no):
+                norm_img = self.resize_norm_img(img_list[indices[ino]], max_wh_ratio)
+                norm_img_batch.append(norm_img[np.newaxis, :])
+            norm_img_batch = np.concatenate(norm_img_batch).astype(np.float32)
+
+            preds = self.session(norm_img_batch)
+            line_results, word_results = self.postprocess_op(
+                preds,
+                return_word_box,
+                wh_ratio_list=wh_ratio_list,
+                max_wh_ratio=max_wh_ratio,
+            )
+
+            for rno, one_res in enumerate(line_results):
+                if return_word_box:
+                    rec_res[indices[beg_img_no + rno]] = (one_res, word_results[rno])
+                    continue
+
+                rec_res[indices[beg_img_no + rno]] = (one_res, None)
+
+        all_line_results, all_word_results = list(zip(*rec_res))
+        txts, scores = list(zip(*all_line_results))
+
+        if normalize_lang(self.cfg.lang_type) in self.RTL_LANGS:
+            txts = reorder_bidi_for_display(txts)
+
+        elapse = time.perf_counter() - start_time
+        return TextRecOutput(
+            img_list,
+            txts,
+            scores,
+            all_word_results,
+            elapse,
+            viser=VisRes(lang_type=self.cfg.lang_type, font_path=self.cfg.font_path),
+        )
+
+    def resize_norm_img(self, img: np.ndarray, max_wh_ratio: float) -> np.ndarray:
+        img_channel, img_height, img_width = self.rec_image_shape
+        assert img_channel == img.shape[2]
+
+        img_width = int(img_height * max_wh_ratio)
+
+        h, w = img.shape[:2]
+        ratio = w / float(h)
+        if math.ceil(img_height * ratio) > img_width:
+            resized_w = img_width
+        else:
+            resized_w = int(math.ceil(img_height * ratio))
+
+        resized_image = cv2.resize(img, (resized_w, img_height))
+        resized_image = resized_image.astype("float32")
+        resized_image = resized_image.transpose((2, 0, 1)) / 255
+        resized_image -= 0.5
+        resized_image /= 0.5
+
+        padding_im = np.zeros((img_channel, img_height, img_width), dtype=np.float32)
+        padding_im[:, :, 0:resized_w] = resized_image
+        return padding_im
+
+===== rapidocr/ch_ppocr_rec/utils.py (decode) =====
+# -*- encoding: utf-8 -*-
+# @Author: SWHL
+# @Contact: liekkaskono@163.com
+from pathlib import Path
+from typing import Any, List, Optional, Tuple, Union
+
+import numpy as np
+
+from ..utils.utils import has_chinese_char
+from .typings import WordInfo, WordType
+
+
+class CTCLabelDecode:
+    def __init__(
+        self,
+        character: Optional[List[str]] = None,
+        character_path: Union[str, Path, None] = None,
+    ):
+        self.character = self.get_character(character, character_path)
+        self.dict = {char: i for i, char in enumerate(self.character)}
+
+    def __call__(
+        self, preds: np.ndarray, return_word_box: bool = False, **kwargs
+    ) -> Tuple[List[Tuple[str, float]], List[Any]]:
+        preds_idx = preds.argmax(axis=2)
+        preds_prob = preds.max(axis=2)
+
+        wh_ratio_list = kwargs.get("wh_ratio_list", (1.0,))
+        max_wh_ratio = kwargs.get("max_wh_ratio", 1.0)
+
+        line_results, word_results = self.decode(
+            preds_idx,
+            preds_prob,
+            return_word_box,
+            wh_ratio_list,
+            max_wh_ratio,
+            remove_duplicate=True,
+        )
+        return line_results, word_results
+
+    def get_character(
+        self,
+        character: Optional[List[str]] = None,
+        character_path: Union[str, Path, None] = None,
+    ) -> List[str]:
+        if character is None and character_path is None:
+            raise ValueError("character must not be None")
+
+        character_list = None
+        if character:
+            character_list = character
+
+        if character is None and character_path is not None:
+            character_list = self.read_character_file(character_path)
+
+        if character_list is None:
+            raise ValueError("character must not be None")
+
+        character_list = self.insert_special_char(
+            character_list, " ", len(character_list)
+        )
+        character_list = self.insert_special_char(character_list, "blank", 0)
+        return character_list
+
+    @staticmethod
+    def read_character_file(character_path: Union[str, Path]) -> List[str]:
+        character_list = []
+        with open(character_path, "rb") as f:
+            lines = f.readlines()
+            for line in lines:
+                line = line.decode("utf-8").strip("\n").strip("\r\n")
+                character_list.append(line)
+        return character_list
+
+    @staticmethod
+    def insert_special_char(
+        character_list: List[str], special_char: str, loc: int = -1
+    ) -> List[str]:
+        character_list.insert(loc, special_char)
+        return character_list
+
+    def decode(
+        self,
+        text_index: np.ndarray,
+        text_prob: Optional[np.ndarray] = None,
+        return_word_box: bool = False,
+        wh_ratio_list: Tuple[float] = (1.0,),
+        max_wh_ratio: float = 1.0,
+        remove_duplicate: bool = False,
+    ) -> Tuple[List[Tuple[str, float]], List[WordInfo]]:
+        result_list, result_words_list = [], []
+        ignored_tokens = self.get_ignored_tokens()
+        batch_size = len(text_index)
+        for batch_idx in range(batch_size):
+            token_indices = text_index[batch_idx]
+
+            selection = np.ones(len(token_indices), dtype=bool)
+            if remove_duplicate:
+                selection[1:] = token_indices[1:] != token_indices[:-1]
+
+            for ignored_token in ignored_tokens:
+                selection &= token_indices != ignored_token
+
+            if text_prob is not None:
+                conf_list = np.array(text_prob[batch_idx][selection]).tolist()
+                conf_list = [round(conf, 5) for conf in conf_list]
+            else:
+                conf_list = [1] * len(selection)
+
+            if len(conf_list) == 0:
+                conf_list = [0]
+
+            char_list = [
+                self.character[text_id] for text_id in token_indices[selection]
+            ]
+            text = "".join(char_list)
+
+            result_list.append((text, np.mean(conf_list).round(5).tolist()))
+
+            if return_word_box:
+                rec_word_info = self.get_word_info(text, selection)
+                rec_word_info.line_txt_len = (
+                    len(token_indices) * wh_ratio_list[batch_idx] / max_wh_ratio
+                )
+                rec_word_info.confs = conf_list
+                result_words_list.append(rec_word_info)
+        return result_list, result_words_list
+
+    @staticmethod
+    def get_word_info(text: str, selection: np.ndarray) -> WordInfo:
+        """
+        Group the decoded characters and record the corresponding decoded positions.
+        from https://github.com/PaddlePaddle/PaddleOCR/blob/fbba2178d7093f1dffca65a5b963ec277f1a6125/ppocr/postprocess/rec_postprocess.py#L70
+        """
+        word_list = []
+        word_col_list = []
+        state_list = []
+
+        word_content = []
+        word_col_content = []
+
+        valid_col = np.where(selection)[0]
+        if len(valid_col) <= 0:
+            return WordInfo()
+
+        col_width = np.zeros(valid_col.shape)
+        col_width[1:] = valid_col[1:] - valid_col[:-1]
+        col_width[0] = min(3 if has_chinese_char(text[0]) else 2, int(valid_col[0]))
+
+        state = None
+        for c_i, char in enumerate(text):
+            if char.isspace():
+                if word_content:
+                    word_list.append(word_content)
+                    word_col_list.append(word_col_content)
+                    state_list.append(state)
+                    word_content = []
+                    word_col_content = []
+                continue
+
+            c_state = WordType.CN if has_chinese_char(char) else WordType.EN_NUM
+            if state is None:
+                state = c_state
+
+            if state != c_state or col_width[c_i] > 5:
+                if len(word_content) != 0:
+                    word_list.append(word_content)
+                    word_col_list.append(word_col_content)
+                    state_list.append(state)
+                    word_content = []
+                    word_col_content = []
+                state = c_state
+
+            word_content.append(char)
+            word_col_content.append(int(valid_col[c_i]))
+
+        if len(word_content) != 0:
+            word_list.append(word_content)
+            word_col_list.append(word_col_content)
+            state_list.append(state)
+
+        return WordInfo(words=word_list, word_cols=word_col_list, word_types=state_list)
+
+    @staticmethod
+    def get_ignored_tokens() -> List[int]:
+        return [0]  # for ctc blank
+
+===== rapidocr/main.py (excerpt: __call__ and rec wiring) =====
+# -*- encoding: utf-8 -*-
+# @Author: SWHL
+# @Contact: liekkaskono@163.com
+import argparse
+import copy
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import cv2
+import numpy as np
+from omegaconf import DictConfig
+
+from .cal_rec_boxes import CalRecBoxes
+from .ch_ppocr_cls import TextClassifier, TextClsOutput
+from .ch_ppocr_det import TextDetector, TextDetOutput
+from .ch_ppocr_rec import TextRecInput, TextRecognizer, TextRecOutput
+from .cli import check_install, check_required_files, generate_cfg
+from .utils.download_models import download_models
+from .utils.load_image import LoadImage
+from .utils.log import logger
+from .utils.output import RapidOCROutput
+from .utils.parse_parameters import ParseParams
+from .utils.process_img import (
+    apply_vertical_padding,
+    get_rotate_crop_image,
+    map_boxes_to_original,
+    map_img_to_original,
+    resize_image_within_bounds,
+)
+from .utils.typings import LangRec
+from .utils.utils import filter_by_indices
+from .utils.vis_res import VisRes
+
+root_dir = Path(__file__).resolve().parent
+DEFAULT_CFG_PATH = root_dir / "config.yaml"
+
+
+class RapidOCR:
+    def __init__(
+        self, config_path: Optional[str] = None, params: Optional[Dict[str, Any]] = None
+    ):
+        cfg = self._load_config(config_path, params)
+
+        logger.setLevel(cfg.Global.log_level.upper())
+
+        self._initialize(cfg)
+
+    def _load_config(
+        self, config_path: Optional[str], params: Optional[Dict[str, Any]]
+    ) -> DictConfig:
+        if config_path is not None and Path(config_path).exists():
+            cfg = ParseParams.load(config_path)
+        else:
+            cfg = ParseParams.load(DEFAULT_CFG_PATH)
+
+        if params:
+            cfg = ParseParams.update_batch(cfg, params)
+
+        if cfg.Global.model_root_dir is None:
+            cfg.Global.model_root_dir = root_dir / "models"
+        return cfg
+
+    def _initialize(self, cfg: DictConfig):
+        self.text_score = cfg.Global.text_score
+        self.min_height = cfg.Global.min_height
+        self.width_height_ratio = cfg.Global.width_height_ratio
+
+        self.use_det = cfg.Global.use_det
+        cfg.Det.engine_cfg = cfg.EngineConfig[cfg.Det.engine_type.value]
+        cfg.Det.model_root_dir = cfg.Global.model_root_dir
+        self.text_det = TextDetector(cfg.Det)
+
+        self.use_cls = cfg.Global.use_cls
+        cfg.Cls.engine_cfg = cfg.EngineConfig[cfg.Cls.engine_type.value]
+        cfg.Cls.model_root_dir = cfg.Global.model_root_dir
+        self.text_cls = TextClassifier(cfg.Cls)
+
+        self.use_rec = cfg.Global.use_rec
+        cfg.Rec.engine_cfg = cfg.EngineConfig[cfg.Rec.engine_type.value]
+        cfg.Rec.font_path = cfg.Global.font_path
+        cfg.Rec.model_root_dir = cfg.Global.model_root_dir
+        self.text_rec = TextRecognizer(cfg.Rec)
+
+        self.load_img = LoadImage()
+        self.max_side_len = cfg.Global.max_side_len
+        self.min_side_len = cfg.Global.min_side_len
+
+        self.cal_rec_boxes = CalRecBoxes()
+
+        self.return_word_box = cfg.Global.return_word_box
+        self.return_single_char_box = cfg.Global.return_single_char_box
+
+        self.cfg = cfg
+
+    def __call__(
+        self,
+        img_content: Union[str, np.ndarray, bytes, Path],
+        use_det: Optional[bool] = None,
+        use_cls: Optional[bool] = None,
+        use_rec: Optional[bool] = None,
+        return_word_box: Optional[bool] = None,
+        return_single_char_box: Optional[bool] = None,
+        text_score: Optional[float] = None,
+        box_thresh: Optional[float] = None,
+        unclip_ratio: Optional[float] = None,
+    ) -> Union[TextDetOutput, TextClsOutput, TextRecOutput, RapidOCROutput]:
+        self.update_params(
+            use_det=use_det,
+            use_cls=use_cls,
+            use_rec=use_rec,
+            return_word_box=return_word_box,
+            return_single_char_box=return_single_char_box,
+            text_score=text_score,
+            box_thresh=box_thresh,
+            unclip_ratio=unclip_ratio,
+        )
+
+        ori_img = self.load_img(img_content)
+        img, op_record = self.preprocess_img(ori_img)
+        det_res, cls_res, rec_res, cropped_img_list = self.run_ocr_steps(img, op_record)
+        return self.build_final_output(
+            ori_img, det_res, cls_res, rec_res, cropped_img_list, op_record
+        )
+
+    def run_ocr_steps(self, img: np.ndarray, op_record: Dict[str, Any]):
+        det_res, cls_res, rec_res = TextDetOutput(), TextClsOutput(), TextRecOutput()
+
+        if self.use_det:
+            try:
+                cropped_img_list, det_res = self.detect_and_crop(img, op_record)
+            except RapidOCRError as e:
+                logger.warning(e)
+                return TextDetOutput(), TextClsOutput(), TextRecOutput(), []
+        else:
+            cropped_img_list = [img]
+
+        if self.use_cls:
+            try:
+                cls_img_list, cls_res = self.cls_and_rotate(cropped_img_list)
+            except RapidOCRError as e:
+</stdin>
+codex
+1. **Ship approach 4. Ranking: 4 > 2 > 3 > 1.** Keep `Needs review`, with the existing `noise` classification, diff, and crop from `build_report`. It is honest, already implemented, adds no latency, and is defensible from the small 10-label evaluation. Approach 2 is the best experiment, but an English-only recognizer cannot represent `č` or `é`, so it cannot independently disprove the multilingual reading; use it as review assistance, not to set `exact=True`. Approach 3 uses correlated observations and sequence voting can manufacture a string no run produced. Approach 1 is invasive and effectively embeds the rejected normalization inside decoding. A reviewer should prefer two clearly disclosed OCR false alarms over an unsupported statutory pass.
+
+2. In approach 1, mask `preds` either immediately after `preds = self.session(norm_img_batch)` in `TextRecognizer.__call__`, or on a copy at the start of `CTCLabelDecode.__call__`, before both `argmax(axis=2)` and `max(axis=2)`. Predictions are `[batch, timesteps, classes]`; the third axis is established by those calls.
+
+   Preserve class `0`: `CTCLabelDecode.get_character` inserts `"blank"` at index 0 and `get_ignored_tokens` removes index 0. Dictionary characters therefore shift by one; space ends up at the final index. Build the mask by enumerating `postprocess_op.character`, not by indexing the raw dictionary. Preserve every required digit and punctuation character as well as ASCII letters.
+
+   Risks:
+
+   - Masking `č` does not imply `c` wins; blank or an unrelated class may be runner-up.
+   - Masking blank creates junk in width-padded timesteps produced by `TextRecognizer.resize_norm_img`.
+   - CTC duplicate removal in `CTCLabelDecode.decode` must run after the constrained argmax.
+   - Recompute probabilities from the constrained table or confidence no longer describes the selected characters.
+   - Copy `preds` so the original decode remains available.
+   - Per-line top-*k* is insufficient unless it always contains the best allowed class.
+   - `TextRecognizer.__call__` sorts and batches lines, so retained logits must be mapped back through `indices`.
+   - The warning is identified only later by `find_warning`; the present `RapidEngine.recognize` exposes decoded strings, not logits. Warning-only dual decoding therefore requires internal-library plumbing or a second recognition pass.
+
+3. Use one perspective-normalized crop per `WarningSpan.lines` quad, not an axis-aligned bounding box. Expand each quad roughly 3–5% at the left/right and 10% of line height above/below, clip to the image, then warp to a horizontal rectangle. Bounding boxes admit adjacent lines and preserve skew.
+
+   The boxes returned through `_to_lines` are canonical upload coordinates, including rotation/scale reversal by `to_canonical`; crop from the corresponding canonical source image or explicitly map them back to the retained working array. `process_image` currently discards that array, so it must be retained or decoded again.
+
+   Call the secondary engine through `RapidOCR.__call__(use_det=False, use_cls=False, use_rec=True)` and preserve the original line order. Join all returned lines with `join_hyphenated`, then apply only `_canon_form` and require a complete literal match through `compare_warning`. Do not splice English characters into the multilingual transcript. Run `anchor_caps_status` on the re-read anchor and require `Status.match`. Evidence boxes remain the original quads; retain both transcripts and model identities in the audit output. Given the English alphabet limitation, treat agreement as corroboration for the reviewer, not sufficient grounds to override a conflicting accent-capable read.
+
+4. Document `exact` as: “The authoritative OCR transcript, produced by a recognizer capable of representing plausible printed characters, equals `CANONICAL` after only `_canon_form` whitespace and typographic-punctuation normalization.” No accent folding, confusable mapping, voting, or canonical-guided substitution may participate; those remain diagnostic operations in `classify_difference`.
+
+   A constrained decoder or English-only verifier cannot upgrade a conflicting accent-capable transcript to exact. It may report “English-constrained read matches” or “likely OCR noise.” A human confirmation can produce a separately named and audited `human-confirmed exact` result. This preserves the distinction already enforced by `compare_warning` and `build_report`.
+
+5. The cheapest useful addition is a recognition-only, native-resolution re-read of each disputed quad using the existing multilingual recognizer through `RapidOCR.__call__(use_det=False)`. It avoids another detector and retains the ability to distinguish accented characters. Define it beforehand as the authoritative high-resolution warning pass, rather than majority-voting outputs; ship it only after regression-testing clean and problem variants.
+
+   Even cheaper: change no OCR and make the existing result less alarming. `classify_difference` already labels these cases `noise`, while `compare_warning` keeps `exact=False`; surface that as “likely OCR artifact—confirm against crop” with the existing evidence from `build_report`.
+tokens used
+19,573
+1. **Ship approach 4. Ranking: 4 > 2 > 3 > 1.** Keep `Needs review`, with the existing `noise` classification, diff, and crop from `build_report`. It is honest, already implemented, adds no latency, and is defensible from the small 10-label evaluation. Approach 2 is the best experiment, but an English-only recognizer cannot represent `č` or `é`, so it cannot independently disprove the multilingual reading; use it as review assistance, not to set `exact=True`. Approach 3 uses correlated observations and sequence voting can manufacture a string no run produced. Approach 1 is invasive and effectively embeds the rejected normalization inside decoding. A reviewer should prefer two clearly disclosed OCR false alarms over an unsupported statutory pass.
+
+2. In approach 1, mask `preds` either immediately after `preds = self.session(norm_img_batch)` in `TextRecognizer.__call__`, or on a copy at the start of `CTCLabelDecode.__call__`, before both `argmax(axis=2)` and `max(axis=2)`. Predictions are `[batch, timesteps, classes]`; the third axis is established by those calls.
+
+   Preserve class `0`: `CTCLabelDecode.get_character` inserts `"blank"` at index 0 and `get_ignored_tokens` removes index 0. Dictionary characters therefore shift by one; space ends up at the final index. Build the mask by enumerating `postprocess_op.character`, not by indexing the raw dictionary. Preserve every required digit and punctuation character as well as ASCII letters.
+
+   Risks:
+
+   - Masking `č` does not imply `c` wins; blank or an unrelated class may be runner-up.
+   - Masking blank creates junk in width-padded timesteps produced by `TextRecognizer.resize_norm_img`.
+   - CTC duplicate removal in `CTCLabelDecode.decode` must run after the constrained argmax.
+   - Recompute probabilities from the constrained table or confidence no longer describes the selected characters.
+   - Copy `preds` so the original decode remains available.
+   - Per-line top-*k* is insufficient unless it always contains the best allowed class.
+   - `TextRecognizer.__call__` sorts and batches lines, so retained logits must be mapped back through `indices`.
+   - The warning is identified only later by `find_warning`; the present `RapidEngine.recognize` exposes decoded strings, not logits. Warning-only dual decoding therefore requires internal-library plumbing or a second recognition pass.
+
+3. Use one perspective-normalized crop per `WarningSpan.lines` quad, not an axis-aligned bounding box. Expand each quad roughly 3–5% at the left/right and 10% of line height above/below, clip to the image, then warp to a horizontal rectangle. Bounding boxes admit adjacent lines and preserve skew.
+
+   The boxes returned through `_to_lines` are canonical upload coordinates, including rotation/scale reversal by `to_canonical`; crop from the corresponding canonical source image or explicitly map them back to the retained working array. `process_image` currently discards that array, so it must be retained or decoded again.
+
+   Call the secondary engine through `RapidOCR.__call__(use_det=False, use_cls=False, use_rec=True)` and preserve the original line order. Join all returned lines with `join_hyphenated`, then apply only `_canon_form` and require a complete literal match through `compare_warning`. Do not splice English characters into the multilingual transcript. Run `anchor_caps_status` on the re-read anchor and require `Status.match`. Evidence boxes remain the original quads; retain both transcripts and model identities in the audit output. Given the English alphabet limitation, treat agreement as corroboration for the reviewer, not sufficient grounds to override a conflicting accent-capable read.
+
+4. Document `exact` as: “The authoritative OCR transcript, produced by a recognizer capable of representing plausible printed characters, equals `CANONICAL` after only `_canon_form` whitespace and typographic-punctuation normalization.” No accent folding, confusable mapping, voting, or canonical-guided substitution may participate; those remain diagnostic operations in `classify_difference`.
+
+   A constrained decoder or English-only verifier cannot upgrade a conflicting accent-capable transcript to exact. It may report “English-constrained read matches” or “likely OCR noise.” A human confirmation can produce a separately named and audited `human-confirmed exact` result. This preserves the distinction already enforced by `compare_warning` and `build_report`.
+
+5. The cheapest useful addition is a recognition-only, native-resolution re-read of each disputed quad using the existing multilingual recognizer through `RapidOCR.__call__(use_det=False)`. It avoids another detector and retains the ability to distinguish accented characters. Define it beforehand as the authoritative high-resolution warning pass, rather than majority-voting outputs; ship it only after regression-testing clean and problem variants.
+
+   Even cheaper: change no OCR and make the existing result less alarming. `classify_difference` already labels these cases `noise`, while `compare_warning` keeps `exact=False`; surface that as “likely OCR artifact—confirm against crop” with the existing evidence from `build_report`.
