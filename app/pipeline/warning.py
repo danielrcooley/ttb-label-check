@@ -1,11 +1,13 @@
 """Government health warning statement checks (27 CFR Part 16).
 
-Exactness is literal here: the only Pass is a character-for-character match of the words, after
-collapsing whitespace, unifying typographic quotes and ignoring letter case. Those three are
-rendering choices rather than wording: 16.22 requires capitals only for the two anchor words, and
-approved labels commonly print the remainder in capitals (docs/EVAL_REAL.md). The anchor's
-capitals are checked separately. Anything else is Needs review or a mismatch, never a Pass. The
-generic normalizer is not used.
+Exactness is literal here: the only Pass is a character-for-character match of every word and
+punctuation mark, ignoring letter case, the style of quotation marks, and spacing next to
+punctuation ("WARNING :(1)"). Those are rendering choices rather than wording: 16.22 requires
+capitals only for the two anchor words, and approved labels commonly print the remainder in
+capitals (docs/EVAL_REAL.md). A word boundary that moves between letters ("womens hould") is not
+spacing; it changes the words and can never be exact. The anchor's capitals are checked
+separately. Anything else is Needs review or a mismatch, never a Pass. The generic fuzzy
+normalizer is not used.
 """
 
 from __future__ import annotations
@@ -73,10 +75,15 @@ def _column_overlap(a: OcrLine, b: OcrLine) -> float:
     """Overlap across the reading direction, as a fraction of the narrower line. Boxes live in the
     oriented original image, so a statement read from a rotated image (a sideways photo, or a label
     that prints the warning vertically along its edge) comes back as vertical strips stacked left to
-    right: for those, the column is shared along y, not x."""
+    right: for those, the column is shared along y, not x. A vertical strip and a horizontal line
+    are never one column, whatever their boxes overlap: the strips of a statement printed along
+    the edge of an upright label cross the label's other text without belonging to it."""
     ax0, ax1, ay0, ay1 = _extent(a)
     bx0, bx1, by0, by1 = _extent(b)
-    if (ay1 - ay0) > (ax1 - ax0) and (by1 - by0) > (bx1 - bx0):  # vertical text lines
+    a_vertical, b_vertical = (ay1 - ay0) > (ax1 - ax0), (by1 - by0) > (bx1 - bx0)
+    if a_vertical != b_vertical:
+        return 0.0
+    if a_vertical:
         inter = max(0.0, min(ay1, by1) - max(ay0, by0))
         return inter / max(1.0, min(ay1 - ay0, by1 - by0))
     inter = max(0.0, min(ax1, bx1) - max(ax0, bx0))
@@ -103,7 +110,8 @@ def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
                 list(acc),
             )
             declines = 0
-            for nxt in group[group.index(head[-1]) + 1 :]:
+            start = next(k for k, x in enumerate(group) if x is head[-1])  # identity, not equality
+            for nxt in group[start + 1 :]:
                 if _column_overlap(ln, nxt) < 0.3:
                     continue  # a different column or an unrelated block
                 acc.append(nxt)
@@ -149,15 +157,21 @@ def word_diff(expected: str, found: str) -> str | None:
     return " | ".join(out) if out else None
 
 
-def _literal_key(s: str) -> str:
-    """What exactness compares: every character of every word, ignoring letter case and spacing."""
-    return _canon_form(s).casefold().replace(" ", "")
+_TOKEN = re.compile(r"[a-z0-9]+|[^a-z0-9\s]")
+
+
+def _tokens(s: str) -> list[str]:
+    """What exactness compares: the words (runs of letters and digits) and the punctuation marks,
+    in order, ignoring letter case and the spacing between them. "WARNING :(1)" and "WARNING: (1)"
+    give the same tokens; "womens hould" and "women should" do not."""
+    return _TOKEN.findall(_canon_form(s).casefold())
 
 
 def compare_warning(found: str) -> tuple[bool, float]:
-    """Returns (exact, similarity 0-1). Exact ignores letter case and spacing, nothing else."""
+    """Returns (exact, similarity 0-1). Exact ignores letter case and spacing around punctuation,
+    nothing else."""
     canon, got = _canon_form(CANONICAL), _canon_form(found)
-    exact = _literal_key(canon) == _literal_key(got)
+    exact = _tokens(canon) == _tokens(got)
     similarity = fuzz.ratio(canon.casefold(), got.casefold()) / 100
     return exact, similarity
 
@@ -178,8 +192,10 @@ def _canon_word(w: str) -> str:
 def _same_word_modulo_noise(a: str, b: str) -> bool:
     """True when two tokens differ only by punctuation, case, accents, OCR confusables, or one slip
     (a character dropped, added, changed, or two adjacent ones swapped) in a word of four or more
-    letters. A real wording change replaces whole words; approved labels read as "Suregon", "YOURS"
-    and "WOMAN" turned out to be small print, not wording (docs/EVAL_REAL.md)."""
+    letters. A slip is left to the person with the diff (Needs review): approved labels read as
+    "Suregon" and "YOURS" were small print, and one that reads "WOMAN" genuinely prints it
+    (docs/EVAL_REAL.md); the tool cannot tell the two apart from an image, so it never passes either.
+    A whole word replaced, added or dropped is a wording change."""
     ka, kb = _canon_word(a), _canon_word(b)
     if ka == kb:
         return True
@@ -250,7 +266,8 @@ def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> Warning
             notes=[
                 "No GOVERNMENT WARNING statement was found on any image. It is mandatory on all alcoholic "
                 "beverages of 0.5% alcohol or more (27 CFR 16.21). If the warning is on a label image not "
-                "uploaded, add that image."
+                "uploaded, add that image. A statement printed sideways in very small type can also go "
+                "unread; check the image."
             ],
         )
     exact, similarity = compare_warning(span.text)

@@ -327,3 +327,24 @@ def test_unparseable_required_field_blocks_ready_and_omitted_optional_fields_do_
     res = compare(_spirits_app(imported=True), lines, [], s)
     assert next(c for c in res.checks if c.id == "country_of_origin").status == "needs_review"
     assert res.verdict == "needs_review"
+
+
+def test_bottler_with_a_different_corporate_form_is_review_not_match():
+    """An omitted form is no difference in who bottled it; two different forms name two different
+    legal entities and go to the person (review 005, item 1.2)."""
+    from app.config import Settings
+    from app.pipeline.compare import bottler_check
+    from app.pipeline.normalize import company_forms
+
+    from tests.unit.conftest import make_lines
+
+    assert company_forms("ACME Brewing LLC, Denver, CO") == frozenset({"LLC", "Company"})
+    assert company_forms("Green Cheek Beer Company") == company_forms("GREEN CHEEK BEER CO.")
+    s = Settings(ocr_workers=1)
+    differs = bottler_check("ACME Brewing LLC", make_lines(["BREWED BY ACME BREWING INC."]), s)
+    assert differs.status == "needs_review", differs
+    assert "LLC" in (differs.note or "") and "Inc." in (differs.note or "")
+    omitted = bottler_check("ACME Brewing Company", make_lines(["BREWED BY ACME BREWING"]), s)
+    assert omitted.status == "match", omitted
+    same = bottler_check("Green Cheek Beer Company, Orange, CA", make_lines(["BREWED BY GREEN CHEEK BEER CO.", "ORANGE, CA"]), s)
+    assert same.status == "match", same

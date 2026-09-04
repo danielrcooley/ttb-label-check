@@ -9,7 +9,9 @@ Three deliberately different levels:
 - ``fold_digits``: OCR confusables mapped to digits, applied only to tokens that look numeric.
   Used by the parsers, never for display.
 
-The government warning check does NOT use these (see warning.py); exactness there is literal.
+The government warning check uses only ``collapse_ws``, ``unify_punctuation``, ``join_hyphenated``
+and ``fold`` (for locating the statement); exactness there compares every word and punctuation mark
+and ignores only letter case and spacing next to punctuation (see warning.py).
 """
 
 from __future__ import annotations
@@ -128,12 +130,35 @@ _CORPORATE_TOKENS = frozenset(
 )
 
 
+_FORM_CANON = {
+    "company": "Company",
+    "co": "Company",
+    "incorporated": "Inc.",
+    "inc": "Inc.",
+    "corporation": "Corp.",
+    "corp": "Corp.",
+    "limited": "Ltd.",
+    "ltd": "Ltd.",
+    "llc": "LLC",
+    "lp": "LP",
+    "llp": "LLP",
+}
+
+
 def fold_company(s: str) -> str:
     """A company name as registered vs as printed: drops a "Bottled by" style prefix and corporate
     forms (Company, Co., LLC, Inc.), then keeps letters and digits like ``key``.
-    "Brewed by GREEN CHEEK BEER CO." and "Green Cheek Beer Company" both become "green cheek beer"."""
+    "Brewed by GREEN CHEEK BEER CO." and "Green Cheek Beer Company" both become "green cheek beer".
+    Whether the forms themselves agree is a separate question: ``company_forms``."""
     words = [w for w in key(_BY_PREFIX.sub("", s)).split(" ") if w and w not in _CORPORATE_TOKENS]
     return " ".join(words)
+
+
+def company_forms(s: str) -> frozenset[str]:
+    """The corporate forms named in a company line, spelled one way ("Co." and "Company" are the
+    same form; "LLC" and "Inc." are not). An omitted form is no difference in who bottled it, but
+    two different forms name two different legal entities and are left to the person."""
+    return frozenset(_FORM_CANON[w] for w in key(s).split(" ") if w in _FORM_CANON)
 
 
 def case_only_difference(a: str, b: str) -> bool:

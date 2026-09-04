@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import csv
 import json
+import math
 import statistics
 import sys
 import time
@@ -192,6 +193,14 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
         "so the applicant row also understates.",
         "- There is no ground truth for the warning statement beyond TTB's approval; the exact rate is what the "
         "comparator reports on the registry's image, and the hand-checked cases are listed at the end.",
+        '- "Statement located" means the heading was found and a span accumulated behind it, at any similarity; '
+        "the exact / slips / wording split below it is the accuracy, not the located rate.",
+        "- \"Country of origin found\" is a proxy: the registry's country name matched somewhere on the label at "
+        "partial-ratio 90 or better, without checking that it sits in an origin statement.",
+        "- The alcohol and net-contents read rates count a parse anywhere in the concatenated text of all the "
+        "record's images, as the extract-only mode of the product does.",
+        "- Latency is the service call for the record (decode, all reads, the extra round when it runs); the file "
+        "read and the pre-fit to the pixel cap are outside it. p95 is the nearest-rank percentile.",
         "",
     ]
     groups: dict[str, list[Record]] = defaultdict(list)
@@ -227,17 +236,17 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
             lambda g: pct(sum(bool(r["origin_found"]) for r in g), sum(r["origin_found"] is not None for r in g)),
         )
     )
-    out.append(row("Warning statement present", lambda g: pct(sum(r["warning_present"] for r in g), len(g))))
+    out.append(row("Warning statement located (heading found)", lambda g: pct(sum(r["warning_present"] for r in g), len(g))))
     out.append(row("Warning exact (of all)", lambda g: pct(sum(r["warning_assessment"] == "exact" for r in g), len(g))))
     out.append(
         row(
-            "Warning exact (of present)",
+            "Warning exact (of located)",
             lambda g: pct(sum(r["warning_assessment"] == "exact" for r in g), sum(r["warning_present"] for r in g)),
         )
     )
     out.append(
         row(
-            "Warning heading all capitals (of present)",
+            "Warning heading all capitals (of located)",
             lambda g: pct(sum(r["warning_anchor_caps"] == "match" for r in g), sum(r["warning_present"] for r in g)),
         )
     )
@@ -247,7 +256,12 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
     out.append(row("Images per record, median", lambda g: f"{statistics.median(r['images'] for r in g):g}"))
     out.append(row("Longest image side, median px", lambda g: f"{statistics.median(r['long_side_px'] for r in g):.0f}"))
     out.append(row("Latency per record, median", lambda g: f"{statistics.median(r['ms'] for r in g):.0f} ms"))
-    out.append(row("Latency per record, p95", lambda g: f"{sorted(r['ms'] for r in g)[int(0.95 * (len(g) - 1))]} ms"))
+    out.append(
+        row(
+            "Latency per record, p95",
+            lambda g: f"{sorted(r['ms'] for r in g)[max(0, math.ceil(0.95 * len(g)) - 1)]} ms",  # nearest rank
+        )
+    )
     out.append("")
     out += ["## Warning assessment, all records", ""]
     c = Counter(r["warning_assessment"] for r in results)

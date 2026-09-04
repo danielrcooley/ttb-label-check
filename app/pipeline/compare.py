@@ -24,7 +24,7 @@ from app.schemas import (
 )
 
 from .match import best_span, status_for
-from .normalize import fold, fold_company
+from .normalize import company_forms, fold, fold_company
 from .parsers import (
     Alcohol,
     alcohol_matches,
@@ -71,39 +71,54 @@ def _text_check(check_id: str, expected: str, lines: list[OcrLine], s: Settings,
     )
 
 
+def _as_printed(check: Check, lines: list[OcrLine]) -> list[OcrLine]:
+    """The original lines behind a check made on rewritten copies of them, in the candidate's own
+    order, each line once: what the evidence and the "found" text should show."""
+    found: list[OcrLine] = []
+    for ev in check.evidence:
+        for ln in lines:
+            if ln.image_index == ev.image_index and ln.box == ev.box and not any(ln is f for f in found):
+                found.append(ln)
+                break
+    check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in found]
+    if found:
+        check.found = " ".join(ln.text for ln in found)
+    return found
+
+
 def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
     """Country of origin: 'USA' in the application matches 'Product of USA' on the label."""
     stripped = [ln.model_copy(update={"text": _ORIGIN_PREFIX.sub("", ln.text)}) for ln in lines]
     check = _text_check("country_of_origin", expected, stripped, s, rule="27 CFR 5.69 / 4.35 / 7.69; 19 CFR 134")
     if check.evidence:
         # restore the full line text in the evidence and the 'found' value for display
-        found_lines = [
-            ln for ln in lines if any(ln.box == ev.box and ln.image_index == ev.image_index for ev in check.evidence)
-        ]
-        check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in found_lines]
-        if found_lines:
-            check.found = " ".join(ln.text for ln in found_lines)
-            if check.status is Status.match and check.found != expected:
-                check.note = f"Label says '{check.found}'."
+        found_lines = _as_printed(check, lines)
+        if found_lines and check.status is Status.match and check.found != expected:
+            check.note = f"Label says '{check.found}'."
     return check
 
 
 def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
     """Name and address as registered vs as printed. Labels abbreviate and prefix ("Brewed by
     GREEN CHEEK BEER CO." for "Green Cheek Beer Company"); the registry spells out. Neither the
-    prefix nor the corporate form is a difference in who bottled it, so both sides are folded with
-    ``fold_company`` before the ordinary fuzzy match; evidence and the found text stay as printed."""
+    prefix nor an omitted corporate form is a difference in who bottled it, so both sides are folded
+    with ``fold_company`` before the ordinary fuzzy match; evidence and the found text stay as
+    printed. Two different forms ("LLC" against "Inc.") name two different legal entities: that
+    match goes to Needs review with both forms in the note."""
     folded = [ln.model_copy(update={"text": fold_company(ln.text)}) for ln in lines]
     check = _text_check("bottler", fold_company(expected), folded, s, rule="27 CFR 5.66 / 4.35 / 7.66")
     check.expected = expected
     if check.evidence:
-        found_lines = [
-            ln for ln in lines if any(ln.box == ev.box and ln.image_index == ev.image_index for ev in check.evidence)
-        ]
-        check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in found_lines]
-        if found_lines:
-            check.found = " ".join(ln.text for ln in found_lines)
-            if check.status is Status.match and fold(check.found) != fold(expected):
+        found_lines = _as_printed(check, lines)
+        if found_lines and check.status is Status.match:
+            want, got = company_forms(expected), company_forms(check.found or "")
+            if want and got and not (want <= got or got <= want):
+                check.status = Status.needs_review
+                check.note = (
+                    f"Same name, but the corporate form differs: the application says "
+                    f"{', '.join(sorted(want))}, the label says {', '.join(sorted(got))}. Confirm on the image."
+                )
+            elif fold(check.found or "") != fold(expected):
                 check.note = f"Label says '{check.found}'."
     return check
 

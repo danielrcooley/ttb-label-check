@@ -41,12 +41,14 @@ class Settings(BaseSettings):
     ocr_min_lines_retry: int = Field(default=3, description="Fewer detected lines than this also triggers the retry")
     warning_rescue: bool = Field(
         default=True,
-        description="When no warning statement is found upright, re-read the images sideways: the statement "
-        "is often printed vertically along the edge of a small label",
+        description="Interactive requests only: when no usable warning statement is found, one more round "
+        "of reads (at most one per worker, in parallel): the images turned sideways, since small labels "
+        "print the statement vertically along an edge, and large artwork once at full resolution. "
+        "Batch requests read every image exactly once",
     )
     warning_rescue_below: float = Field(
         default=0.5,
-        description="Similarity of the best upright statement below which the sideways re-read runs "
+        description="Similarity of the best upright statement below which the extra round runs "
         "(a garbled but present statement scores higher and would not be helped)",
     )
     warning_rescue_max_side: int = Field(

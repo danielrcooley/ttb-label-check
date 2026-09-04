@@ -82,8 +82,18 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 13. **Statements printed sideways or in small type on large artwork.** Small labels often run the
     government warning vertically along one edge of an otherwise upright label; large artwork
     sometimes carries it in type that is unreadable once the image is scaled to the working size.
-    When no usable statement is found upright, each image is read again turned both ways and, if it
-    was scaled down, once more at up to 2,048 pixels (`TTB_WARNING_RESCUE`, on by default). That
-    costs up to three more reads per image and happens only in that case, so a label with no
-    statement takes a few seconds longer to report it missing. Sideways photographs are handled
-    earlier by the general rotation retry.
+    On the single-label screen, when no usable statement is found upright, the tool runs one more
+    round of reads in parallel, at most one per worker: the images turned 270 then 90 degrees (270
+    unrolls a statement printed up the right edge, the layout of three of the four such labels in
+    the real sample) and, for large artwork, once at up to 2,048 pixels (`TTB_WARNING_RESCUE`, on by
+    default). The round costs one read-time (about 2 s on the deployed sizing), so an upload with no
+    statement at all, such as a front label on its own, takes about twice as long to say so. What
+    the round can try scales with the workers: two workers try both turns of one image, or the
+    first turn of each image of a pair; the full-resolution read goes first only when the heading
+    was seen and the body was not.
+    A statement the round does not reach is reported absent. The batch screen reads every image
+    exactly once, before it knows which application the image belongs to, so it never re-reads:
+    a statement printed sideways in a batch shows as absent, and the row's note says to check the
+    image. Sideways photographs are handled earlier by the general rotation retry (three reads).
+    Known approximation in the finder: the column tolerance is half the median line thickness of
+    the whole image, which large display type can inflate.

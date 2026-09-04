@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import statistics
 import sys
 import time
@@ -133,7 +134,7 @@ def summarize(data: dict) -> tuple[str, dict]:
         summary[tier] = {
             "cases": len(cases),
             "p50_ms": statistics.median(lat),
-            "p95_ms": sorted(lat)[int(0.95 * (len(lat) - 1))],
+            "p95_ms": sorted(lat)[max(0, math.ceil(0.95 * len(lat)) - 1)],  # nearest rank
         }
         out += [
             f"## {tier.capitalize()} tier ({len(cases)} cases)",

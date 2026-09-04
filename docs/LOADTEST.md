@@ -74,3 +74,35 @@ _Appended by `tools/loadtest.py`. Each block names the host it ran against._
 - no browser errors
 - run at 2026-09-03 20:11:24
 
+## Build af9e239 on Azure (the unbounded sideways re-read, superseded by D-039)
+
+The four runs below measured the build that re-read every image turned both ways, and large
+artwork at full resolution, whenever no statement was found. A single-image extract, which is
+how the batch screen reads, went from 2.0 s to 8.6 s and the 300-image batch from 364 s to
+841 s. They are kept as the evidence for the bounded round; the runs after them are the
+corrected build.
+
+### steady interactive: 20 x verify (2 image(s) each), concurrency 2, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 53.2 s, throughput 0.38 req/s (0.75 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 5127, p95 5890, max 6741
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 04:37:07
+
+### steady: 100 x extract (1 image(s) each), concurrency 2, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 432.7 s, throughput 0.23 req/s (0.23 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 8617, p95 8933, max 9191
+- final status codes: {200: 100}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 04:44:20
+
+### burst: 16 simultaneous extract requests, no backoff, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- status codes: {429: 14, 200: 2} (429 = refused immediately with Retry-After)
+- served latency ms: p50 10184, max 10265; wall 10.3 s
+- health during burst: HTTP 200, in_flight=0
+- run at 2026-09-04 04:44:31
+
+### browser batch: 150 applications x 2 images through the batch screen, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 841 s (0.36 images/s end to end, including compare calls and rendering)
+- summary tiles: 150 Ready for approval | 0 Need review | 0 Issues / unreadable | 0 Errors | 0 Images not matched | 0/150 Decided | 7.5 s per image, median (p95 8.7 s)
+- no browser errors
+- run at 2026-09-04 04:58:40
+

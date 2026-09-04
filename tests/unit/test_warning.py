@@ -224,3 +224,14 @@ def test_continuation_lines_must_share_the_anchor_column():
     lines += [make_line("Tasting notes: oak, vanilla, caramel", y=100 + i * 44, x=1600, h=34) for i in range(len(left))]
     r = report(lines)
     assert r.exact, r.diff
+
+
+def test_word_boundary_changes_are_never_exact():
+    """Spacing is ignored only next to punctuation. A boundary moved between letters changes the
+    words: it is a slip for a person to check, never a pass (review 005, item 1.1)."""
+    moved = report(make_lines(wrapped(CANONICAL.replace("women should", "womens hould"))))
+    assert not moved.exact and moved.assessment == "noise" and moved.diff and "womens" in moved.diff
+    merged = report(make_lines(wrapped(CANONICAL.replace("a car", "acar"))))
+    assert not merged.exact and merged.assessment == "noise"
+    split = report(make_lines(wrapped(CANONICAL.replace("GOVERNMENT WARNING", "GOVERN MENT WARNING"))))
+    assert split.present and not split.exact
