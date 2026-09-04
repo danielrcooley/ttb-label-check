@@ -18,7 +18,7 @@ from rapidfuzz.distance import Levenshtein
 from app.schemas import Evidence, OcrLine, Status, WarningReport
 
 from .match import reading_order
-from .normalize import collapse_ws, fold, join_hyphenated, strip_diacritics, unify_punctuation
+from .normalize import collapse_ws, fold, join_hyphenated, unify_punctuation
 
 # Verbatim text of 27 CFR 16.21, verified against the eCFR API on 2026-09-03 (docs/REGULATIONS.md).
 CANONICAL = (
@@ -39,7 +39,17 @@ class WarningSpan:
 
 
 def _anchor_score(text: str) -> int:
-    return int(fuzz.partial_ratio(fold(ANCHOR), fold(text)))
+    """Both words must be present (fuzzily); \"WARNING\" alone is not an anchor."""
+    t = fold(text)
+    return int(min(fuzz.partial_ratio("government", t), fuzz.partial_ratio("warning", t)))
+
+
+def _x_overlap(a: OcrLine, b: OcrLine) -> float:
+    """Horizontal overlap as a fraction of the narrower line."""
+    a0, a1 = min(p[0] for p in a.box), max(p[0] for p in a.box)
+    b0, b1 = min(p[0] for p in b.box), max(p[0] for p in b.box)
+    inter = max(0.0, min(a1, b1) - max(a0, b0))
+    return inter / max(1.0, min(a1 - a0, b1 - b0))
 
 
 def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
@@ -57,6 +67,8 @@ def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
             local_best: tuple[float, list[OcrLine]] | None = None
             declines = 0
             for nxt in group[i:]:
+                if nxt is not ln and _x_overlap(ln, nxt) < 0.3:
+                    continue  # a different column or an unrelated block
                 acc.append(nxt)
                 sim = fuzz.ratio(_CANON_FOLD, fold(join_hyphenated([x.text for x in acc]))) / 100
                 if local_best is None or sim > local_best[0]:
@@ -79,9 +91,8 @@ def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
 
 
 def _canon_form(s: str) -> str:
-    # The required text has no accented letters, so an accent in the OCR read ("alcoholič") is
-    # recognition noise by definition and is removed before the literal comparison.
-    return collapse_ws(unify_punctuation(strip_diacritics(s)))
+    # Whitespace and typographic quotes are rendering, not wording; everything else must be literal.
+    return collapse_ws(unify_punctuation(s))
 
 
 def word_diff(expected: str, found: str) -> str | None:
@@ -170,7 +181,7 @@ def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
     )
 
 
-def build_report(lines: list[OcrLine], *, review_similarity: float, mismatch_similarity: float) -> WarningReport:
+def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> WarningReport:
     """Assess the warning statement. ``assessment`` drives the verdict:
     exact -> pass; case/noise -> Needs review; wording/absent -> issue."""
     span = find_warning(lines)
@@ -205,8 +216,8 @@ def build_report(lines: list[OcrLine], *, review_similarity: float, mismatch_sim
         "exact": "Wording is exact (27 CFR 16.21).",
         "case": "Wording matches except for letter case. Confirm the statement's capitalization on the image.",
         "noise": (
-            "Wording matches apart from punctuation or single characters as read, which is usually OCR noise "
-            "(a dropped colon, a '1' read as 'i'). Compare the diff with the image."
+            "Wording matches apart from punctuation, an accent, or single characters as read, which is usually "
+            "OCR noise (a dropped colon, a '1' read as 'i', a stray accent). Compare the diff with the image."
         ),
         "wording": (
             "Wording differs from the required text: a word is missing, added or changed. "

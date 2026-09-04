@@ -89,6 +89,8 @@ def decode_image(data: bytes, *, max_pixels: int, max_side: int, filename: str |
             )
         if fmt == "gif":
             im.seek(0)
+        if fmt == "jpeg" and max(w, h) > 2 * max_side:
+            im.draft("RGB", (max_side * 2, max_side * 2))  # decode large JPEGs at reduced size: far less memory
         im = ImageOps.exif_transpose(im) or im
         im = im.convert("RGB")
     except ImageError:

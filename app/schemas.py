@@ -57,9 +57,9 @@ class ApplicationFields(BaseModel):
 
 
 class OcrLine(BaseModel):
-    image_index: int
-    text: str
-    confidence: float
+    image_index: int = Field(ge=0, le=64)
+    text: str = Field(max_length=1000)
+    confidence: float = Field(ge=0, le=1)
     box: Quad
 
 
@@ -167,8 +167,8 @@ class VerifyResponse(CompareResult):
 class CompareItem(BaseModel):
     item_id: str = Field(max_length=128)
     application: ApplicationFields
-    lines: list[OcrLine]
-    images: list[ImageInfo] = Field(default_factory=list)
+    lines: list[OcrLine] = Field(max_length=2000)
+    images: list[ImageInfo] = Field(default_factory=list, max_length=64)
 
 
 class CompareRequest(BaseModel):
@@ -191,6 +191,7 @@ class HealthResponse(BaseModel):
     engine: EngineInfo
     max_concurrency: int
     in_flight: int
+    requests_in_flight: int = 0
     version: str
     git_sha: str
 

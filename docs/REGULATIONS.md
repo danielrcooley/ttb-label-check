@@ -20,15 +20,19 @@ brand label, a separate front label, or a back or side label.
 
 | Rule | Regulatory language | Checked by the app |
 |---|---|---|
-| Anchor in capitals and bold | "The first two words ... 'GOVERNMENT WARNING,' shall appear in capital letters and in bold type." | Yes: OCR case check + stroke-width bold estimate (heuristic, reports Needs review when unsure) |
-| Remainder not bold | "The remainder of the warning statement may not appear in bold type." | Yes: stroke-width comparison anchor vs body (heuristic) |
-| Legible, contrasting background | "readily legible under ordinary conditions, and ... on a contrasting background" | Partially: luminance contrast inside the warning box (heuristic) |
+| Anchor in capitals and bold | "The first two words ... 'GOVERNMENT WARNING,' shall appear in capital letters and in bold type." | Capitals: yes (from the OCR read). Bold: not in this build; shown as "Not checked" |
+| Remainder not bold | "The remainder of the warning statement may not appear in bold type." | Not in this build; shown as "Not checked" |
+| Legible, contrasting background | "readily legible under ordinary conditions, and ... on a contrasting background" | Not in this build |
 | Not compressed | "shall not be compressed in such a manner that the warning statement is not readily legible" | No (needs physical measurement) |
-| Minimum type size | 1 mm for containers of 237 mL or less; 2 mm for more than 237 mL up to 3 L; 3 mm for more than 3 L | Relative only: warning text height vs other label text, flagged if suspiciously small. Physical mm cannot be measured from an image without scale. |
+| Minimum type size | 1 mm for containers of 237 mL or less; 2 mm for more than 237 mL up to 3 L; 3 mm for more than 3 L | Not in this build. Physical mm cannot be measured from an image without a known scale. |
 | Max characters per inch | 40 at 1 mm, 25 at 2 mm, 12 at 3 mm | No (needs physical scale) |
 | Firmly affixed | labels not removable without water or solvents | No (physical) |
 
 Amendment history: T.D. ATF-294 (1990), T.D. 372 (1996), T.D. TTB-91 (2011).
+
+Applicability: Part 16 applies to alcoholic beverages of 0.5 percent or more alcohol by volume
+(27 CFR 16.10). When the application states less than 0.5 percent, the app reports the warning as
+not required instead of missing.
 
 ## Standards of fill (authorized container sizes)
 

@@ -13,19 +13,21 @@ const ACCEPT = /^image\/(png|jpeg|gif|webp|tiff|bmp)$/;
 const $ = (sel) => document.querySelector(sel);
 
 const state = {
-  images: new Map(),      // lower-cased file name -> File
+  images: new Map(),      // fileKey (relative path or name, lower-cased) -> File
+  inputVersion: 0, builtVersion: -1, detailCache: new Map(),
   csv: null,              // parsed CSV response
   items: [],              // application rows (or one per image when there is no CSV)
   unpaired: [],           // file names not attached to any row
   extractions: new Map(), // file name -> extract response
   decisions: new Map(),   // item key -> {decision, note}
-  running: false, abort: null, maxConcurrency: 3, concurrency: 3, successes: 0, inflight: 0, waiters: [],
+  running: false, abort: null, maxConcurrency: 3, concurrency: 3, successes: 0, inflight: 0, waiters: [], renderTimer: 0,
   filter: "all", page: 0, expanded: null, times: [], startedAt: 0,
 };
 
 // ------------------------------------------------------------------ helpers
-const norm = (name) => name.split(/[\\/]/).pop().toLowerCase();
+const norm = (name) => name.split(/[\\/]/).pop().toLowerCase();          // basename, lower-cased
 const stem = (name) => norm(name).replace(/\.[a-z0-9]+$/, "");
+const fileKey = (f) => (f.webkitRelativePath || f.name).toLowerCase();  // folder-aware identity
 function setStatus(text, busy = false) { const s = $("#batch-status"); s.textContent = text; s.classList.toggle("is-busy", busy); }
 function showError(msg) { const box = $("#batch-error"); box.querySelector("p").textContent = msg; box.hidden = !msg; }
 function seconds(ms) { return `${(ms / 1000).toFixed(1)} s`; }
@@ -37,10 +39,16 @@ function addImages(files) {
   for (const f of files) {
     if (f.type && !ACCEPT.test(f.type)) continue;
     if (f.size === 0 || f.size > 10 * 1024 * 1024) continue;
-    const key = norm(f.name);
+    const key = fileKey(f);
     if (!state.images.has(key)) { state.images.set(key, f); added++; }
   }
-  $("#batch-image-count").textContent = `${state.images.size} image${state.images.size === 1 ? "" : "s"} ready${added ? ` (${added} added)` : ""}.`;
+  state.inputVersion++;
+  const byName = new Map();
+  for (const k of state.images.keys()) byName.set(norm(k), (byName.get(norm(k)) || 0) + 1);
+  const dupes = [...byName.entries()].filter(([, n]) => n > 1);
+  let msg = `${state.images.size} image${state.images.size === 1 ? "" : "s"} ready${added ? ` (${added} added)` : ""}.`;
+  if (dupes.length) msg += ` ${dupes.length} file name${dupes.length === 1 ? "" : "s"} appear${dupes.length === 1 ? "s" : ""} in more than one folder (${dupes.slice(0, 3).map(([n]) => n).join(", ")}${dupes.length > 3 ? ", …" : ""}); those are kept apart and cannot be paired by name alone.`;
+  $("#batch-image-count").textContent = msg;
   updateStartButton();
 }
 
@@ -53,6 +61,7 @@ async function setCsv(file) {
     const body = await resp.json();
     if (!resp.ok) throw new ApiError(resp.status, body);
     state.csv = body;
+    state.inputVersion++;
     const bad = body.rows.filter((r) => r.errors.length);
     box.replaceChildren(...[
       el("p", { class: "text-bold margin-0", text: `${file.name}: ${body.rows.length} row${body.rows.length === 1 ? "" : "s"}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
@@ -80,24 +89,35 @@ function buildItems() {
       if (!row.application) continue;
       const app = row.application;
       const key = app.application_id || `row-${row.row_number}`;
-      let names = row.images.map(norm).filter((n) => files.has(n));
-      if (!names.length && app.application_id) {
-        const id = app.application_id.toLowerCase();
-        names = [...files.keys()].filter((n) => stem(n) === id || stem(n).startsWith(id + "_") || stem(n).startsWith(id + "-") || stem(n).startsWith(id + " "));
+      const byName = (n) => [...files.keys()].filter((k) => norm(k) === norm(n));
+      let keys = [];
+      const missing = [];
+      for (const listed of row.images) {
+        const hits = byName(listed);
+        if (hits.length === 1) keys.push(hits[0]);
+        else missing.push(hits.length ? `${listed} (ambiguous: ${hits.length} files)` : listed);
       }
-      const attached = names.map((n) => files.get(n)).filter(Boolean);
-      for (const n of names) files.delete(n);
-      items.push({ key, row: row.row_number, application: app, files: attached, method: row.images.length ? "listed in CSV" : attached.length ? "filename prefix" : "none",
+      let method = row.images.length ? (missing.length ? `listed in CSV (${missing.length} not found)` : "listed in CSV") : "none";
+      if (!row.images.length && app.application_id) {
+        const id = app.application_id.toLowerCase();
+        keys = [...files.keys()].filter((k) => { const st = stem(k); return st === id || st.startsWith(id + "_") || st.startsWith(id + "-") || st.startsWith(id + " "); });
+        method = keys.length ? "filename prefix" : "none";
+      }
+      const attached = keys.map((k) => files.get(k)).filter(Boolean);
+      for (const k of keys) files.delete(k);
+      items.push({ key, row: row.row_number, application: app, files: attached, missing, method,
         result: null, error: null, ms: 0, status: attached.length ? "pending" : "no-images" });
     }
     state.unpaired = [...files.keys()];
   } else {
     for (const [n, f] of files) {
-      items.push({ key: n, row: null, application: null, files: [f], method: "extract only", result: null, error: null, ms: 0, status: "pending" });
+      items.push({ key: n, row: null, application: null, files: [f], missing: [], method: "extract only", result: null, error: null, ms: 0, status: "pending" });
     }
     state.unpaired = [];
   }
   state.items = items;
+  state.builtVersion = state.inputVersion;
+  state.detailCache.clear();
 }
 
 // ------------------------------------------------------------------ processing
@@ -113,9 +133,11 @@ function releaseSlot() {
 }
 
 async function extractOne(file, signal) {
-  const key = norm(file.name);
+  const key = fileKey(file);
   if (state.extractions.has(key)) return state.extractions.get(key);
+  let delay = 0;
   for (let attempt = 0; attempt < 6; attempt++) {
+    if (delay) { await new Promise((r) => setTimeout(r, delay)); delay = 0; } // back off without holding a slot
     await acquireSlot();
     try {
       const t0 = performance.now();
@@ -129,7 +151,7 @@ async function extractOne(file, signal) {
       if (e.name === "AbortError") throw e;
       if (e instanceof ApiError && (e.status === 429 || e.status === 503)) {
         state.concurrency = Math.max(1, state.concurrency - 1);
-        await new Promise((r) => setTimeout(r, (e.retryAfter || 1) * 1000 * (attempt + 1) + Math.random() * 500));
+        delay = (e.retryAfter || 1) * 1000 * (attempt + 1) + Math.random() * 500;
         continue;
       }
       throw e;
@@ -143,7 +165,7 @@ async function extractOne(file, signal) {
 function linesForItem(item) {
   const lines = [], images = [];
   item.files.forEach((f, idx) => {
-    const ex = state.extractions.get(norm(f.name));
+    const ex = state.extractions.get(fileKey(f));
     if (!ex) return;
     for (const im of ex.images) images.push({ ...im, index: idx });
     for (const ln of ex.lines) lines.push({ ...ln, image_index: idx });
@@ -163,7 +185,7 @@ async function processItem(item, signal) {
       item.lines = lines;
       item.images = images;
     } else {
-      const ex = state.extractions.get(norm(item.files[0].name));
+      const ex = state.extractions.get(fileKey(item.files[0]));
       item.result = null;
       item.fields = ex.fields;
       item.lines = lines;
@@ -179,6 +201,11 @@ async function processItem(item, signal) {
   }
 }
 
+function scheduleRender() {
+  if (state.renderTimer) return;
+  state.renderTimer = setTimeout(() => { state.renderTimer = 0; renderProgress(); renderTable(); }, 250);
+}
+
 async function runPool(items, signal) {
   const queue = [...items];
   let active = 0;
@@ -188,7 +215,7 @@ async function runPool(items, signal) {
       while (!signal.aborted && active < state.maxConcurrency * 2 && queue.length) {
         const item = queue.shift();
         active++;
-        processItem(item, signal).finally(() => { active--; renderProgress(); renderTable(); pump(); });
+        processItem(item, signal).finally(() => { active--; scheduleRender(); pump(); });
       }
       if (!queue.length && active === 0) resolve();
     };
@@ -198,7 +225,7 @@ async function runPool(items, signal) {
 
 async function start() {
   showError("");
-  if (!state.items.length || state.items.every((i) => i.status === "done")) buildItems();
+  if (!state.items.length || state.builtVersion !== state.inputVersion || state.items.every((i) => i.status === "done")) buildItems();
   const pending = state.items.filter((i) => i.status === "pending" || i.status === "error");
   if (!pending.length && !state.items.length) { showError("Add images first."); return; }
   try { const h = await health(); state.maxConcurrency = Math.max(1, Math.min(4, h.max_concurrency)); } catch { state.maxConcurrency = 2; }
@@ -314,7 +341,8 @@ function renderTable() {
       el("td", {}, statusCell),
       el("td", {}, [el("div", { class: "app-id", text: it.application?.application_id || it.key }),
         el("div", { class: "app-brand", text: it.application ? `${it.application.brand_name} · ${it.application.class_type}` : (it.fields?.largest_text ? `Read: ${it.fields.largest_text}` : "") })]),
-      el("td", {}, [el("div", { class: "files", text: it.files.map((f) => f.name).join(", ") || "none" }), el("div", { class: "files", text: it.method })]),
+      el("td", {}, [el("div", { class: "files", text: it.files.map((f) => f.name).join(", ") || "none" }), el("div", { class: "files", text: it.method }),
+        it.missing && it.missing.length ? el("div", { class: "files text-secondary-dark", text: `Listed but not uploaded: ${it.missing.join(", ")}` }) : null]),
       el("td", {}, it.status === "error" ? el("span", { class: "text-secondary-dark", text: it.error }) : it.status === "no-images" ? el("span", { text: "No images matched this row." })
         : it.application ? issueList(it) : (it.fields ? el("ul", { class: "usa-list usa-list--unstyled issues" }, [
           el("li", { text: `Alcohol: ${it.fields.alcohol_percent != null ? it.fields.alcohol_percent + "%" : "not read"}` }),
@@ -326,9 +354,13 @@ function renderTable() {
     ]);
     rows.push(tr);
     if (state.expanded === it.key && it.status === "done") {
-      const panel = el("div", { class: "detail-panel" });
+      let panel = state.detailCache.get(it.key);
+      if (!panel) {
+        panel = el("div", { class: "detail-panel" });
+        state.detailCache.set(it.key, panel);
+        renderDetail(panel, it);
+      }
       rows.push(el("tr", { class: "detail-row" }, el("td", { colspan: "6" }, panel)));
-      renderDetail(panel, it);
     }
   }
   $("#batch-table").replaceChildren(el("table", { class: "usa-table usa-table--stacked batch-table" }, [
@@ -373,7 +405,7 @@ function renderUnpaired() {
     sel.addEventListener("change", async () => {
       const it = state.items.find((i) => i.key === sel.value);
       if (!it) return;
-      it.files.push(f); it.method = "assigned by agent"; it.status = "pending";
+      it.files.push(f); it.method = "assigned by agent"; it.status = "pending"; state.detailCache.delete(it.key);
       state.unpaired = state.unpaired.filter((n) => n !== name);
       renderUnpaired();
       const ac = new AbortController();

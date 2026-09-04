@@ -219,7 +219,10 @@ export async function makeCrops(files, images, checks) {
         bitmaps.set(ev.image_index, await createImageBitmap(file, { imageOrientation: "from-image" }));
       }
       const bmp = bitmaps.get(ev.image_index);
-      const sx = bmp.width / im.width, sy = bmp.height / im.height; // 1.0 when orientation agrees
+      if (Math.abs(bmp.width - im.width) > 2 || Math.abs(bmp.height - im.height) > 2) {
+        continue; // browser and server disagree on orientation for this file: no crop rather than a wrong one
+      }
+      const sx = 1, sy = 1;
       const xs = c.evidence.flatMap((e) => e.box.map((p) => p[0]));
       const ys = c.evidence.flatMap((e) => e.box.map((p) => p[1]));
       const pad = 8;

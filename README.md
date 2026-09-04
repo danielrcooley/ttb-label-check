@@ -38,7 +38,7 @@ Each one is met by design and checked by a test or a measurement, not by a claim
 | "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.3 s, p95 2.6 s on two workers. Deployed: _DEPLOY_P95_ (see [Measured](#measured)) |
 | "something **my mother could figure out**" | One screen, two numbered steps, one big button, three one-click samples, U.S. Web Design System, statuses as icon + word + color, keyboard and screen-reader friendly. | Observed usability test: _USABILITY_RESULT_ |
 | "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | Load test to hundreds of images: [docs/LOADTEST.md](docs/LOADTEST.md) |
-| The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes; OCR noise is "Needs review" with a diff; a changed or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
+| The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes. Punctuation, accent and single-character differences are "Needs review" with a diff (usually OCR noise); a changed, added or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
 
 And the constraint behind the architecture: Marcus's network "blocks outbound traffic to a lot of
 domains". The verification path makes **no network calls**. Models are in the repository, the page
@@ -68,8 +68,8 @@ flowchart LR
   minimum type size) and the container-size lists are documented with their sources in
   [docs/REGULATIONS.md](docs/REGULATIONS.md). Items the tool cannot assess from an image say
   "Not checked" instead of pretending.
-- **Batch is orchestrated by the browser.** Each image is read once; applications are compared in
-  bulk; the server keeps no state, refuses rather than queues when it is full (HTTP 429 with
+- **Batch is orchestrated by the browser.** Each image is read once; each application is compared as
+  soon as its images are read; the server keeps no state, refuses rather than queues when it is full (HTTP 429 with
   Retry-After), and gives a waiting person priority over a batch.
 
 ## Run it
@@ -92,8 +92,8 @@ python -m venv .venv
 .venv/bin/uvicorn app.main:app --port 8000
 ```
 
-The first request after start waits for the models to load (a few seconds);
-`GET /api/v1/health` reports `ready: true` when they have.
+For a few seconds after start the verification endpoints return 503 while the models load and the
+page shows "starting"; `GET /api/v1/ready` turns 200 when they are warm.
 
 **API (for integration, or for a script):**
 
@@ -111,8 +111,9 @@ Endpoints: `POST /api/v1/verify`, `POST /api/v1/extract`, `POST /api/v1/compare`
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -m "not integration"        # 86 fast unit tests, no OCR
-pytest                              # + 13 integration tests through the API with the real engine
+pytest -m "not integration"        # 107 fast unit tests, no OCR
+pytest                              # + 16 integration tests through the API with the real engine
+python tests/browser/smoke_single.py   # headless browser checks (needs a running server + Playwright)
 ruff check . && mypy                # lint and strict typing
 python tools/evaluate.py            # accuracy and latency table -> docs/EVAL.md
 python tools/loadtest.py --url http://localhost:8000 --mode burst --concurrency 16
@@ -125,14 +126,16 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 
 | What | Result | Where |
 |---|---|---|
-| Field match rate on clean artwork (recall) | 100% on all six fields (60 of 60 checks); warning exact on 10 of 10 | [docs/EVAL.md](docs/EVAL.md) |
+| Field match rate on clean artwork (recall) | 100% on all six fields (60 of 60 checks); warning exact on 8 of 10, the other 2 read with a stray accented letter and land in Needs review (see error analysis below) | [docs/EVAL.md](docs/EVAL.md) |
 | False-alarm rate on clean artwork | 0.0% (0 of 60 field checks) | [docs/EVAL.md](docs/EVAL.md) |
-| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 18 of 20; 17 of 20 cases ready, 2 need review, 1 issue (a label shrunk to a third of its size) | [docs/EVAL.md](docs/EVAL.md) |
-| Planted defects detected | 6 of 6 (wrong ABV, title-case heading, altered wording, missing statement; tiny and all-bold read as exact text, since size and bold are not assessed) | [docs/EVAL.md](docs/EVAL.md) |
-| Per-application latency, local (two images, 2 workers) | median 2,335 ms, p95 2,644 ms | [docs/EVAL.md](docs/EVAL.md) |
+| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 14 of 20; 13 of 20 cases ready, 4 need review, 3 issues (labels shrunk to a third of their size and one sideways read) | [docs/EVAL.md](docs/EVAL.md) |
+| Planted defects detected | 4 of the 4 the tool assesses (wrong ABV, title-case heading, altered wording, missing statement); the other two planted defects (tiny type, all-bold statement) are not assessed in this build and are reported as such | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, local (two images, 2 workers) | median 2,380 ms, p95 2,642 ms | [docs/EVAL.md](docs/EVAL.md) |
 | Per-application latency, deployed | _DEPLOY_LATENCY_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Batch throughput, deployed | _DEPLOY_THROUGHPUT_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |
+
+**Error analysis.** Every warning miss on clean artwork is the same failure: the multilingual recognizer occasionally emits an accented letter for a plain one ("alcoholič", "drivé"). The tool could silently strip accents and report "exact", and an earlier build did; the reviewer was right that a legal status must not hide instrument error, so those cases are "Needs review" with the diff and the evidence crop, a two-second confirmation for the agent. The remaining degraded misses are text shrunk to a third of its size and one sideways image where the rotation retry picked up a partial read. An English-only recognizer would remove the accent failure; it measured about 60% slower single-threaded (`docs/OCR_EVAL.md`), so it was not adopted for this build.
 
 Engine selection and thread scaling are in [docs/BAKEOFF.md](docs/BAKEOFF.md) and
 [docs/OCR_EVAL.md](docs/OCR_EVAL.md). Enforced limits and known weaknesses, stated plainly, are in

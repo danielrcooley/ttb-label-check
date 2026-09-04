@@ -3,11 +3,17 @@
 One engine per worker thread, one ONNX intra-op thread per engine (measured to scale near
 linearly, see docs/OCR_EVAL.md). A single capacity limiter of N slots protects the CPU.
 
-Priority policy (pinned by tests/unit/test_pool.py):
+Admission policy (pinned by tests/unit/test_pool.py):
 - Interactive requests may wait briefly for a slot (a person is watching a spinner).
 - Batch requests never wait. They are refused with BusyError (HTTP 429 + Retry-After) when every
   slot is busy, or when an interactive request is already waiting, so the next free slot goes to
   the person rather than to the queue. When nobody is waiting, batch may use every slot.
+- A slot is held for as long as an OCR thread is actually running. If the awaiting request is
+  cancelled (client disconnect), the slot is released when the thread finishes, not before:
+  ONNX Runtime inference cannot be interrupted, so pretending the capacity is free would let more
+  jobs onto the CPU than there are workers.
+- A slot can be held across several images (batch requests use one slot for all their images), so a
+  multi-image request is never refused halfway through.
 
 Health checks never touch the pool, so they answer even when it is saturated.
 """
@@ -18,8 +24,9 @@ import asyncio
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 
 import numpy as np
 
@@ -28,6 +35,8 @@ from app.config import Settings
 from .base import OcrEngine, RawLine
 
 log = logging.getLogger(__name__)
+
+Runner = Callable[[np.ndarray], Awaitable[list[RawLine]]]
 
 
 class BusyError(Exception):
@@ -45,7 +54,7 @@ class OcrPool:
         self._local = threading.local()
         self._sem = asyncio.Semaphore(self.workers)
         self._lock = threading.Lock()
-        self._active = 0  # admitted requests holding (or about to hold) a slot
+        self._active = 0  # slots held (running or reserved)
         self._interactive_waiting = 0
         self._info: dict[str, str] = {}
         self.ready = False
@@ -118,17 +127,45 @@ class OcrPool:
             self._active += 1  # reserve before awaiting so concurrent batch callers cannot all pass
         await self._sem.acquire()  # cannot block: holders + reservations never exceed the slot count
 
-    async def recognize(self, rgb: np.ndarray, *, interactive: bool) -> tuple[list[RawLine], int, int]:
-        """Run OCR on one image. Returns (lines, queue_ms, ocr_ms). Raises BusyError when refused."""
+    def _release(self) -> None:
+        with self._lock:
+            self._active -= 1
+        self._sem.release()
+
+    @asynccontextmanager
+    async def slot(self, *, interactive: bool) -> AsyncIterator[tuple[Runner, int]]:
+        """Hold one worker slot. Yields (run, queue_ms); ``await run(rgb)`` executes OCR on the slot.
+
+        The slot is released when the block exits, or, if the block is cancelled while a thread is
+        still running, when that thread finishes.
+        """
         t0 = time.perf_counter()
         await self._admit(interactive)
         queue_ms = int((time.perf_counter() - t0) * 1000)
+        loop = asyncio.get_running_loop()
+        pending: list[asyncio.Future[list[RawLine]]] = []
+
+        async def run(rgb: np.ndarray) -> list[RawLine]:
+            fut = loop.run_in_executor(self._executor, self._run, rgb)
+            pending.append(fut)
+            try:
+                return await asyncio.shield(fut)
+            finally:
+                if fut.done():
+                    pending.remove(fut)
+
         try:
-            t1 = time.perf_counter()
-            loop = asyncio.get_running_loop()
-            lines = await loop.run_in_executor(self._executor, self._run, rgb)
-            return lines, queue_ms, int((time.perf_counter() - t1) * 1000)
+            yield run, queue_ms
         finally:
-            with self._lock:
-                self._active -= 1
-            self._sem.release()
+            running = [f for f in pending if not f.done()]
+            if running:
+                running[-1].add_done_callback(lambda _f: self._release())
+            else:
+                self._release()
+
+    async def recognize(self, rgb: np.ndarray, *, interactive: bool) -> tuple[list[RawLine], int, int]:
+        """Run OCR on one image in its own slot. Returns (lines, queue_ms, ocr_ms)."""
+        async with self.slot(interactive=interactive) as (run, queue_ms):
+            t1 = time.perf_counter()
+            lines = await run(rgb)
+            return lines, queue_ms, int((time.perf_counter() - t1) * 1000)

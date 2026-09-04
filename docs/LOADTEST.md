@@ -20,3 +20,15 @@ _Appended by `tools/loadtest.py`. Each block names the host it ran against._
 - final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
 - run at 2026-09-03 16:40:46
 
+### steady: 20 x extract (1 image(s) each), concurrency 2, host http://127.0.0.1:8000
+- wall 14.6 s, throughput 1.37 req/s (1.37 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 1451, p95 1505, max 1566
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-03 17:15:50
+
+### steady interactive: 10 x verify (2 image(s) each), concurrency 2, host http://127.0.0.1:8000
+- wall 19.6 s, throughput 0.51 req/s (1.02 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 3679, p95 4437, max 4631
+- final status codes: {200: 10}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-03 17:16:10
+

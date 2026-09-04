@@ -111,7 +111,7 @@ function fillApplication(app) {
     form.querySelector(`#${id}`).value = app[id] || "";
   }
   form.querySelector("#imported").checked = Boolean(app.imported);
-  const hasOptional = app.bottler || app.country_of_origin || app.application_id || app.imported;
+  const hasOptional = app.country_of_origin || app.application_id || app.imported;
   const btn = form.querySelector("[aria-controls=optional-fields]");
   if (hasOptional && btn.getAttribute("aria-expanded") !== "true") btn.click();
 }

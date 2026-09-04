@@ -12,7 +12,7 @@ import numpy as np
 
 from app.config import Settings
 from app.ocr.base import RawLine
-from app.ocr.pool import OcrPool
+from app.ocr.pool import OcrPool, Runner
 from app.pipeline.compare import compare
 from app.pipeline.extract import extract_fields
 from app.pipeline.images import DecodedImage, decode_image, rotate_array, to_canonical
@@ -84,24 +84,25 @@ def _quality(raw: list[RawLine]) -> ImageQuality:
 
 
 async def process_image(
-    up: Upload, index: int, settings: Settings, pool: OcrPool, *, interactive: bool
+    up: Upload, index: int, settings: Settings, run: Runner, *, queue_ms: int = 0
 ) -> ProcessedImage:
+    """Decode one upload and read it on the given slot, retrying sideways orientations when the
+    first read is poor (the one failure mode the engine does not recover on its own)."""
     dec = decode_image(
         up.data, max_pixels=settings.max_image_pixels, max_side=settings.ocr_max_side, filename=up.filename
     )
-    raw, q_ms, o_ms = await pool.recognize(dec.array, interactive=interactive)
+    t0 = time.perf_counter()
+    raw = await run(dec.array)
     h, w = dec.array.shape[:2]
     best = (_read_score(raw), raw, 0, w, h)
     mean = float(np.mean([r.confidence for r in raw])) if raw else 0.0
     if mean < settings.ocr_low_conf_retry or len(raw) < settings.ocr_min_lines_retry:
-        # Sideways photos are the one failure mode the engine does not recover on its own.
         for degrees in (90, 270):
             rot = rotate_array(dec.array, degrees)
-            raw2, q2, o2 = await pool.recognize(rot, interactive=interactive)
-            q_ms += q2
-            o_ms += o2
+            raw2 = await run(rot)
             if _read_score(raw2) > best[0] * 1.15:
                 best = (_read_score(raw2), raw2, degrees, rot.shape[1], rot.shape[0])
+    ocr_ms = int((time.perf_counter() - t0) * 1000)
     _, raw_best, degrees, rw, rh = best
     lines = _to_lines(raw_best, dec, index, degrees, rw, rh)
     info = ImageInfo(
@@ -113,69 +114,78 @@ async def process_image(
         rotated_degrees=degrees,
         quality=_quality(raw_best),
     )
-    return ProcessedImage(info=info, lines=lines, queue_ms=q_ms, ocr_ms=o_ms)
+    return ProcessedImage(info=info, lines=lines, queue_ms=queue_ms, ocr_ms=ocr_ms)
 
 
 async def process_images(
     uploads: list[Upload], settings: Settings, pool: OcrPool, *, interactive: bool
 ) -> list[ProcessedImage]:
-    """Interactive: the images of one application fan out across workers (a person is waiting, and
-    a front+back pair then costs one image-time). Batch: images are read one at a time, because a
-    batch request is refused rather than queued when no slot is free, and a multi-image request must
-    never be refused halfway through while already holding a slot."""
+    """Interactive: each image takes its own slot so a front+back pair costs one image-time.
+    Batch: one slot is held for all the images of the request, so it can never be refused halfway."""
     if interactive:
-        return list(
-            await asyncio.gather(
-                *(process_image(u, i, settings, pool, interactive=True) for i, u in enumerate(uploads))
-            )
-        )
-    return [await process_image(u, i, settings, pool, interactive=False) for i, u in enumerate(uploads)]
+
+        async def one(i: int, u: Upload) -> ProcessedImage:
+            async with pool.slot(interactive=True) as (run, queue_ms):
+                return await process_image(u, i, settings, run, queue_ms=queue_ms)
+
+        return list(await asyncio.gather(*(one(i, u) for i, u in enumerate(uploads))))
+    async with pool.slot(interactive=False) as (run, queue_ms):
+        return [await process_image(u, i, settings, run, queue_ms=queue_ms) for i, u in enumerate(uploads)]
 
 
 def engine_info(pool: OcrPool) -> EngineInfo:
     return EngineInfo(name="rapidocr-onnxruntime", models=pool.info(), workers=pool.workers)
 
 
+def _timing(t0: float, processed: list[ProcessedImage]) -> Timing:
+    return Timing(
+        total_ms=int((time.perf_counter() - t0) * 1000),
+        queue_ms=max((p.queue_ms for p in processed), default=0),
+        ocr_ms=[p.ocr_ms for p in processed],
+    )
+
+
 async def verify(
-    app: ApplicationFields, uploads: list[Upload], settings: Settings, pool: OcrPool, *, interactive: bool = True
+    app: ApplicationFields,
+    uploads: list[Upload],
+    settings: Settings,
+    pool: OcrPool,
+    *,
+    interactive: bool = True,
+    request_id: str | None = None,
 ) -> VerifyResponse:
     t0 = time.perf_counter()
     processed = await process_images(uploads, settings, pool, interactive=interactive)
     lines = [ln for p in processed for ln in p.lines]
     images = [p.info for p in processed]
     result = compare(app, lines, images, settings)
-    timing = Timing(
-        total_ms=int((time.perf_counter() - t0) * 1000),
-        queue_ms=max((p.queue_ms for p in processed), default=0),
-        ocr_ms=[p.ocr_ms for p in processed],
-    )
     return VerifyResponse(
-        request_id=new_request_id(),
+        request_id=request_id or new_request_id(),
         application=app,
         images=images,
         lines=lines,
-        timing=timing,
+        timing=_timing(t0, processed),
         engine=engine_info(pool),
         **result.model_dump(),
     )
 
 
 async def extract(
-    uploads: list[Upload], settings: Settings, pool: OcrPool, *, interactive: bool = False
+    uploads: list[Upload],
+    settings: Settings,
+    pool: OcrPool,
+    *,
+    interactive: bool = False,
+    request_id: str | None = None,
 ) -> ExtractResponse:
     t0 = time.perf_counter()
     processed = await process_images(uploads, settings, pool, interactive=interactive)
     lines = [ln for p in processed for ln in p.lines]
-    timing = Timing(
-        total_ms=int((time.perf_counter() - t0) * 1000),
-        queue_ms=max((p.queue_ms for p in processed), default=0),
-        ocr_ms=[p.ocr_ms for p in processed],
-    )
     return ExtractResponse(
-        request_id=new_request_id(),
+        request_id=request_id or new_request_id(),
         images=[p.info for p in processed],
         lines=lines,
         fields=extract_fields(lines),
-        timing=timing,
+        timing=_timing(t0, processed),
         engine=engine_info(pool),
     )

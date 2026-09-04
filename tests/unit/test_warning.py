@@ -11,7 +11,7 @@ from app.schemas import Status
 
 from tests.unit.conftest import make_lines
 
-REVIEW, MISMATCH = 0.97, 0.80
+MISMATCH = 0.80
 
 
 def wrapped(text: str, width: int = 60) -> list[str]:
@@ -19,7 +19,7 @@ def wrapped(text: str, width: int = 60) -> list[str]:
 
 
 def report(lines):
-    return build_report(lines, review_similarity=REVIEW, mismatch_similarity=MISMATCH)
+    return build_report(lines, mismatch_similarity=MISMATCH)
 
 
 def test_exact_warning_across_wrapped_lines_is_exact():
@@ -107,11 +107,29 @@ def test_small_text_misreads_are_noise_not_wording():
     assert r.assessment == "noise" and not r.exact
 
 
-def test_accented_letter_in_the_read_does_not_break_exactness():
-    """The regulation text has no accents; 'alcoholi\u010d' is a recognition artifact."""
+def test_accented_letter_in_the_read_is_noise_not_exact():
+    """The regulation text has no accents; 'alcoholi\u010d' is almost certainly a recognition artifact,
+    but exact means exact, so the agent confirms it."""
     r = report(make_lines(wrapped(CANONICAL.replace("alcoholic beverages during", "alcoholi\u010d beverages during"))))
-    assert r.exact and r.assessment == "exact"
+    assert not r.exact and r.assessment == "noise"
 
 
 def test_missing_warning_has_absent_assessment():
     assert report(make_lines(["OLD TOM DISTILLERY"])).assessment == "absent"
+
+
+def test_warning_alone_is_not_an_anchor():
+    lines = make_lines(["WARNING: keep out of reach of children.", "Contains sulfites."])
+    assert find_warning(lines) is None
+    assert report(lines).assessment == "absent"
+
+
+def test_continuation_lines_must_share_the_anchor_column():
+    from tests.unit.conftest import make_line
+
+    left = wrapped(CANONICAL, 50)
+    lines = [make_line(t, y=100 + i * 44, x=100, h=34) for i, t in enumerate(left)]
+    # a second column of unrelated text at the same heights must not be swept into the span
+    lines += [make_line("Tasting notes: oak, vanilla, caramel", y=100 + i * 44, x=1600, h=34) for i in range(len(left))]
+    r = report(lines)
+    assert r.exact, r.diff

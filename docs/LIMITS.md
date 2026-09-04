@@ -7,15 +7,16 @@ Reviewers will push on this prototype, and they should. This page says what happ
 | Limit | Value | What happens past it |
 |---|---|---|
 | Image size | 10 MB per image | HTTP 413, message names the file and the limit |
-| Request size | 40 MB, `Content-Length` required | HTTP 413 or 411 before the body is read |
-| Image dimensions | 40 megapixels | HTTP 413 "image too large", checked from the header before decoding |
+| Request size | 40 MB, `Content-Length` required | HTTP 413 or 411 before the body is read (six images fit only if together they stay under 40 MB) |
+| Image dimensions | 25 megapixels | HTTP 413 "image too large", checked from the header before decoding; large JPEGs decode at reduced size |
 | Images per application | 6 | HTTP 422 |
 | Image formats | PNG, JPEG, GIF, WebP, TIFF, BMP by file signature | HTTP 415 with a format-specific hint (PDF, SVG, HEIC named) |
 | Concurrent OCR jobs | one per CPU (`TTB_OCR_WORKERS`) | Interactive requests wait up to 8 s for a slot, then 429; batch requests get 429 immediately with `Retry-After` |
-| Concurrent requests per client | 4 | HTTP 429 with `Retry-After: 1` |
+| Concurrent requests per client | 4 | HTTP 429 with `Retry-After: 1`, decided before the body is read |
+| Concurrent metered requests, all clients | 24 | HTTP 503 with `Retry-After: 2`, decided before the body is read |
 | Compare items per call | 100 | HTTP 422 |
 | CSV rows / size | 5,000 rows, 2 MB | Rows beyond the limit are ignored with a warning; larger files are refused |
-| Batch size in the browser | no hard cap; tested with hundreds of images | Table paginates at 50 rows; thumbnails are created only when a row is expanded |
+| Batch size in the browser | no hard cap; tested with hundreds of images | Table paginates at 50 rows and re-renders at most a few times per second; result detail (crops, highlights) is rendered only when a row is expanded and cached |
 
 Health (`/api/v1/health`) never goes through the limiter, so it answers during a flood.
 Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a platform never routes traffic to a cold instance.
@@ -59,6 +60,10 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 10. **Synthetic test corpus.** Ground truth is exact because the labels are rendered, and that also
     means real-world variety is under-represented. Numbers in `docs/EVAL.md` are an upper bound
     for artwork and a rough guide for photographs.
-11. **Fuzzy pairing is not attempted.** Images that are not listed in the CSV or named with the
+11. **The recognizer occasionally emits an accented letter for a plain one** ("alcoholič"). The warning
+    check treats that as noise and asks for confirmation rather than calling the statement exact; on the
+    clean test corpus this happened on 2 of 10 labels. An English-only recognizer avoids it at a
+    measured 60% latency cost and is the first thing to revisit.
+12. **Fuzzy pairing is not attempted.** Images that are not listed in the CSV or named with the
     application reference are shown as unmatched for the agent to assign. Guessing which back label
     belongs to which application would be confidently wrong too often.

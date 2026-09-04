@@ -19,7 +19,7 @@ from app.ocr.pool import OcrPool
 from app.ocr.rapid import RapidEngine
 from app.routes.api import router as api_router
 from app.routes.csv_routes import router as csv_router
-from app.security import ClientLimiter, SecurityMiddleware, install_error_handlers
+from app.security import AdmissionLimiter, SecurityMiddleware, install_error_handlers
 
 logging.basicConfig(
     level=logging.INFO, format='{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}'
@@ -71,8 +71,9 @@ def create_app(
         openapi_url="/api/v1/openapi.json",
     )
     app.state.settings = settings
-    app.state.client_limiter = ClientLimiter(settings)
-    app.add_middleware(SecurityMiddleware, settings=settings)
+    limiter = AdmissionLimiter(settings)
+    app.state.limiter = limiter
+    app.add_middleware(SecurityMiddleware, settings=settings, limiter=limiter)
     install_error_handlers(app)
     app.include_router(api_router)
     app.include_router(csv_router)

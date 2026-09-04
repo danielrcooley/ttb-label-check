@@ -43,7 +43,7 @@ class Alcohol:
 
 _ABV_PATTERNS = [
     # 45% Alc./Vol.   5.2% ALC/VOL   14.1% Alc. by Vol.   45 % abv
-    re.compile(_NUM + r"\s*%\s*(?:alc|alcohol|abv|vol)", re.I),
+    re.compile(_NUM + r"\s*%\s*(?:alc\.?\s*/\s*vol|alc\.?\s*by\s*vol|alc\.?\s*vol|alcohol\s*by\s*vol|abv|vol)", re.I),
     # Alc. 40% by Vol.   ABV 5.2%   Alcohol 13.5%   ALC 13.5% VOL
     re.compile(r"(?:alc(?:ohol)?\.?|abv)[\s.:]*" + _NUM + r"\s*%", re.I),
     # Alcohol 13.5 percent by volume / alc 13.5 by vol (no % sign)

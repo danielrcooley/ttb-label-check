@@ -101,13 +101,15 @@
                 <label class="usa-label" for="net_contents">Net contents <abbr title="required" class="usa-hint usa-hint--required">*</abbr></label>
                 <input class="usa-input" id="net_contents" name="net_contents" type="text" required autocomplete="off" placeholder="750 mL">
 
+                <label class="usa-label" for="bottler">Name and address of bottler / producer</label>
+                <span class="usa-hint" id="bottler-hint">Optional here, but a required label element; when left blank the result says it was not compared.</span>
+                <input class="usa-input" id="bottler" name="bottler" type="text" autocomplete="off" aria-describedby="bottler-hint">
+
                 <div class="usa-accordion usa-accordion--bordered margin-top-3">
                   <h3 class="usa-accordion__heading">
                     <button type="button" class="usa-accordion__button" aria-expanded="false" aria-controls="optional-fields">More fields (optional)</button>
                   </h3>
                   <div id="optional-fields" class="usa-accordion__content usa-prose" hidden>
-                    <label class="usa-label margin-top-0" for="bottler">Name and address of bottler / producer</label>
-                    <input class="usa-input" id="bottler" name="bottler" type="text" autocomplete="off">
 
                     <label class="usa-label" for="country_of_origin">Country of origin</label>
                     <input class="usa-input" id="country_of_origin" name="country_of_origin" type="text" autocomplete="off" placeholder="USA">
@@ -162,7 +164,7 @@
     <section id="view-batch" class="usa-section padding-top-4" data-view-panel="batch" hidden>
       <div class="grid-container">
         <h1 class="margin-top-0">Check a batch of applications</h1>
-        <p class="usa-intro measure-6">For the importer who sends 300 at once. Add all the label images, add a spreadsheet of what each application says, and watch the results come in. Nothing leaves your browser except the images being read, one at a time.</p>
+        <p class="usa-intro measure-6">For the importer who sends 300 at once. Add all the label images, add a spreadsheet of what each application says, and watch the results come in. Images are sent to the server one request at a time to be read and are discarded immediately; the spreadsheet rows are sent for comparison; nothing is stored.</p>
 
         <div class="sample-bar">
           <span class="text-bold">Try it:</span>

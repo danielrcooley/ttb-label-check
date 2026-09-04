@@ -114,3 +114,42 @@ def test_warmup_failure_is_recorded_and_visible_in_health():
         assert "libgthread" in body["error"]
         r = c.get("/api/v1/ready")
         assert r.status_code == 503 and "libgthread" in r.json()["message"]
+
+
+def test_cancelled_request_keeps_its_slot_until_the_thread_finishes():
+    async def go():
+        pool = make_pool(1, seconds=0.6)
+        task = asyncio.create_task(pool.recognize(IMG, interactive=False))
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        with pytest.raises(BusyError):  # the OCR thread is still running; capacity is not free
+            await pool.recognize(IMG, interactive=False)
+        await asyncio.sleep(0.8)
+        lines, _, _ = await pool.recognize(IMG, interactive=False)  # released once the thread ended
+        assert lines
+        pool.shutdown()
+
+    asyncio.run(go())
+
+
+def test_batch_request_holds_one_slot_across_all_its_images():
+    async def go():
+        pool = make_pool(1, seconds=0.3)
+
+        async def two_images():
+            async with pool.slot(interactive=False) as (run, _q):
+                first = await run(IMG)
+                second = await run(IMG)  # must not be refused: the slot is still ours
+                return first, second
+
+        t = asyncio.create_task(two_images())
+        await asyncio.sleep(0.05)
+        with pytest.raises(BusyError):  # a competing batch request sees no free slot in between
+            await pool.recognize(IMG, interactive=False)
+        first, second = await t
+        assert first and second
+        pool.shutdown()
+
+    asyncio.run(go())

@@ -76,7 +76,9 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
 
         async def task() -> None:
             async with sem:
-                results.append(await one(client, args.url, args.endpoint, files, batch=True, retry=True))
+                results.append(
+                    await one(client, args.url, args.endpoint, files, batch=not args.interactive, retry=True)
+                )
 
         t0 = time.perf_counter()
         await asyncio.gather(*(task() for _ in range(args.n)))
@@ -88,7 +90,8 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
     refused = sum(r for _, _, r in results)
     return "\n".join(
         [
-            f"### steady: {args.n} x {args.endpoint} ({len(files)} image(s) each), concurrency {args.concurrency}, host {args.url}",
+            f"### steady{' interactive' if args.interactive else ''}: {args.n} x {args.endpoint} "
+            f"({len(files)} image(s) each), concurrency {args.concurrency}, host {args.url}",
             f"- wall {wall:.1f} s, throughput {args.n / wall:.2f} req/s ({args.n * len(files) / wall:.2f} images/s)",
             f"- wall latency ms per successful request, including any backoff waits: p50 {pct(ok, 0.5):.0f}, "
             f"p95 {pct(ok, 0.95):.0f}, max {max(ok) if ok else 0:.0f}",
@@ -129,6 +132,7 @@ def main() -> None:
     ap.add_argument("--concurrency", type=int, default=0, help="0 = the server's max_concurrency from /health")
     ap.add_argument("--images", nargs="*", default=None, help="image paths; default: bundled clean sample")
     ap.add_argument("--report", default="docs/LOADTEST.md")
+    ap.add_argument("--interactive", action="store_true", help="no X-Batch header: measures the person-facing path")
     args = ap.parse_args()
     paths = (
         [Path(p) for p in args.images]

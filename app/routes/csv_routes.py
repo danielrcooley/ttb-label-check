@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.config import Settings
 from app.csvio import parse_csv, template_csv
 from app.schemas import ApplicationFields
-from app.services import new_request_id
+from app.security import request_id_of
 
 router = APIRouter(prefix="/api/v1/csv", tags=["batch"])
 
@@ -47,7 +47,7 @@ async def csv_parse(request: Request, file: UploadFile = File(...)) -> CsvParseR
         raise HTTPException(status_code=413, detail=f"CSV larger than {settings.max_csv_bytes // 1024} KB.")
     result = parse_csv(data, max_rows=settings.max_csv_rows)
     return CsvParseResponse(
-        request_id=new_request_id(),
+        request_id=request_id_of(request),
         rows=[
             CsvRowOut(row_number=r.row_number, application=r.application, images=r.images, errors=r.errors)
             for r in result.rows

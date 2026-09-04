@@ -41,8 +41,8 @@ PROBLEM_EXPECTATIONS = {
     "titlecase": lambda r: r.warning.present and r.warning.anchor_caps == "needs_review",
     "altered": lambda r: r.warning.present and not r.warning.exact and r.verdict == "issues_found",
     "missing": lambda r: not r.warning.present and r.verdict == "issues_found",
-    "tiny": lambda r: r.warning.present and r.warning.exact,  # text is exact; size is not assessed
-    "allbold": lambda r: r.warning.present and r.warning.exact,  # bold is not assessed in this build
+    "tiny": None,  # planted defect the tool does not assess (physical type size)
+    "allbold": None,  # planted defect the tool does not assess (bold type)
 }
 
 
@@ -97,7 +97,10 @@ async def run(labels: Path, workers: int) -> dict:
                     "checks": {c.id: c.status for c in res.checks},
                     "warning_exact": res.warning.exact,
                     "warning_present": res.warning.present,
-                    "detected": PROBLEM_EXPECTATIONS[variant](res) if tier == "problem" else None,
+                    "detected": (PROBLEM_EXPECTATIONS[variant](res) if PROBLEM_EXPECTATIONS.get(variant) else None)
+                    if tier == "problem"
+                    else None,
+                    "assessed": tier == "problem" and PROBLEM_EXPECTATIONS.get(variant) is not None,
                 }
             )
     pool.shutdown()
@@ -175,18 +178,22 @@ def summarize(data: dict) -> tuple[str, dict]:
         else:
             out += ["| Planted defect | detected | note |", "|---|---|---|"]
             notes = {
-                "tiny": "wording exact; physical size not assessed",
-                "allbold": "wording exact; bold not assessed in this build",
+                "tiny": "NOT ASSESSED by design: physical type size",
+                "allbold": "NOT ASSESSED by design: bold type",
             }
             det = 0
+            assessed = [c for c in cases if c["assessed"]]
             for c in cases:
                 det += bool(c["detected"])
-                out.append(
-                    f"| {c['variant']} ({c['app']}) | {'yes' if c['detected'] else 'NO'} | {notes.get(c['variant'], '')} |"
-                )
-            summary["problem_detection"] = det / len(cases)
-            out += ["", f"- Detection rate: {det}/{len(cases)}", ""]
-    out += ["## Engine", "", f"- {data['engine']}", f"- workers: {data['workers']}", ""]
+                mark = ("yes" if c["detected"] else "NO") if c["assessed"] else "n/a"
+                out.append(f"| {c['variant']} ({c['app']}) | {mark} | {notes.get(c['variant'], '')} |")
+            summary["problem_detection"] = det / len(assessed) if assessed else None
+            out += [
+                "",
+                f"- Detection rate over the defects the tool assesses: {det}/{len(assessed)}; "
+                f"{len(cases) - len(assessed)} planted defects are outside this build's checks and are listed as n/a",
+                "",
+            ]
     return "\n".join(out), summary
 
 

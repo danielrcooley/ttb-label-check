@@ -154,3 +154,25 @@ def test_health_reports_engine_and_capacity(client):
 def test_ready_probe_answers_200_once_warm(client):
     r = client.get("/api/v1/ready")
     assert r.status_code == 200 and r.json() == {"ready": True}
+
+
+def test_request_id_in_body_matches_the_header(client, manifest):
+    app = manifest["applications"][0]
+    r = client.post("/api/v1/verify", data={"application": app_json(app)}, files=image_files("APP-001_front_clean.png"))
+    assert r.json()["request_id"] == r.headers["X-Request-ID"]
+    assert "Server-Timing" in r.headers and "Content-Security-Policy" in r.headers
+
+
+def test_early_rejections_carry_security_headers_and_do_not_crash(client):
+    r = client.post(
+        "/api/v1/extract",
+        content=b"x",
+        headers={"Content-Type": "multipart/form-data; boundary=x", "Content-Length": "abc"},
+    )
+    assert r.status_code == 400 and "Content-Security-Policy" in r.headers
+    r = client.post(
+        "/api/v1/extract",
+        content=b"x" * 10,
+        headers={"Content-Type": "multipart/form-data; boundary=x", "Content-Length": "99999999999"},
+    )
+    assert r.status_code == 413 and r.json()["code"] == "request_too_large"

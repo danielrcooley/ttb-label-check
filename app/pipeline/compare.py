@@ -24,6 +24,7 @@ from app.schemas import (
 
 from .match import best_span, status_for
 from .parsers import (
+    Alcohol,
     alcohol_matches,
     alcohol_statement_required,
     fill_rule,
@@ -73,7 +74,6 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
     stripped = [ln.model_copy(update={"text": _ORIGIN_PREFIX.sub("", ln.text)}) for ln in lines]
     check = _text_check("country_of_origin", expected, stripped, s, rule="27 CFR 5.69 / 4.35 / 7.69; 19 CFR 134")
     if check.evidence:
-        original = {id(ln): ln for ln in stripped}
         # restore the full line text in the evidence and the 'found' value for display
         found_lines = [
             ln for ln in lines if any(ln.box == ev.box and ln.image_index == ev.image_index for ev in check.evidence)
@@ -83,25 +83,27 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
             check.found = " ".join(ln.text for ln in found_lines)
             if check.status is Status.match and check.found != expected:
                 check.note = f"Label says '{check.found}'."
-        del original
     return check
 
 
 def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) -> Check:
     required, why = alcohol_statement_required(app.beverage_type, app.class_type)
     expected = parse_alcohol(app.alcohol_content, allow_bare=True) if app.alcohol_content else None
-    # Read every line; keep the first line whose text parses, with its evidence.
-    found = None
-    ev: list[Evidence] = []
+    # Parse every line; prefer the statement that agrees with the application, else the first one.
+    candidates: list[tuple[Alcohol, OcrLine]] = []
     for ln in lines:
         got = parse_alcohol(ln.text)
         if got:
-            found, ev = got, [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)]
-            break
+            candidates.append((got, ln))
+    found: Alcohol | None = None
+    ev: list[Evidence] = []
+    distinct = sorted({round(a.percent, 1) for a, _ in candidates if a.percent is not None})
+    if candidates:
+        chosen = next(((a, ln) for a, ln in candidates if expected and alcohol_matches(expected, a)), candidates[0])
+        found, _line = chosen
+        ev = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for _, ln in candidates]
     if found is None:  # statements sometimes wrap ("45% Alc./Vol." / "(90 Proof)")
-        got = parse_alcohol(" ".join(ln.text for ln in lines))
-        if got:
-            found = got
+        found = parse_alcohol(" ".join(ln.text for ln in lines))
     base: dict[str, Any] = {
         "id": "alcohol_content",
         "label": _LABELS["alcohol_content"],
@@ -113,10 +115,16 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
     if expected is None:
         if found is None:
             st = Status.not_found if required else Status.info
-            return Check(status=st, note=("No alcohol statement in the application or on the label. " + why), **base)
+            return Check(status=st, note="No alcohol statement in the application or on the label. " + why, **base)
+        if required:
+            return Check(
+                status=Status.needs_review,
+                note=f"The application gives no alcohol content, but one is required and the label states "
+                f"{found.percent}%. Confirm the application. " + why,
+                **base,
+            )
         return Check(
             status=Status.info,
-            score=None,
             note=f"Application gives no alcohol content; the label states {found.percent}%. " + why,
             **base,
         )
@@ -124,10 +132,26 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
         return Check(
             status=Status.not_found, note="No alcohol content statement could be read on the label. " + why, **base
         )
+    if len(distinct) > 1:
+        stated = ", ".join(f"{v:g}%" for v in distinct)
+        return Check(
+            status=Status.mismatch,
+            score=0.0,
+            note=f"The label images state different alcohol contents ({stated}); the application says "
+            f"{expected.percent:g}%. A label may not contradict itself.",
+            **base,
+        )
     if alcohol_matches(expected, found):
         note = f"Both state {found.percent}% alcohol by volume."
+        if expected.proof is not None and found.proof is not None and abs(expected.proof - found.proof) > 0.2:
+            return Check(
+                status=Status.mismatch,
+                score=0.0,
+                note=f"Percentages agree but proof differs: application {expected.proof:g}, label {found.proof:g}.",
+                **base,
+            )
         if found.consistent is False:
-            note += f" The label's proof ({found.proof}) does not equal twice the percentage. Confirm on the image."
+            note += f" The label's proof ({found.proof:g}) does not equal twice the percentage. Confirm on the image."
             return Check(status=Status.needs_review, score=100.0, note=note, **base)
         return Check(status=Status.match, score=100.0, note=note, **base)
     return Check(
@@ -211,7 +235,9 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
     statuses = [c.status for c in checks if c.id != "standard_of_fill"]
     issues = [c for c in checks if c.status in hard]
     reviews = [c for c in checks if c.status in soft]
-    if warning.assessment in ("absent", "wording"):
+    if warning.assessment == "not_required":
+        pass
+    elif warning.assessment in ("absent", "wording"):
         issues.append(Check(id="warning", label="Government warning", status=Status.mismatch))
     elif warning.assessment in ("case", "noise") or warning.anchor_caps is Status.needs_review:
         reviews.append(Check(id="warning", label="Government warning", status=Status.needs_review))
@@ -223,7 +249,9 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
     if reviews:
         names = ", ".join(c.label.lower() for c in reviews)
         return Verdict.needs_review, f"Everything else matches; please confirm: {names}."
-    if all(st in {Status.match, Status.info} for st in statuses) and warning.exact:
+    if all(st in {Status.match, Status.info, Status.not_checked} for st in statuses) and (
+        warning.exact or warning.assessment == "not_required"
+    ):
         return Verdict.ready_for_approval, "All checks match and the warning is exact. Ready for the agent's approval."
     return Verdict.needs_review, "Some checks could not be completed. Review the items marked."
 
@@ -238,6 +266,16 @@ def compare(app: ApplicationFields, lines: list[OcrLine], images: list[ImageInfo
     checks.append(net)
     if app.bottler:
         checks.append(_text_check("bottler", app.bottler, lines, s, rule="27 CFR 5.66 / 4.35 / 7.66"))
+    else:
+        checks.append(
+            Check(
+                id="bottler",
+                label=_LABELS["bottler"],
+                status=Status.not_checked,
+                note="Not compared: the application did not provide the bottler's name and address.",
+                rule="27 CFR 5.66 / 4.35 / 7.66",
+            )
+        )
     if app.country_of_origin:
         checks.append(_origin_check(app.country_of_origin, lines, s))
     elif app.imported:
@@ -251,10 +289,30 @@ def compare(app: ApplicationFields, lines: list[OcrLine], images: list[ImageInfo
                 rule="19 CFR 134",
             )
         )
+    else:
+        checks.append(
+            Check(
+                id="country_of_origin",
+                label=_LABELS["country_of_origin"],
+                status=Status.not_checked,
+                note="Not compared: the application did not provide a country of origin (required for imports).",
+                rule="19 CFR 134",
+            )
+        )
     if fill:
         checks.append(fill)
-    warning = build_report(
-        lines, review_similarity=s.warning_review_similarity, mismatch_similarity=s.warning_mismatch_similarity
-    )
+    warning = build_report(lines, mismatch_similarity=s.warning_mismatch_similarity)
+    stated = parse_alcohol(app.alcohol_content, allow_bare=True) if app.alcohol_content else None
+    if stated and stated.percent is not None and stated.percent < 0.5:
+        warning = warning.model_copy(
+            update={
+                "assessment": "not_required",
+                "notes": [
+                    f"The application states {stated.percent:g}% alcohol. The health warning statement is required "
+                    "only for beverages of 0.5% alcohol or more (27 CFR 16.10), so its absence is not a finding."
+                ]
+                + ([] if not warning.present else ["A warning statement is present anyway."]),
+            }
+        )
     verdict, summary = _verdict(checks, warning, images, s)
     return CompareResult(verdict=verdict, checks=checks, warning=warning, summary=summary)

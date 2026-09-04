@@ -82,3 +82,35 @@ def test_unrotate_point_round_trips_a_marked_pixel(degrees):
 def test_to_canonical_undoes_scale_and_rotation():
     quad = to_canonical([(10, 10), (20, 10), (20, 20), (10, 20)], scale=0.5, degrees=0, rot_w=100, rot_h=100)
     assert quad == ((20.0, 20.0), (40.0, 20.0), (40.0, 40.0), (20.0, 40.0))
+
+
+@pytest.mark.parametrize("orientation", [1, 2, 3, 4, 5, 6, 7, 8])
+def test_all_eight_exif_orientations_yield_the_displayed_geometry(orientation):
+    """A 60x40 image with a red pixel near its top-left, saved with each EXIF orientation tag.
+    After decoding, the canonical image must be what a viewer would display."""
+    from PIL import ImageOps as _Ops
+
+    base = Image.new("RGB", (60, 40), (255, 255, 255))
+    base.putpixel((5, 3), (255, 0, 0))
+    # produce the stored (un-oriented) pixels by applying the inverse of the tag's transform
+    inverse = {
+        1: None,
+        2: Image.FLIP_LEFT_RIGHT,
+        3: Image.ROTATE_180,
+        4: Image.FLIP_TOP_BOTTOM,
+        5: Image.TRANSPOSE,
+        6: Image.ROTATE_90,
+        7: Image.TRANSVERSE,
+        8: Image.ROTATE_270,
+    }[orientation]
+    stored = base if inverse is None else base.transpose(inverse)
+    exif = stored.getexif()
+    exif[0x0112] = orientation
+    buf = BytesIO()
+    stored.save(buf, "JPEG", quality=95, exif=exif.tobytes())
+    d = decode_image(buf.getvalue(), max_pixels=10**7, max_side=1280)
+    assert (d.width, d.height) == (60, 40)
+    expected = _Ops.exif_transpose(Image.open(BytesIO(buf.getvalue()))).convert("RGB")
+    ys, xs = np.nonzero(d.array[:, :, 1] < 128)  # the red pixel (low green)
+    ey, ex = np.nonzero(np.asarray(expected)[:, :, 1] < 128)
+    assert (int(xs.mean()), int(ys.mean())) == (int(ex.mean()), int(ey.mean()))

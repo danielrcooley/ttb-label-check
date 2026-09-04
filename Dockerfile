@@ -9,9 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OMP_NUM_THREADS=1 \
     PORT=8000
 
-# libgomp is needed by onnxruntime, libglib2.0-0 (libgthread) by opencv-python-headless; nothing else.
+# libgomp: onnxruntime. libglib2.0-0, libxcb1, libsm6, libxext6, libxrender1: runtime links of the
+# opencv-python-headless wheel (no display is used). Nothing else beyond the slim image.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
+ && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 libxcb1 libsm6 libxext6 libxrender1 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app
 

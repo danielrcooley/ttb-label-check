@@ -20,6 +20,7 @@ from app.schemas import BeverageType
         ("13,5% vol", 13.5, None),
         ("ALCOHOL 13.5% BY VOLUME", 13.5, None),
         ("Alcohol 14.1 percent by volume", 14.1, None),
+        ("13.5% vol", 13.5, None),
         ("90 PROOF", 45.0, 90.0),
         ("14.1% Alc./Vol.", 14.1, None),
         ("6.8% ALC/VOL", 6.8, None),
@@ -114,3 +115,93 @@ def test_alcohol_statement_requirements_by_beverage_type():
     assert alcohol_statement_required(BeverageType.wine, "Table Wine")[0] is False
     assert alcohol_statement_required(BeverageType.wine, "Cabernet Sauvignon")[0] is True
     assert alcohol_statement_required(BeverageType.malt, "India Pale Ale")[0] is False
+
+
+def test_compare_flags_proof_disagreement_and_missing_required_statement():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    lines = make_lines(
+        ["OLD TOM DISTILLERY", "Kentucky Straight Bourbon Whiskey", "45% Alc./Vol. (80 Proof)", "750 mL"]
+    )
+    app = ApplicationFields(
+        beverage_type="spirits",
+        brand_name="OLD TOM DISTILLERY",
+        class_type="Kentucky Straight Bourbon Whiskey",
+        alcohol_content="45% Alc./Vol. (90 Proof)",
+        net_contents="750 mL",
+    )
+    alc = next(c for c in compare(app, lines, [], s).checks if c.id == "alcohol_content")
+    assert alc.status == "mismatch" and "proof differs" in alc.note
+
+    app2 = app.model_copy(update={"alcohol_content": None})
+    alc2 = next(c for c in compare(app2, lines, [], s).checks if c.id == "alcohol_content")
+    assert alc2.status == "needs_review"  # required for spirits, missing from the application
+
+
+def test_compare_prefers_the_alcohol_line_that_matches_the_application():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    lines = make_lines(["Contains 5% alcohol flavoring", "45% ALC/VOL", "750 mL"])
+    app = ApplicationFields(
+        beverage_type="spirits", brand_name="X", class_type="Vodka", alcohol_content="45%", net_contents="750 mL"
+    )
+    alc = next(c for c in compare(app, lines, [], s).checks if c.id == "alcohol_content")
+    assert alc.status == "match" and alc.found == "45% ALC/VOL"
+
+
+def test_warning_not_required_below_half_percent():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    lines = make_lines(["NEAR BEER", "Non-alcoholic malt beverage", "0.4% ALC/VOL", "12 FL OZ"])
+    app = ApplicationFields(
+        beverage_type="malt",
+        brand_name="NEAR BEER",
+        class_type="Non-alcoholic malt beverage",
+        alcohol_content="0.4% ALC/VOL",
+        net_contents="12 FL OZ",
+    )
+    res = compare(app, lines, [], s)
+    assert res.warning.assessment == "not_required"
+    assert res.verdict == "ready_for_approval"
+
+
+def test_percent_without_a_volume_marker_is_not_an_alcohol_statement():
+    assert parse_alcohol("Contains 5% alcohol flavoring") is None
+    assert parse_alcohol("Save 20% today") is None
+
+
+def test_conflicting_alcohol_statements_across_images_are_a_mismatch():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    front = make_lines(["OLD TOM DISTILLERY", "40% Alc./Vol. (80 Proof)", "750 mL"], image_index=0)
+    back = make_lines(["Product of USA", "45% Alc./Vol. (90 Proof) 750 mL"], image_index=1)
+    app = ApplicationFields(
+        beverage_type="spirits",
+        brand_name="OLD TOM DISTILLERY",
+        class_type="Bourbon",
+        alcohol_content="45% Alc./Vol. (90 Proof)",
+        net_contents="750 mL",
+    )
+    alc = next(c for c in compare(app, front + back, [], s).checks if c.id == "alcohol_content")
+    assert alc.status == "mismatch" and "40%" in alc.note and "45%" in alc.note
+    assert len(alc.evidence) == 2

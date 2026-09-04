@@ -40,12 +40,13 @@ class Settings(BaseSettings):
     # --- request limits (see LIMITS.md)
     max_image_bytes: int = 10 * 1024 * 1024
     max_request_bytes: int = 40 * 1024 * 1024
-    max_image_pixels: int = 40_000_000
+    max_image_pixels: int = 25_000_000
     max_images_per_application: int = 6
     max_compare_items: int = 100
     max_csv_rows: int = 5000
     max_csv_bytes: int = 2 * 1024 * 1024
     per_client_inflight: int = 4
+    global_inflight: int = Field(default=24, description="Concurrent metered requests across all clients")
     interactive_wait_seconds: float = Field(
         default=8.0, description="How long an interactive request may wait for a worker slot"
     )
@@ -55,9 +56,6 @@ class Settings(BaseSettings):
         default=90, description="Fuzzy score at/above which a non-exact match is Needs review"
     )
     match_mismatch_threshold: int = Field(default=70, description="Below this the best candidate counts as Not found")
-    warning_review_similarity: float = Field(
-        default=0.97, description="Warning similarity at/above which a non-exact warning is Needs review"
-    )
     warning_mismatch_similarity: float = Field(
         default=0.80, description="Below this the warning is treated as wording differs"
     )

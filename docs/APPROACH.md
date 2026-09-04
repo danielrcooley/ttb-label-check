@@ -26,7 +26,8 @@ from those four plus Marcus's firewall.
   for Section 508. Statuses are always an icon, a word and a color.
 - **Batch** meant the browser orchestrates: it reads each image once, pairs images to applications
   by an explicit rule (a CSV column or a filename prefix; leftovers are assigned by hand, never
-  guessed), compares in bulk, and streams rows in. The server stays stateless, which is also why it
+  guessed), compares each application as soon as its images are read, and streams rows in. The
+  bulk compare endpoint serves scripted clients. The server stays stateless, which is also why it
   scales by adding replicas and why a refresh clears the session (the page says so).
 - **Exact warning** meant a character-level comparison with the regulation text pulled from the
   eCFR API, where only an exact match passes. The interesting engineering is separating OCR noise
@@ -37,9 +38,9 @@ Two decisions I would defend first. Automatic approval was never on the table, b
 right that judgment is the job and because federal AI guidance requires human oversight for
 decisions like this. And no LLM sits in the verification path: the firewall forbids it, the
 five-second budget punishes it, and a compliance tool should give the same answer for the same
-label every time, with every finding traceable to pixels. A provider interface exists for an
-optional second opinion; it is off, and would be pointed at an approved endpoint inside the
-agency boundary.
+label every time, with every finding traceable to pixels. The engine sits behind a small
+interface (`app/ocr/base.py`); a second-opinion provider would implement it and be pointed at an
+approved endpoint inside the agency boundary. None is wired in.
 
 ## How it works
 

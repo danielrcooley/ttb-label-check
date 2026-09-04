@@ -19,7 +19,8 @@ from app.schemas import (
     HealthResponse,
     VerifyResponse,
 )
-from app.services import Upload, engine_info, extract, new_request_id, verify
+from app.security import request_id_of
+from app.services import Upload, engine_info, extract, verify
 
 router = APIRouter(prefix="/api/v1")
 
@@ -87,6 +88,7 @@ async def health(request: Request) -> HealthResponse:
         engine=engine_info(pool),
         max_concurrency=pool.workers,
         in_flight=pool.in_flight,
+        requests_in_flight=request.app.state.limiter.in_flight,
         version=__version__,
         git_sha=s.git_sha,
     )
@@ -115,11 +117,9 @@ async def verify_route(
 ) -> VerifyResponse:
     pool = _pool(request)
     app_fields = _parse_application(application)
-    limiter = request.app.state.client_limiter
-    async with limiter.slot(request):
-        uploads = await _read_uploads(images, settings)
-        interactive = request.headers.get("x-batch", "0") != "1"
-        return await verify(app_fields, uploads, settings, pool, interactive=interactive)
+    uploads = await _read_uploads(images, settings)
+    interactive = request.headers.get("x-batch", "0") != "1"
+    return await verify(app_fields, uploads, settings, pool, interactive=interactive, request_id=request_id_of(request))
 
 
 @router.post(
@@ -134,11 +134,9 @@ async def extract_route(
     settings: Settings = Depends(_settings),
 ) -> ExtractResponse:
     pool = _pool(request)
-    limiter = request.app.state.client_limiter
-    async with limiter.slot(request):
-        uploads = await _read_uploads(images, settings)
-        interactive = request.headers.get("x-batch", "0") != "1"
-        return await extract(uploads, settings, pool, interactive=interactive)
+    uploads = await _read_uploads(images, settings)
+    interactive = request.headers.get("x-batch", "0") != "1"
+    return await extract(uploads, settings, pool, interactive=interactive, request_id=request_id_of(request))
 
 
 @router.post(
@@ -160,4 +158,4 @@ async def compare_route(
         )
         for item in body.items
     ]
-    return CompareResponse(request_id=new_request_id(), results=results)
+    return CompareResponse(request_id=request_id_of(request), results=results)
