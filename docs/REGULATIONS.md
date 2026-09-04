@@ -22,6 +22,7 @@ brand label, a separate front label, or a back or side label.
 |---|---|---|
 | Anchor in capitals and bold | "The first two words ... 'GOVERNMENT WARNING,' shall appear in capital letters and in bold type." | Capitals: yes (from the OCR read). Bold: not in this build; shown as "Not checked" |
 | Remainder not bold | "The remainder of the warning statement may not appear in bold type." | Not in this build; shown as "Not checked" |
+| Letter case of the remainder | Not regulated: 16.22 requires capitals only for the two anchor words. On a sample of approved labels from the Public COLA Registry (`docs/EVAL_REAL.md`) most print the whole statement in capitals. | "Exact" compares the words character for character ignoring letter case and spacing; the anchor's capitals are the separate format check above |
 | Legible, contrasting background | "readily legible under ordinary conditions, and ... on a contrasting background" | Not in this build |
 | Not compressed | "shall not be compressed in such a manner that the warning statement is not readily legible" | No (needs physical measurement) |
 | Minimum type size | 1 mm for containers of 237 mL or less; 2 mm for more than 237 mL up to 3 L; 3 mm for more than 3 L | Not in this build. Physical mm cannot be measured from an image without a known scale. |

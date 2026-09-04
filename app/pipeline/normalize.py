@@ -108,11 +108,32 @@ def join_hyphenated(lines: list[str]) -> str:
         ln = ln.strip()
         if not ln:
             continue
-        if parts and parts[-1].endswith("-") and ln[:1].islower():
+        if parts and parts[-1].endswith("-") and ln[:1].isalpha():  # "preg-" + "nancy", "CONSUMP-" + "TION"
             parts[-1] = parts[-1][:-1] + ln
         else:
             parts.append(ln)
     return collapse_ws(" ".join(parts))
+
+
+_BY_PREFIX = re.compile(
+    r"^\W*(?:(?:hand[- ]?)?(?:distilled|bottled|brewed|produced|vinted|cellared|made|packaged|imported|blended|"
+    r"crafted|manufactured|filled|canned|fermented)"
+    r"(?:\s*(?:,|&|and|\+)\s*(?:distilled|bottled|brewed|produced|vinted|cellared|made|packaged|imported|blended|"
+    r"crafted|manufactured|filled|canned|fermented))*"
+    r"\s+(?:by|for)\b\s*:?\s*)",
+    re.I,
+)
+_CORPORATE_TOKENS = frozenset(
+    {"company", "co", "incorporated", "inc", "corporation", "corp", "limited", "ltd", "llc", "lp", "llp", "the"}
+)
+
+
+def fold_company(s: str) -> str:
+    """A company name as registered vs as printed: drops a "Bottled by" style prefix and corporate
+    forms (Company, Co., LLC, Inc.), then keeps letters and digits like ``key``.
+    "Brewed by GREEN CHEEK BEER CO." and "Green Cheek Beer Company" both become "green cheek beer"."""
+    words = [w for w in key(_BY_PREFIX.sub("", s)).split(" ") if w and w not in _CORPORATE_TOKENS]
+    return " ".join(words)
 
 
 def case_only_difference(a: str, b: str) -> bool:

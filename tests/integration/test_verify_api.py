@@ -59,6 +59,33 @@ def test_title_case_warning_anchor_needs_review(client, manifest):
     assert body["verdict"] in ("needs_review", "issues_found")
 
 
+def test_sideways_back_label_still_yields_an_exact_warning(client, manifest):
+    """A back label photographed sideways is recovered by the rotation retry; its warning lines
+    map back as vertical strips and must still be joined into one statement."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    from tests.integration.conftest import FIXTURES
+
+    back = Image.open(FIXTURES / "APP-001_back_clean.png").convert("RGB").rotate(90, expand=True)
+    buf = BytesIO()
+    back.save(buf, "PNG")
+    app = _app(manifest, "APP-001")
+    r = client.post(
+        "/api/v1/verify",
+        data={"application": app_json(app)},
+        files=[*image_files("APP-001_front_clean.png"), ("images", ("back_sideways.png", buf.getvalue(), "image/png"))],
+    )
+    body = r.json()
+    assert body["images"][1]["rotated_degrees"] in (90, 270), body["images"][1]
+    assert body["warning"]["present"] and body["warning"]["exact"], body["warning"]
+    assert body["verdict"] == "ready_for_approval", body["summary"]
+    for ev in body["warning"]["evidence"]:  # vertical strips in the sideways image
+        xs, ys = [p[0] for p in ev["box"]], [p[1] for p in ev["box"]]
+        assert max(ys) - min(ys) > max(xs) - min(xs)
+
+
 def test_altered_warning_wording_is_an_issue(client, manifest):
     app = _app(manifest, "APP-004")
     r = client.post(

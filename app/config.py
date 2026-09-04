@@ -39,6 +39,21 @@ class Settings(BaseSettings):
     ocr_max_side: int = Field(default=1280, description="Images are downscaled to this longest side before OCR")
     ocr_low_conf_retry: float = Field(default=0.80, description="Mean confidence below which a 90-degree retry runs")
     ocr_min_lines_retry: int = Field(default=3, description="Fewer detected lines than this also triggers the retry")
+    warning_rescue: bool = Field(
+        default=True,
+        description="When no warning statement is found upright, re-read the images sideways: the statement "
+        "is often printed vertically along the edge of a small label",
+    )
+    warning_rescue_below: float = Field(
+        default=0.5,
+        description="Similarity of the best upright statement below which the sideways re-read runs "
+        "(a garbled but present statement scores higher and would not be helped)",
+    )
+    warning_rescue_max_side: int = Field(
+        default=2048,
+        description="Longest side for the one full-resolution re-read of large artwork whose statement "
+        "was unreadable at the working size",
+    )
     models_dir: Path = MODELS_DIR
 
     # --- request limits (see LIMITS.md)
@@ -55,9 +70,11 @@ class Settings(BaseSettings):
         default=8.0, description="How long an interactive request may wait for a worker slot"
     )
 
-    # --- matching thresholds (tuned against tests/fixtures; see docs/OCR_EVAL.md)
+    # --- matching thresholds (tuned against tests/fixtures and real labels; see docs/EVAL_REAL.md)
     match_review_threshold: int = Field(
-        default=90, description="Fuzzy score at/above which a non-exact match is Needs review"
+        default=80,
+        description="Fuzzy score at/above which a non-exact match is Needs review rather than a mismatch "
+        "(decorative fonts on real labels read at 80-89 while genuinely different names score under 70)",
     )
     match_mismatch_threshold: int = Field(default=70, description="Below this the best candidate counts as Not found")
     warning_mismatch_similarity: float = Field(

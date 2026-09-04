@@ -35,7 +35,7 @@ Each one is met by design and checked by a test or a measurement, not by a claim
 
 | Emphasized in the brief | What this prototype does | Evidence |
 |---|---|---|
-| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.5 s, p95 2.7 s on two workers. Deployed (Azure, 2 vCPU): one person, front+back, median 3.1 s, p95 3.1 s over 20 runs; two people submitting at once, p95 5.9 s (see [Measured](#measured)) |
+| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.5 s, p95 2.8 s on two workers. Deployed (Azure, 2 vCPU): one person, front+back, median 3.1 s, p95 3.1 s over 20 runs; two people submitting at once, p95 5.9 s (see [Measured](#measured)) |
 | "something **my mother could figure out**" | One screen, two numbered steps, one big button, three one-click samples, U.S. Web Design System, statuses as icon + word + color, keyboard and screen-reader friendly. | Observed usability test: _USABILITY_RESULT_ |
 | "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | 300 images (150 applications) through the real screen in 275 s with zero errors: [docs/LOADTEST.md](docs/LOADTEST.md) |
 | The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes. Punctuation and single-character differences are "Needs review" with a diff (usually OCR noise); a changed, added or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
@@ -132,7 +132,8 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 | False-alarm rate on clean artwork | 0.0% (0 of 60 field checks) | [docs/EVAL.md](docs/EVAL.md) |
 | Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 16 of 20; 15 of 20 cases ready, 2 need review, 3 issues (one label shrunk to a third of its size and two sideways reads) | [docs/EVAL.md](docs/EVAL.md) |
 | Planted defects detected | 4 of the 4 the tool assesses (wrong ABV, title-case heading, altered wording, missing statement); the other two planted defects (tiny type, all-bold statement) are not assessed in this build and are reported as such | [docs/EVAL.md](docs/EVAL.md) |
-| Per-application latency, local (two images, 2 workers) | median 2,468 ms, p95 2,647 ms | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, local (two images, 2 workers) | median 2,450 ms, p95 2,775 ms | [docs/EVAL.md](docs/EVAL.md) |
+| Real approved labels: 150 applications from TTB's Public COLA Registry, 50 each spirits, wine, malt, artwork as submitted | Warning statement found on 99% (the two misses have no statement in the uploaded artwork); wording exact on 61% of those, small-print slips flagged for review on 16%, wording issues on 22% (including three approved labels that genuinely deviate); brand name matched or sent to review on 87%; applicant name on 67%; country of origin found on 90% of imports; alcohol statement read on 81%, net contents on 80% | [docs/EVAL_REAL.md](docs/EVAL_REAL.md) |
 | Per-application latency, deployed (Azure Container Apps, 2 vCPU, 2 workers, measured from outside) | one client: median 3,056 ms, p95 3,126 ms, max 3,718 ms over 20 front+back applications; two concurrent clients: median 4,979 ms, p95 5,887 ms; zero refusals | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Batch throughput, deployed (300 images, 150 applications, through the real batch screen from a laptop browser) | 364 s end to end, 0.82 images/s including comparison and rendering; 150 ready, 0 errors, no browser errors; 100 single-image requests at capacity: 100 of 100 served, p95 2.2 s | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |
@@ -141,6 +142,23 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 | Inside the CI container (GitHub runner, 1 worker, networking disabled) | ready 2.1 s after start; front+back application verified in 3.1 s | CI run 33821661824 |
 
 **Error analysis, and one decision worth reading.** The first evaluation showed the multilingual recognizer occasionally emitting an accented letter for a plain one on clean artwork ("alcoholič", "drivé"), which turned an exact warning into "Needs review" on 2 of 10 labels. An early build stripped accents before the comparison; the independent reviewer rejected that, correctly, because a legal "exact" must not paper over instrument error. I then tested a native-resolution re-read of the warning lines, which did not converge (one label fixed, a different accent on another, and a previously exact label lost a letter). The fix that shipped is a recognizer configuration, not a comparison shortcut: the decoder's alphabet is restricted to printable ASCII for every line, the same choice as using an English recognizer and with none of the latency. There is one transcript and it is compared literally. The consequence, stated in the limits: genuinely accented print is read as its base letter, which the field comparisons already tolerate and the evidence crop shows; and the direction that matters legally, an accented character printed inside the warning would be read as its base letter and could pass as exact, is stated there too. The setting is a documented switch (`TTB_OCR_ASCII_ALPHABET`). The remaining degraded misses are text shrunk to a third of its size and two sideways images where the rotation retry picked up a partial read.
+
+**What 150 real labels changed.** The synthetic corpus has exact ground truth and no surprises, so
+on the second day I fetched 150 approved applications from TTB's Public COLA Registry (50 each of
+spirits, wine and malt; `tools/cola_fetch.py`, polite and rate-limited) and ran the pipeline on
+their label images as submitted (`tools/evaluate_real.py`, [docs/EVAL_REAL.md](docs/EVAL_REAL.md);
+the artwork stays local because it belongs to the brand owners). The first pass was humbling: the
+warning was never judged exact, because most approved labels print the whole statement in
+capitals and the comparator treated letter case as wording; small labels print the statement
+vertically along one edge and the upright read never saw it; applicants register "Green Cheek Beer
+Company" where the label prints "BREWED BY GREEN CHEEK BEER CO."; and a column filter in the
+warning finder silently truncated any statement read from a rotated image, a bug the sideways tier
+of the synthetic corpus had been reporting as two "issues" all along. Each of those became a
+decision (D-035 to D-038), a code change and a test. The regulation supports the case change:
+16.22 requires capitals only for the two anchor words. Hand-checking records against their images
+also found the other kind of result: three approved tequila labels that genuinely print "WOMAN" and
+"BECAUSE OF RISK OF BIRTH DEFECTS", which the tool reports as a wording issue with the exact words
+in the diff. That is the tool working as Jenny asked.
 
 Engine selection and thread scaling are in [docs/BAKEOFF.md](docs/BAKEOFF.md) and
 [docs/OCR_EVAL.md](docs/OCR_EVAL.md). Enforced limits and known weaknesses, stated plainly, are in
@@ -194,6 +212,8 @@ _AUTHOR_SECTION_
 | `TTB_MAX_IMAGES_PER_APPLICATION` | 6 | Images per verify call |
 | `TTB_PER_CLIENT_INFLIGHT` | 4 | Concurrent requests per client |
 | `TTB_INTERACTIVE_WAIT_SECONDS` | 8 | How long an interactive request waits for a worker |
+| `TTB_WARNING_RESCUE` | true | When no usable warning is found upright, re-read the images sideways (small labels print it vertically) and, for large artwork, once at full resolution (up to 2048 px) |
+| `TTB_MATCH_REVIEW_THRESHOLD` | 80 | Fuzzy score at or above which a non-exact text match is Needs review rather than a mismatch |
 | `TTB_TRUST_PROXY` | false | Take the client address from `X-Forwarded-For` (set true behind a platform proxy) |
 | `TTB_AGENCY_NAME` | unset | Optional agency name for internal branding (no seals in the public prototype) |
 | `GIT_SHA` | dev | Shown in the footer and in `/api/v1/health` |

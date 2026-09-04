@@ -24,6 +24,7 @@ from app.schemas import (
 )
 
 from .match import best_span, status_for
+from .normalize import fold, fold_company
 from .parsers import (
     Alcohol,
     alcohol_matches,
@@ -83,6 +84,26 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
         if found_lines:
             check.found = " ".join(ln.text for ln in found_lines)
             if check.status is Status.match and check.found != expected:
+                check.note = f"Label says '{check.found}'."
+    return check
+
+
+def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
+    """Name and address as registered vs as printed. Labels abbreviate and prefix ("Brewed by
+    GREEN CHEEK BEER CO." for "Green Cheek Beer Company"); the registry spells out. Neither the
+    prefix nor the corporate form is a difference in who bottled it, so both sides are folded with
+    ``fold_company`` before the ordinary fuzzy match; evidence and the found text stay as printed."""
+    folded = [ln.model_copy(update={"text": fold_company(ln.text)}) for ln in lines]
+    check = _text_check("bottler", fold_company(expected), folded, s, rule="27 CFR 5.66 / 4.35 / 7.66")
+    check.expected = expected
+    if check.evidence:
+        found_lines = [
+            ln for ln in lines if any(ln.box == ev.box and ln.image_index == ev.image_index for ev in check.evidence)
+        ]
+        check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in found_lines]
+        if found_lines:
+            check.found = " ".join(ln.text for ln in found_lines)
+            if check.status is Status.match and fold(check.found) != fold(expected):
                 check.note = f"Label says '{check.found}'."
     return check
 
@@ -260,7 +281,7 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
         pass
     elif warning.assessment in ("absent", "wording"):
         issues.append(Check(id="warning", label="Government warning", status=Status.mismatch))
-    elif warning.assessment in ("case", "noise") or warning.anchor_caps is Status.needs_review:
+    elif warning.assessment == "noise" or warning.anchor_caps is Status.needs_review:
         reviews.append(Check(id="warning", label="Government warning", status=Status.needs_review))
     if issues:
         names = ", ".join(c.label.lower() for c in issues)
@@ -293,7 +314,7 @@ def compare(app: ApplicationFields, lines: list[OcrLine], images: list[ImageInfo
     net, fill = _net_contents_check(app, lines, s)
     checks.append(net)
     if app.bottler:
-        checks.append(_text_check("bottler", app.bottler, lines, s, rule="27 CFR 5.66 / 4.35 / 7.66"))
+        checks.append(bottler_check(app.bottler, lines, s))
     else:
         checks.append(
             Check(

@@ -6,7 +6,7 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 ## Artwork tier (10 cases)
 
-- Per-application latency (two images, parallel): median 2468 ms, p95 2647 ms
+- Per-application latency (two images, parallel): median 2450 ms, p95 2775 ms
 
 | Field | Match | Needs review | Mismatch / not found | Match rate |
 |---|---:|---:|---:|---:|
@@ -23,7 +23,7 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 ## Degraded tier (20 cases)
 
-- Per-application latency (two images, parallel): median 2282 ms, p95 6412 ms
+- Per-application latency (two images, parallel): median 2320 ms, p95 6436 ms
 
 | Field | Match | Needs review | Mismatch / not found | Match rate |
 |---|---:|---:|---:|---:|
@@ -33,24 +33,24 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 | net_contents | 20 | 0 | 0 | 100% |
 | bottler | 20 | 0 | 0 | 100% |
 | country_of_origin | 19 | 1 | 0 | 95% |
-| warning exact | 16 | 4 | 0 | 80% |
+| warning exact | 18 | 2 | 0 | 90% |
 
-- Verdicts: {<Verdict.needs_review: 'needs_review'>: 2, <Verdict.ready_for_approval: 'ready_for_approval'>: 15, <Verdict.issues_found: 'issues_found'>: 3}
+- Verdicts: {<Verdict.needs_review: 'needs_review'>: 2, <Verdict.ready_for_approval: 'ready_for_approval'>: 17, <Verdict.issues_found: 'issues_found'>: 1}
 
 | Degradation | cases | verdicts | median ms |
 |---|---:|---|---:|
-| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2444 |
-| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2147 |
-| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2092 |
-| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2194 |
-| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2180 |
-| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2462 |
-| rotate90 | 2 | {<Verdict.issues_found: 'issues_found'>: 2} | 6610 |
-| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2108 |
+| blur | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2560 |
+| glare | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2187 |
+| jpeg | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2161 |
+| lowcontrast | 3 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 3} | 2305 |
+| perspective | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2266 |
+| rotate7 | 3 | {<Verdict.needs_review: 'needs_review'>: 1, <Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 2387 |
+| rotate90 | 2 | {<Verdict.ready_for_approval: 'ready_for_approval'>: 2} | 6548 |
+| small | 2 | {<Verdict.issues_found: 'issues_found'>: 1, <Verdict.needs_review: 'needs_review'>: 1} | 2116 |
 
 ## Problem tier (6 cases)
 
-- Per-application latency (two images, parallel): median 2408 ms, p95 2512 ms
+- Per-application latency (two images, parallel): median 2414 ms, p95 3016 ms
 
 | Planted defect | detected | note |
 |---|---|---|

@@ -1,8 +1,11 @@
 """Government health warning statement checks (27 CFR Part 16).
 
-Exactness is literal here: the only Pass is a character-for-character match (after collapsing
-whitespace and unifying typographic quotes, which are rendering choices rather than wording).
-Anything else is Needs review or a mismatch, never a Pass. The generic normalizer is not used.
+Exactness is literal here: the only Pass is a character-for-character match of the words, after
+collapsing whitespace, unifying typographic quotes and ignoring letter case. Those three are
+rendering choices rather than wording: 16.22 requires capitals only for the two anchor words, and
+approved labels commonly print the remainder in capitals (docs/EVAL_REAL.md). The anchor's
+capitals are checked separately. Anything else is Needs review or a mismatch, never a Pass. The
+generic normalizer is not used.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import unicodedata
 from dataclasses import dataclass
 
 from rapidfuzz import fuzz
-from rapidfuzz.distance import Levenshtein
+from rapidfuzz.distance import OSA
 
 from app.schemas import Evidence, OcrLine, Status, WarningReport
 
@@ -36,6 +39,7 @@ class WarningSpan:
     text: str
     lines: tuple[OcrLine, ...]
     anchor_text: str  # the anchor as OCR read it, for the caps check
+    similarity: float = 0.0  # to the canonical text, 0-1, case-folded
 
 
 def _anchor_score(text: str) -> int:
@@ -44,12 +48,39 @@ def _anchor_score(text: str) -> int:
     return int(min(fuzz.partial_ratio("government", t), fuzz.partial_ratio("warning", t)))
 
 
-def _x_overlap(a: OcrLine, b: OcrLine) -> float:
-    """Horizontal overlap as a fraction of the narrower line."""
-    a0, a1 = min(p[0] for p in a.box), max(p[0] for p in a.box)
-    b0, b1 = min(p[0] for p in b.box), max(p[0] for p in b.box)
-    inter = max(0.0, min(a1, b1) - max(a0, b0))
-    return inter / max(1.0, min(a1 - a0, b1 - b0))
+def _anchor_at(group: list[OcrLine], i: int) -> tuple[str, list[OcrLine]] | None:
+    """The anchor as read and the lines that form it, or None. Either both words on one line, or
+    "GOVERNMENT" alone on this line with a line starting "WARNING" a little further down the same
+    column (a common layout when the two words are set large; the reading order may slip an
+    unrelated neighbour between them, which is left out of the statement)."""
+    ln = group[i]
+    if _anchor_score(ln.text) >= 80:
+        m = _ANCHOR_RE.search(ln.text)
+        return (m.group(0) if m else ln.text), [ln]
+    if fuzz.ratio("government", fold(ln.text)) >= 85:
+        for j in range(i + 1, min(i + 4, len(group))):
+            if fold(group[j].text).startswith("warning") and _column_overlap(ln, group[j]) >= 0.3:
+                return ln.text + " " + group[j].text, [ln, group[j]]
+    return None
+
+
+def _extent(ln: OcrLine) -> tuple[float, float, float, float]:
+    xs, ys = [p[0] for p in ln.box], [p[1] for p in ln.box]
+    return min(xs), max(xs), min(ys), max(ys)
+
+
+def _column_overlap(a: OcrLine, b: OcrLine) -> float:
+    """Overlap across the reading direction, as a fraction of the narrower line. Boxes live in the
+    oriented original image, so a statement read from a rotated image (a sideways photo, or a label
+    that prints the warning vertically along its edge) comes back as vertical strips stacked left to
+    right: for those, the column is shared along y, not x."""
+    ax0, ax1, ay0, ay1 = _extent(a)
+    bx0, bx1, by0, by1 = _extent(b)
+    if (ay1 - ay0) > (ax1 - ax0) and (by1 - by0) > (bx1 - bx0):  # vertical text lines
+        inter = max(0.0, min(ay1, by1) - max(ay0, by0))
+        return inter / max(1.0, min(ay1 - ay0, by1 - by0))
+    inter = max(0.0, min(ax1, bx1) - max(ax0, bx0))
+    return inter / max(1.0, min(ax1 - ax0, bx1 - bx0))
 
 
 def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
@@ -57,17 +88,23 @@ def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
     canonical text keeps improving. Returns the best span over all images."""
     best: WarningSpan | None = None
     best_sim = -1.0
-    for group in reading_order(lines).values():
+    # Both directions: a statement printed vertically maps back with its lines running right to left
+    # or left to right depending on which way the label was turned, and the anchor may sit last.
+    ordered = [g for grp in reading_order(lines).values() for g in (grp, grp[::-1])]
+    for group in ordered:
         for i, ln in enumerate(group):
-            if _anchor_score(ln.text) < 80:
+            anchor = _anchor_at(group, i)
+            if anchor is None:
                 continue
-            m = _ANCHOR_RE.search(ln.text)
-            anchor_text = m.group(0) if m else ln.text
-            acc: list[OcrLine] = []
-            local_best: tuple[float, list[OcrLine]] | None = None
+            anchor_text, head = anchor
+            acc: list[OcrLine] = list(head)
+            local_best: tuple[float, list[OcrLine]] | None = (
+                fuzz.ratio(_CANON_FOLD, fold(join_hyphenated([x.text for x in acc]))) / 100,
+                list(acc),
+            )
             declines = 0
-            for nxt in group[i:]:
-                if nxt is not ln and _x_overlap(ln, nxt) < 0.3:
+            for nxt in group[group.index(head[-1]) + 1 :]:
+                if _column_overlap(ln, nxt) < 0.3:
                     continue  # a different column or an unrelated block
                 acc.append(nxt)
                 sim = fuzz.ratio(_CANON_FOLD, fold(join_hyphenated([x.text for x in acc]))) / 100
@@ -86,6 +123,7 @@ def find_warning(lines: list[OcrLine]) -> WarningSpan | None:
                     text=join_hyphenated([x.text for x in local_best[1]]),
                     lines=tuple(local_best[1]),
                     anchor_text=anchor_text,
+                    similarity=local_best[0],
                 )
     return best
 
@@ -96,10 +134,12 @@ def _canon_form(s: str) -> str:
 
 
 def word_diff(expected: str, found: str) -> str | None:
-    """Compact word-level diff, e.g. '-may +can' or '-(2) '. None when identical."""
+    """Compact word-level diff, e.g. '-may +can' or '-(2) '. None when identical. Words are aligned
+    ignoring letter case (a statement printed in capitals shows only its real differences)."""
     a, b = _canon_form(expected).split(" "), _canon_form(found).split(" ")
     out: list[str] = []
-    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+    matcher = difflib.SequenceMatcher(a=[w.casefold() for w in a], b=[w.casefold() for w in b], autojunk=False)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
             continue
         if i2 > i1:
@@ -109,16 +149,21 @@ def word_diff(expected: str, found: str) -> str | None:
     return " | ".join(out) if out else None
 
 
-def compare_warning(found: str) -> tuple[bool, bool, float]:
-    """Returns (exact, case_only_difference, similarity 0-1)."""
+def _literal_key(s: str) -> str:
+    """What exactness compares: every character of every word, ignoring letter case and spacing."""
+    return _canon_form(s).casefold().replace(" ", "")
+
+
+def compare_warning(found: str) -> tuple[bool, float]:
+    """Returns (exact, similarity 0-1). Exact ignores letter case and spacing, nothing else."""
     canon, got = _canon_form(CANONICAL), _canon_form(found)
-    exact = canon == got
-    case_only = (not exact) and canon.casefold() == got.casefold()
+    exact = _literal_key(canon) == _literal_key(got)
     similarity = fuzz.ratio(canon.casefold(), got.casefold()) / 100
-    return exact, case_only, similarity
+    return exact, similarity
 
 
 _PUNCT_ONLY = re.compile(r"^[^\w]+$")
+_NUMBER_ONLY = re.compile(r"^\W*\d+\W*$")
 _STRIP = re.compile(r"[^\w]")
 # OCR confusables folded to one canonical letter: 0/o, 1/l/i/|/!, 5/s, 8/b, 2/z, 6/g
 _CONFUSABLE = str.maketrans({"0": "o", "1": "l", "i": "l", "|": "l", "!": "l", "5": "s", "8": "b", "2": "z", "6": "g"})
@@ -131,12 +176,14 @@ def _canon_word(w: str) -> str:
 
 
 def _same_word_modulo_noise(a: str, b: str) -> bool:
-    """True when two tokens differ only by punctuation, case, accents, OCR confusables, or a single
-    character in a word of five or more letters (a real wording change replaces whole words)."""
+    """True when two tokens differ only by punctuation, case, accents, OCR confusables, or one slip
+    (a character dropped, added, changed, or two adjacent ones swapped) in a word of four or more
+    letters. A real wording change replaces whole words; approved labels read as "Suregon", "YOURS"
+    and "WOMAN" turned out to be small print, not wording (docs/EVAL_REAL.md)."""
     ka, kb = _canon_word(a), _canon_word(b)
     if ka == kb:
         return True
-    return len(ka) >= 5 and len(kb) >= 5 and Levenshtein.distance(ka, kb) <= 1
+    return len(ka) >= 4 and len(kb) >= 4 and OSA.distance(ka, kb) <= 1
 
 
 def classify_difference(expected: str, found: str) -> str:
@@ -161,10 +208,13 @@ def classify_difference(expected: str, found: str) -> str:
             if _canon_word("".join(left)) == _canon_word("".join(right)):
                 continue
             return "wording"
-        # pure insert or delete: punctuation-only tokens are noise; anything with a letter or digit
-        # (a word, or a clause number like "(2)") is a wording change
+        # pure insert or delete: punctuation-only tokens are noise; a bare number swept in from a
+        # neighbouring line (a lot code, a year) is noise; anything else added or dropped (a word, a
+        # missing clause number like "(2)") is a wording change
         tokens = left or right
         if all(_PUNCT_ONLY.match(t) for t in tokens):
+            continue
+        if tag == "insert" and all(_NUMBER_ONLY.match(t) for t in tokens):
             continue
         return "wording"
     return verdict
@@ -183,7 +233,8 @@ def anchor_caps_status(anchor_text: str) -> tuple[Status, str]:
 
 def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> WarningReport:
     """Assess the warning statement. ``assessment`` drives the verdict:
-    exact -> pass; case/noise -> Needs review; wording/absent -> issue."""
+    exact -> pass; noise -> Needs review; wording/absent -> issue. The anchor's capitals are a
+    separate format check (``anchor_caps``) and can send an exact statement to Needs review."""
     span = find_warning(lines)
     if span is None:
         return WarningReport(
@@ -202,19 +253,16 @@ def build_report(lines: list[OcrLine], *, mismatch_similarity: float) -> Warning
                 "uploaded, add that image."
             ],
         )
-    exact, case_only, similarity = compare_warning(span.text)
+    exact, similarity = compare_warning(span.text)
     caps_status, caps_note = anchor_caps_status(span.anchor_text)
     if exact:
         assessment = "exact"
-    elif case_only:
-        assessment = "case"
     else:
         assessment = classify_difference(CANONICAL, span.text)
         if assessment == "noise" and similarity < mismatch_similarity:
             assessment = "wording"  # too many differences to call it noise
     notes = {
         "exact": "Wording is exact (27 CFR 16.21).",
-        "case": "Wording matches except for letter case. Confirm the statement's capitalization on the image.",
         "noise": (
             "Wording matches apart from punctuation, an accent, or single characters as read, which is usually "
             "OCR noise (a dropped colon, a '1' read as 'i', a stray accent). Compare the diff with the image."

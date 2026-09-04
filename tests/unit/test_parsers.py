@@ -280,6 +280,30 @@ def test_zero_percent_parses_and_exempts_the_warning():
     assert res.verdict == "ready_for_approval" and "no health warning" in res.summary
 
 
+def test_bottler_as_registered_matches_the_label_as_printed():
+    """Real labels prefix and abbreviate ("Brewed by GREEN CHEEK BEER CO."); applications spell out."""
+    from app.config import Settings
+    from app.pipeline.compare import bottler_check
+    from app.pipeline.normalize import fold_company
+
+    from tests.unit.conftest import make_lines
+
+    assert fold_company("Brewed & Packaged by GREEN CHEEK BEER CO.") == "green cheek beer"
+    assert fold_company("Green Cheek Beer Company, LLC") == "green cheek beer"
+    assert fold_company("Imported by: T. Elenteny Imports, New York, NY") == "t elenteny imports new york ny"
+    s = Settings(ocr_workers=1)
+    lines = make_lines(["BREWED BY GREEN CHEEK BEER CO.", "ORANGE, CA", "12 FL OZ"])
+    check = bottler_check("Green Cheek Beer Company, Orange, CA", lines, s)
+    assert check.status == "match", check
+    assert check.found == "BREWED BY GREEN CHEEK BEER CO. ORANGE, CA" and "Label says" in (check.note or "")
+    assert check.expected == "Green Cheek Beer Company, Orange, CA"
+    # a different company is still a difference
+    other = bottler_check(
+        "T. Elenteny Holdings, LLC", make_lines(["IMPORTED BY: T. ELENTENY IMPORTS", "NEW YORK, NY"]), s
+    )
+    assert other.status in ("mismatch", "needs_review")
+
+
 def test_unparseable_required_field_blocks_ready_and_omitted_optional_fields_do_not():
     from app.config import Settings
     from app.pipeline.compare import compare

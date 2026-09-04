@@ -5,3 +5,4 @@ ruff==0.16.6
 mypy==2.3.1
 pip-audit==2.10.0
 types-Pillow==10.2.0.20240822
+truststore==0.10.4  # tools/cola_fetch.py: verify ttbonline.gov against the OS trust store

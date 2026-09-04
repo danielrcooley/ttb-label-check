@@ -48,9 +48,72 @@ def test_missing_warning_is_reported_as_absent():
 def test_title_case_anchor_is_flagged_for_review():
     text = CANONICAL.replace("GOVERNMENT WARNING:", "Government Warning:")
     r = report(make_lines(wrapped(text)))
-    assert r.present and not r.exact
+    assert r.present and r.exact  # the wording is exact; the format check is what fails
     assert r.anchor_caps is Status.needs_review
     assert "not all capitals" in r.notes[1] or "not all capitals" in " ".join(r.notes)
+
+
+def test_warning_read_from_a_rotated_image_accumulates_its_vertical_lines():
+    """A sideways photo, or a label that prints the statement vertically along its edge, is read
+    from a rotated array; mapped back, its lines are vertical strips stacked left to right. The
+    column filter must follow the text direction or the span stops after the anchor."""
+    from app.schemas import OcrLine
+
+    lines = []
+    for i, text in enumerate(wrapped(CANONICAL)):
+        x = 1800 + 40 * i  # each line is a tall narrow box; consecutive lines step right
+        lines.append(
+            OcrLine(image_index=0, text=text, confidence=0.99, box=((x, 170), (x + 36, 170), (x + 36, 1300), (x, 1300)))
+        )
+    r = report(lines)
+    assert r.present and r.exact, (r.assessment, r.similarity, r.diff)
+
+
+def test_anchor_split_over_two_lines_is_found():
+    """Seen on real labels: "GOVERNMENT" and "WARNING:" set large on two lines, the statement below."""
+    head = "GOVERNMENT WARNING: "
+    lines = make_lines(["Distilled and Bottled by", "GOVERNMENT", "WARNING:", *wrapped(CANONICAL[len(head) :], 40)])
+    r = report(lines)
+    assert r.present and r.exact, (r.assessment, r.similarity, r.diff)
+    assert r.anchor_caps is Status.match
+    # the reading order can slip an unrelated neighbour between the two words; it must be left out
+    lines = make_lines(["GOVERNMENT", "LLC Lebanon IN", "WARNING:", *wrapped(CANONICAL[len(head) :], 40)])
+    r = report(lines)
+    assert r.present and r.exact, (r.assessment, r.similarity, r.diff)
+
+
+def test_tight_column_lines_keep_top_to_bottom_order():
+    """Seen on real labels: a narrow column of small type whose OCR boxes overlap vertically, with a
+    few pixels of jitter on the left edge. Two lines must not swap places (that turned an exact
+    statement into "wording" with the same words deleted and re-inserted)."""
+    from tests.unit.conftest import make_line
+
+    texts = wrapped(CANONICAL, 24)
+    lines = [make_line(t, y=100 + i * 28, x=1393 + (i % 2) * 3, h=60) for i, t in enumerate(texts)]
+    r = report(lines)
+    assert r.exact, r.diff
+
+
+def test_body_printed_in_capitals_is_exact():
+    """16.22 requires capitals only for the anchor; approved labels commonly print the remainder in
+    capitals too (docs/EVAL_REAL.md). Letter case is typography, not wording."""
+    head = "GOVERNMENT WARNING: "
+    text = head + CANONICAL[len(head) :].upper()
+    r = report(make_lines(wrapped(text)))
+    assert r.exact and r.assessment == "exact" and r.diff is None
+    assert r.anchor_caps is Status.match
+
+
+def test_spacing_around_punctuation_is_exact():
+    text = CANONICAL.replace("WARNING: (1)", "WARNING :(1)").replace("General, women", "General ,women")
+    assert report(make_lines(wrapped(text))).exact
+
+
+def test_capitals_with_a_dropped_comma_is_noise_with_a_short_diff():
+    text = CANONICAL.upper().replace("GENERAL, WOMEN", "GENERAL WOMEN")
+    r = report(make_lines(wrapped(text)))
+    assert not r.exact and r.assessment == "noise"
+    assert r.diff and "General," in r.diff and len(r.diff) < 60  # case alone must not flood the diff
 
 
 def test_one_word_substitution_is_a_wording_change_not_noise():
@@ -78,6 +141,34 @@ def test_dropped_colon_or_comma_is_noise():
 def test_ocr_confusable_inside_a_word_is_noise():
     text = CANONICAL.replace("Surgeon", "Surge0n").replace("machinery", "machlnery")
     assert classify_difference(CANONICAL, text) == "noise"
+
+
+def test_small_print_slips_seen_on_approved_labels_are_noise():
+    """From the real-label sample: a transposition, an added or dropped letter in a four-letter word,
+    and a lot number swept in from the next line. All Needs review with a diff, none an issue."""
+    assert classify_difference(CANONICAL, CANONICAL.replace("Surgeon", "Suregon")) == "noise"
+    assert classify_difference(CANONICAL, CANONICAL.replace("your ability", "yours ability")) == "noise"
+    assert classify_difference(CANONICAL, CANONICAL.replace("to drive", "to rive")) == "noise"
+    assert classify_difference(CANONICAL, CANONICAL.replace("women", "woman")) == "noise"
+    assert classify_difference(CANONICAL, CANONICAL.replace("(2) Consumption", "26 (2) Consumption")) == "noise"
+    # still wording: a word replaced or dropped
+    assert classify_difference(CANONICAL, CANONICAL.replace("may cause", "can cause")) == "wording"
+    assert classify_difference(CANONICAL, CANONICAL.replace("of the risk", "of risk")) == "wording"
+
+
+def test_hyphenated_line_break_in_capitals_is_repaired():
+    head = "GOVERNMENT WARNING: "
+    caps = head + CANONICAL[len(head) :].upper()
+    lines = make_lines(
+        [
+            "GOVERNMENT WARNING: (1) ACCORDING TO THE SURGEON GENERAL,",
+            "WOMEN SHOULD NOT DRINK ALCOHOLIC BEVERAGES DURING PREG-",
+            "NANCY BECAUSE OF THE RISK OF BIRTH DEFECTS. (2) CONSUMP-",
+            "TION OF ALCOHOLIC BEVERAGES IMPAIRS YOUR ABILITY TO DRIVE",
+            "A CAR OR OPERATE MACHINERY, AND MAY CAUSE HEALTH PROBLEMS.",
+        ]
+    )
+    assert report(lines).exact, caps
 
 
 def test_hyphenated_line_break_does_not_break_exactness():

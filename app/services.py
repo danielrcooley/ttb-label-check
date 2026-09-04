@@ -12,10 +12,11 @@ import numpy as np
 
 from app.config import Settings
 from app.ocr.base import RawLine
-from app.ocr.pool import OcrPool, Runner
+from app.ocr.pool import BusyError, OcrPool, Runner
 from app.pipeline.compare import compare
 from app.pipeline.extract import extract_fields
 from app.pipeline.images import DecodedImage, decode_image, rotate_array, to_canonical
+from app.pipeline.warning import find_warning
 from app.schemas import (
     ApplicationFields,
     EngineInfo,
@@ -128,9 +129,76 @@ async def process_images(
             async with pool.slot(interactive=True) as (run, queue_ms):
                 return await process_image(u, i, settings, run, queue_ms=queue_ms)
 
-        return list(await asyncio.gather(*(one(i, u) for i, u in enumerate(uploads))))
-    async with pool.slot(interactive=False) as (run, queue_ms):
-        return [await process_image(u, i, settings, run, queue_ms=queue_ms) for i, u in enumerate(uploads)]
+        processed = list(await asyncio.gather(*(one(i, u) for i, u in enumerate(uploads))))
+    else:
+        async with pool.slot(interactive=False) as (run, queue_ms):
+            processed = [await process_image(u, i, settings, run, queue_ms=queue_ms) for i, u in enumerate(uploads)]
+    if settings.warning_rescue:
+        upright = find_warning([ln for p in processed for ln in p.lines])
+        if upright is None or upright.similarity < settings.warning_rescue_below:
+            await _rescue_sideways_warning(
+                uploads,
+                processed,
+                settings,
+                pool,
+                interactive=interactive,
+                floor=upright.similarity if upright else 0.0,
+            )
+    return processed
+
+
+async def _rescue_sideways_warning(
+    uploads: list[Upload],
+    processed: list[ProcessedImage],
+    settings: Settings,
+    pool: OcrPool,
+    *,
+    interactive: bool,
+    floor: float,
+) -> None:
+    """Two layouts hide the statement from the ordinary read: printed sideways along the edge of a
+    small label that otherwise reads perfectly upright (so the low-confidence retry never fires),
+    and printed in small type on large artwork (unreadable once the image is scaled to the working
+    size). When no usable warning was found upright (none, or a span far from the required text),
+    read each image rotated both ways, then once at bounded full resolution, and keep only the lines
+    of a warning span that beats what the upright read had. Best effort: a request that cannot get a
+    slot back keeps its result as it is."""
+    try:
+        async with pool.slot(interactive=interactive) as (run, _):
+            for up, p in zip(uploads, processed, strict=True):
+                if p.info.rotated_degrees or not p.info.quality.readable:
+                    continue  # already read sideways, or nothing was legible at all
+                dec = decode_image(
+                    up.data, max_pixels=settings.max_image_pixels, max_side=settings.ocr_max_side, filename=up.filename
+                )
+                t0 = time.perf_counter()
+                found = False
+                for degrees in (90, 270):
+                    rot = rotate_array(dec.array, degrees)
+                    raw = await run(rot)
+                    lines = _to_lines(raw, dec, p.info.index, degrees, rot.shape[1], rot.shape[0])
+                    span = find_warning(lines)
+                    if span is not None and span.similarity > floor:
+                        p.lines.extend(span.lines)
+                        floor = span.similarity
+                        found = True
+                        break
+                # Large artwork with the statement in small type: unreadable at the working size,
+                # legible once, at (bounded) full resolution.
+                side = min(settings.warning_rescue_max_side, max(dec.width, dec.height))
+                if not found and side > settings.ocr_max_side:
+                    hi = decode_image(
+                        up.data, max_pixels=settings.max_image_pixels, max_side=side, filename=up.filename
+                    )
+                    raw = await run(hi.array)
+                    lines = _to_lines(raw, hi, p.info.index, 0, hi.array.shape[1], hi.array.shape[0])
+                    span = find_warning(lines)
+                    if span is not None and span.similarity > floor:
+                        p.lines.extend(span.lines)
+                        floor = span.similarity
+                p.ocr_ms += int((time.perf_counter() - t0) * 1000)
+    except BusyError:
+        return
 
 
 def engine_info(pool: OcrPool) -> EngineInfo:

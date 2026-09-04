@@ -57,8 +57,30 @@ def reading_order(lines: list[OcrLine]) -> dict[int, list[OcrLine]]:
                 rows[-1].append(ln)
             else:
                 rows.append([ln])
-        by_image[idx] = [ln for row in rows for ln in sorted(row, key=lambda x: min(p[0] for p in x.box))]
+        # Within a row, left to right; but lines whose left edges sit within half a line's thickness
+        # of each other share a column and stay top to bottom (tight body text in a narrow column has
+        # boxes that overlap vertically, and a few pixels of edge jitter must not swap lines).
+        tol = max(1.0, 0.5 * statistics.median(_thickness(ln) for ln in group))
+        by_image[idx] = [ln for row in rows for ln in _columns_then_down(row, tol)]
     return by_image
+
+
+def _thickness(ln: OcrLine) -> float:
+    """The extent across the text direction: height for a horizontal line, width for a vertical one."""
+    xs, ys = [p[0] for p in ln.box], [p[1] for p in ln.box]
+    return max(1.0, min(max(xs) - min(xs), max(ys) - min(ys)))
+
+
+def _columns_then_down(row: list[OcrLine], tol: float) -> list[OcrLine]:
+    by_x = sorted(row, key=lambda ln: min(p[0] for p in ln.box))
+    cols: list[list[OcrLine]] = []
+    for ln in by_x:
+        x = min(p[0] for p in ln.box)
+        if cols and x - min(p[0] for p in cols[-1][0].box) <= tol:
+            cols[-1].append(ln)
+        else:
+            cols.append([ln])
+    return [ln for col in cols for ln in sorted(col, key=_center_y)]
 
 
 def _vertical_overlap(a: OcrLine, b: OcrLine) -> float:

@@ -27,9 +27,10 @@ def test_fold_digits_repairs_confusables_only_in_numeric_tokens():
     assert fold_digits("OLD TOM") == "OLD TOM"
 
 
-def test_join_hyphenated_repairs_line_break_hyphenation_only_for_lowercase_continuations():
+def test_join_hyphenated_repairs_line_break_hyphenation_for_letter_continuations():
     assert join_hyphenated(["during preg-", "nancy because"]) == "during pregnancy because"
-    assert join_hyphenated(["ALC-", "VOL"]) == "ALC- VOL"
+    assert join_hyphenated(["(2) CONSUMP-", "TION OF ALCOHOLIC"]) == "(2) CONSUMPTION OF ALCOHOLIC"  # capitals too
+    assert join_hyphenated(["750 mL -", "12 FL OZ"]) == "750 mL - 12 FL OZ"  # a continuation must start with a letter
     assert join_hyphenated(["", "  a  ", "b"]) == "a b"
 
 

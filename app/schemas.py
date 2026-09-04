@@ -85,7 +85,9 @@ class WarningReport(BaseModel):
     present: bool
     exact: bool
     assessment: str = Field(
-        default="absent", description="exact | case | noise | wording | absent (how the read text relates to 16.21)"
+        default="absent",
+        description="exact | noise | wording | absent | not_required (how the read text relates to 16.21; "
+        "exact ignores letter case and spacing, the anchor's capitals are anchor_caps)",
     )
     similarity: float
     found_text: str | None = None
