@@ -111,9 +111,10 @@ Certificate issuance takes a few minutes. Test `https://$DOMAIN/api/v1/health`.
 
 ## 7. Redeploy
 
+Push to `master`, let CI build, verify and publish `label-check:<short sha>`, then point the app at it:
+
 ```bash
 SHA=$(git rev-parse --short HEAD)
-az acr build --registry $ACR --image label-check:$SHA --build-arg GIT_SHA=$SHA .
 az containerapp update --name $APP --resource-group $RG --image $ACR.azurecr.io/label-check:$SHA --set-env-vars GIT_SHA=$SHA
 ```
 
@@ -131,9 +132,9 @@ The footer and `/api/v1/health` show the SHA, so a reviewer can match the runnin
 
 ## Notes
 
-- Uploads never touch disk: multipart parts up to the per-image cap are kept in memory
-  (`app/main.py` raises Starlette's spool threshold). `/tmp` is therefore only a fallback; mounting it
-  in memory is still good hygiene if the platform allows it.
+- Multipart parts up to the per-image cap stay in memory (`app/main.py` raises Starlette's spool
+  threshold); a larger part is spooled to `/tmp` until the route rejects it. Mount `/tmp` in memory
+  where the platform allows it (Container Apps: an ephemeral volume; Docker: `--tmpfs /tmp`).
 - The image needs no outbound network at run time. If the environment restricts egress, nothing
   in the app will notice.
 - Two vCPUs are the floor for the five-second front+back target; more vCPUs raise batch throughput
