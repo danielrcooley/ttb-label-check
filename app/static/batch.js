@@ -327,12 +327,19 @@ function visibleItems() {
   return items;
 }
 
-function issueList(item) {
-  if (!item.result) return null;
+function issueTexts(item) {
+  // The "What to look at" column: one line per check that is not a plain match, plus the warning.
+  if (!item.result) return [];
   const probs = item.result.checks.filter((c) => c.status !== "match" && c.status !== "info" && c.status !== "not_checked").map((c) => `${c.label}: ${c.status.replace("_", " ")}`);
   const w = item.result.warning;
   if (w.assessment === "not_required") { /* under 0.5% alcohol: no statement required */ }
   else if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
+  return probs;
+}
+
+function issueList(item) {
+  if (!item.result) return null;
+  const probs = issueTexts(item);
   return probs.length ? el("ul", { class: "usa-list usa-list--unstyled issues" }, probs.map((p) => el("li", { text: p }))) : el("span", { class: "text-base", text: "All checks match" });
 }
 
@@ -452,7 +459,7 @@ function csvCell(v) {
   return `"${s.replace(/"/g, '""')}"`;
 }
 function exportCsv() {
-  const head = ["application_id", "brand_name", "class_type", "verdict", "summary", "brand_status", "class_status", "alcohol_status", "net_contents_status",
+  const head = ["application_id", "brand_name", "class_type", "verdict", "what_to_look_at", "summary", "brand_status", "class_status", "alcohol_status", "net_contents_status",
     "bottler_status", "origin_status", "warning_present", "warning_exact", "warning_anchor_caps", "decision", "note", "images", "elapsed_ms_in_batch", "exported_at"];
   const lines = [head.map(csvCell).join(",")];
   const st = (it, id) => it.result?.checks.find((c) => c.id === id)?.status || "";
@@ -460,7 +467,7 @@ function exportCsv() {
     const d = state.decisions.get(it.key) || {};
     const w = it.result?.warning;
     lines.push([it.application?.application_id || it.key, it.application?.brand_name || it.fields?.largest_text || "", it.application?.class_type || "",
-      it.result?.verdict || it.status, it.result?.summary || it.error || "", st(it, "brand_name"), st(it, "class_type"), st(it, "alcohol_content"),
+      it.result?.verdict || it.status, it.result ? (issueTexts(it).join("; ") || "All checks match") : "", it.result?.summary || it.error || "", st(it, "brand_name"), st(it, "class_type"), st(it, "alcohol_content"),
       st(it, "net_contents"), st(it, "bottler"), st(it, "country_of_origin"), w ? w.present : "", w ? w.exact : "", w ? w.anchor_caps : "",
       d.decision || "", d.note || "", it.files.map((f) => f.name).join(";"), it.ms, new Date().toISOString()].map(csvCell).join(","));
   }
