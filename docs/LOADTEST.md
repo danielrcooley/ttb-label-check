@@ -106,3 +106,45 @@ corrected build.
 - no browser errors
 - run at 2026-09-04 04:58:40
 
+## Build a9738ed on Azure (the bounded round, D-039)
+
+The corrected build: one extra round of reads, at most one per worker, on interactive requests
+only; batch requests read every image exactly once. The "10 x extract, concurrency 1, interactive"
+run is a front label on its own, the case that triggers the round.
+
+### steady interactive: 20 x verify (2 image(s) each), concurrency 1, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 54.8 s, throughput 0.37 req/s (0.73 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 2674, p95 2758, max 3672
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 05:34:07
+
+### steady interactive: 20 x verify (2 image(s) each), concurrency 2, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 45.4 s, throughput 0.44 req/s (0.88 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 4301, p95 5032, max 6876
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 05:34:53
+
+### steady interactive: 10 x extract (1 image(s) each), concurrency 1, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 34.1 s, throughput 0.29 req/s (0.29 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 3249, p95 3334, max 4740
+- final status codes: {200: 10}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 05:35:27
+
+### steady: 100 x extract (1 image(s) each), concurrency 2, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 87.7 s, throughput 1.14 req/s (1.14 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 1717, p95 1785, max 3168
+- final status codes: {200: 100}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 05:36:56
+
+### burst: 16 simultaneous extract requests, no backoff, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- status codes: {429: 14, 200: 2} (429 = refused immediately with Retry-After)
+- served latency ms: p50 3172, max 3217; wall 3.2 s
+- health during burst: HTTP 200, in_flight=0
+- run at 2026-09-04 05:36:59
+
+### browser batch: 150 applications x 2 images through the batch screen, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 315 s (0.95 images/s end to end, including compare calls and rendering)
+- summary tiles: 150 Ready for approval | 0 Need review | 0 Issues / unreadable | 0 Errors | 0 Images not matched | 0/150 Decided | 2.3 s per image, median (p95 2.8 s)
+- no browser errors
+- run at 2026-09-04 05:42:20
+
