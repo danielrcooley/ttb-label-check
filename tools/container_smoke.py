@@ -4,6 +4,7 @@ Waits for readiness, then verifies the bundled clean sample through the real API
 verdict. Exits non-zero on any failure so CI cannot pass silently.
 """
 
+import contextlib
 import json
 import os
 import sys
@@ -38,10 +39,8 @@ def wait_ready(seconds: int) -> float:
             last = repr(exc)
         time.sleep(1)
     print("NOT READY after", seconds, "s; last:", last, file=sys.stderr)
-    try:
+    with contextlib.suppress(Exception):
         print(json.dumps(get("/api/v1/health")[1], indent=1), file=sys.stderr)
-    except Exception:
-        pass
     sys.exit(2)
 
 

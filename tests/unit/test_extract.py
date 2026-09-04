@@ -20,7 +20,7 @@ def test_extract_only_mode_reads_origin_bottler_alcohol_volume_and_warning():
     assert f.bottler_lines and f.bottler_lines[0].startswith("Distilled and Bottled by")
     assert f.alcohol_percent == 45.0 and f.proof == 90.0
     assert f.net_contents_ml == [750.0]
-    assert f.largest_text == "Distilled and Bottled by Old Tom Distillery, Bardstown, Kentucky"
+    assert f.largest_text == "OLD TOM DISTILLERY"  # equal heights: the first line wins
 
 
 def test_origin_pattern_requires_whole_words():
