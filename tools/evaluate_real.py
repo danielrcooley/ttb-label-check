@@ -195,7 +195,7 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
         "comparator reports on the registry's image, and the hand-checked cases are listed at the end.",
         '- "Statement located" means the heading was found and a span accumulated behind it, at any similarity; '
         "the exact / slips / wording split below it is the accuracy, not the located rate.",
-        "- \"Country of origin found\" is a proxy: the registry's country name matched somewhere on the label at "
+        '- "Country of origin found" is a proxy: the registry\'s country name matched somewhere on the label at '
         "partial-ratio 90 or better, without checking that it sits in an origin statement.",
         "- The alcohol and net-contents read rates count a parse anywhere in the concatenated text of all the "
         "record's images, as the extract-only mode of the product does.",
@@ -236,7 +236,9 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
             lambda g: pct(sum(bool(r["origin_found"]) for r in g), sum(r["origin_found"] is not None for r in g)),
         )
     )
-    out.append(row("Warning statement located (heading found)", lambda g: pct(sum(r["warning_present"] for r in g), len(g))))
+    out.append(
+        row("Warning statement located (heading found)", lambda g: pct(sum(r["warning_present"] for r in g), len(g)))
+    )
     out.append(row("Warning exact (of all)", lambda g: pct(sum(r["warning_assessment"] == "exact" for r in g), len(g))))
     out.append(
         row(

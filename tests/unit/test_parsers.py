@@ -346,5 +346,7 @@ def test_bottler_with_a_different_corporate_form_is_review_not_match():
     assert "LLC" in (differs.note or "") and "Inc." in (differs.note or "")
     omitted = bottler_check("ACME Brewing Company", make_lines(["BREWED BY ACME BREWING"]), s)
     assert omitted.status == "match", omitted
-    same = bottler_check("Green Cheek Beer Company, Orange, CA", make_lines(["BREWED BY GREEN CHEEK BEER CO.", "ORANGE, CA"]), s)
+    same = bottler_check(
+        "Green Cheek Beer Company, Orange, CA", make_lines(["BREWED BY GREEN CHEEK BEER CO.", "ORANGE, CA"]), s
+    )
     assert same.status == "match", same
