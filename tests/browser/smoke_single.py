@@ -48,7 +48,9 @@ def main() -> int:
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url} {r.failure}"))
         page.on("response", lambda r: problems.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
-        page.on("dialog", lambda d: d.accept() if d.type == "beforeunload" else d.dismiss())  # leave-page prompt on reload
+        page.on(
+            "dialog", lambda d: d.accept() if d.type == "beforeunload" else d.dismiss()
+        )  # leave-page prompt on reload
         page.goto(BASE + "/", wait_until="networkidle")
         print("title:", page.title())
         page.screenshot(path=f"{OUT}/ui_home.png", full_page=True)
