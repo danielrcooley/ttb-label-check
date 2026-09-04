@@ -19,6 +19,10 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+# Tiny crops gain nothing from OpenCV's thread pool, and on a two-vCPU host that pool contends with the
+# OCR engine's threads (one intra-op thread per worker). Keep OpenCV single-threaded in this process.
+cv2.setNumThreads(1)
+
 _ANCHOR = re.compile(r"g\s*o\s*v\s*e\s*r\s*n\s*m\s*e\s*n\s*t\s*w\s*a\s*r\s*n\s*i\s*n\s*g\s*:?", re.I)
 MIN_HEIGHT = 24  # px of box height: below this the strokes are a pixel or two and the ratio is noise
 MIN_WIDTH = 24

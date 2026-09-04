@@ -123,8 +123,8 @@ Endpoints: `POST /api/v1/verify`, `POST /api/v1/extract`, `POST /api/v1/compare`
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -m "not integration"        # 142 fast unit tests, no OCR
-pytest                              # + 17 integration tests through the API with the real engine
+pytest -m "not integration"        # 168 fast unit tests, no OCR
+pytest                              # + 18 integration tests through the API with the real engine
 python tests/browser/smoke_single.py   # headless browser checks (needs a running server + Playwright)
 ruff check . && mypy                # lint and strict typing
 python tools/evaluate.py            # accuracy and latency table -> docs/EVAL.md
