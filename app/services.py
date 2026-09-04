@@ -16,7 +16,7 @@ from app.ocr.pool import OcrPool, Runner
 from app.pipeline.compare import compare
 from app.pipeline.extract import extract_fields
 from app.pipeline.images import DecodedImage, decode_image, rotate_array, to_canonical
-from app.pipeline.typeface import measure_line
+from app.pipeline.typeface import measure_line, to_gray
 from app.pipeline.warning import WarningSpan, find_warning
 from app.schemas import (
     ApplicationFields,
@@ -68,8 +68,9 @@ def _to_lines(
     """Canonical lines from a read, with the type weight of each line measured on the array the
     engine read (``arr``), so the warning report can judge bold type without the pixels."""
     out: list[OcrLine] = []
+    gray = to_gray(arr) if arr is not None and raw else None
     for r in raw:
-        lw = measure_line(arr, r.box, r.text) if arr is not None else None
+        lw = measure_line(gray, r.box, r.text) if gray is not None else None
         out.append(
             OcrLine(
                 image_index=index,

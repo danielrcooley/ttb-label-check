@@ -74,6 +74,11 @@ def _crop(arr: np.ndarray, x0: float, y0: float, x1: float, y1: float, pad: int 
     return cv2.cvtColor(part, cv2.COLOR_RGB2GRAY) if part.ndim == 3 else part
 
 
+def to_gray(arr: np.ndarray) -> np.ndarray:
+    """Greyscale once per read; measure_line accepts either the colour array or this."""
+    return cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY) if arr.ndim == 3 else arr
+
+
 def measure_line(arr: np.ndarray, box: object, text: str) -> LineWeight:
     """Weights for one OCR line in the array it was read from. When the line carries the warning
     heading, the heading's part and the rest are measured apart, splitting the box in proportion

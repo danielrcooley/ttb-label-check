@@ -48,8 +48,8 @@ def pct(xs: list[float], p: float) -> float:
 
 async def one(
     client: httpx.AsyncClient, url: str, endpoint: str, files: list[tuple[str, bytes]], batch: bool, retry: bool
-) -> tuple[int, float, int]:
-    """Returns (final status, wall ms including retries, number of 429s seen)."""
+) -> tuple[int, float, int, float | None]:
+    """Returns (final status, wall ms including retries, number of 429s seen, server-side ms or None)."""
     headers = {"X-Batch": "1"} if batch else {}
     refused = 0
     t0 = time.perf_counter()
@@ -59,19 +59,25 @@ async def one(
         try:
             r = await client.post(f"{url}/api/v1/{endpoint}", files=form, data=data, headers=headers)
         except httpx.HTTPError:
-            return 0, (time.perf_counter() - t0) * 1000, refused
+            return 0, (time.perf_counter() - t0) * 1000, refused, None
         if r.status_code == 429 and retry:
             refused += 1
             base = float(r.headers.get("Retry-After", "1"))
             await asyncio.sleep(base * (attempt + 1) + random.random() * 0.5)  # grows like the browser client
             continue
-        return r.status_code, (time.perf_counter() - t0) * 1000, refused
-    return 429, (time.perf_counter() - t0) * 1000, refused
+        server_ms: float | None = None
+        if r.status_code == 200:
+            try:
+                server_ms = float(r.json()["timing"]["total_ms"])  # the server's own clock, network excluded
+            except (ValueError, KeyError, TypeError):
+                server_ms = None
+        return r.status_code, (time.perf_counter() - t0) * 1000, refused, server_ms
+    return 429, (time.perf_counter() - t0) * 1000, refused, None
 
 
 async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> str:
     sem = asyncio.Semaphore(args.concurrency)
-    results: list[tuple[int, float, int]] = []
+    results: list[tuple[int, float, int, float | None]] = []
     async with httpx.AsyncClient(timeout=60) as client:
 
         async def task() -> None:
@@ -83,11 +89,12 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
         t0 = time.perf_counter()
         await asyncio.gather(*(task() for _ in range(args.n)))
         wall = time.perf_counter() - t0
-    ok = [ms for st, ms, _ in results if st == 200]
+    ok = [ms for st, ms, _, _ in results if st == 200]
+    server = [sv for st, _, _, sv in results if st == 200 and sv is not None]
     codes = {}
-    for st, _, _ in results:
+    for st, _, _, _ in results:
         codes[st] = codes.get(st, 0) + 1
-    refused = sum(r for _, _, r in results)
+    refused = sum(r for _, _, r, _ in results)
     return "\n".join(
         [
             f"### steady{' interactive' if args.interactive else ''}: {args.n} x {args.endpoint} "
@@ -95,6 +102,8 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
             f"- wall {wall:.1f} s, throughput {args.n / wall:.2f} req/s ({args.n * len(files) / wall:.2f} images/s)",
             f"- wall latency ms per successful request, including any backoff waits: p50 {pct(ok, 0.5):.0f}, "
             f"p95 {pct(ok, 0.95):.0f}, max {max(ok) if ok else 0:.0f}",
+            f"- server-side latency ms (the response's own timing.total_ms, network excluded): p50 {pct(server, 0.5):.0f}, "
+            f"p95 {pct(server, 0.95):.0f}, max {max(server) if server else 0:.0f}",
             f"- final status codes: {codes}; 429 responses absorbed by backoff along the way: {refused}",
         ]
     )
@@ -110,9 +119,9 @@ async def burst(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> str
         wall = time.perf_counter() - t0
         h = await health_task
     codes: dict[int, int] = {}
-    for st, _, _ in results:
+    for st, _, _, _ in results:
         codes[st] = codes.get(st, 0) + 1
-    served = [ms for st, ms, _ in results if st == 200]
+    served = [ms for st, ms, _, _ in results if st == 200]
     return "\n".join(
         [
             f"### burst: {args.concurrency} simultaneous {args.endpoint} requests, no backoff, host {args.url}",
