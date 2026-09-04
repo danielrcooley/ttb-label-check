@@ -148,3 +148,39 @@ run is a front label on its own, the case that triggers the round.
 - no browser errors
 - run at 2026-09-04 05:42:20
 
+## Build 56e33af on Azure (bold type measured; server-side latency reported)
+
+From here on each block also reports the server's own latency (the response's timing.total_ms),
+because wall time from a laptop depends on its connection: this afternoon DNS lookups took about a
+second and uploads one to two, while in the morning wall time matched server time within 0.1 s.
+Measuring bold type costs about 200 ms per front-and-back pair on this host (A/B against the
+previous image on the same node: 2.65 to 2.7 s against 2.85 to 2.95 s server-side).
+
+### steady interactive: 20 x verify (2 image(s) each), concurrency 1, host https://labelcheck.dev
+- wall 88.1 s, throughput 0.23 req/s (0.45 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 4343, p95 4653, max 5610
+- server-side latency ms (the response's own timing.total_ms, network excluded): p50 2830, p95 2955, max 3400
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 13:16:38
+
+### steady interactive: 20 x verify (2 image(s) each), concurrency 2, host https://labelcheck.dev
+- wall 59.6 s, throughput 0.34 req/s (0.67 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 5631, p95 6028, max 8882
+- server-side latency ms (the response's own timing.total_ms, network excluded): p50 3919, p95 4323, max 5687
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 13:17:38
+
+### steady interactive: 10 x extract (1 image(s) each), concurrency 1, host https://labelcheck.dev
+- wall 44.4 s, throughput 0.23 req/s (0.23 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 4275, p95 4701, max 5363
+- server-side latency ms (the response's own timing.total_ms, network excluded): p50 3587, p95 3917, max 3928
+- final status codes: {200: 10}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 13:18:23
+
+### steady: 100 x extract (1 image(s) each), concurrency 2, host https://labelcheck.dev
+- wall 133.9 s, throughput 0.75 req/s (0.75 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 2504, p95 3360, max 5037
+- server-side latency ms (the response's own timing.total_ms, network excluded): p50 1801, p95 1919, max 2079
+- final status codes: {200: 100}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-04 13:20:37
+

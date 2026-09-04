@@ -91,7 +91,7 @@ async def steady(args: argparse.Namespace, files: list[tuple[str, bytes]]) -> st
         wall = time.perf_counter() - t0
     ok = [ms for st, ms, _, _ in results if st == 200]
     server = [sv for st, _, _, sv in results if st == 200 and sv is not None]
-    codes = {}
+    codes: dict[int, int] = {}
     for st, _, _, _ in results:
         codes[st] = codes.get(st, 0) + 1
     refused = sum(r for _, _, r, _ in results)
