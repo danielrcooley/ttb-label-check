@@ -453,7 +453,7 @@ function csvCell(v) {
 }
 function exportCsv() {
   const head = ["application_id", "brand_name", "class_type", "verdict", "summary", "brand_status", "class_status", "alcohol_status", "net_contents_status",
-    "bottler_status", "origin_status", "warning_present", "warning_exact", "warning_anchor_caps", "decision", "note", "images", "processing_ms", "checked_at"];
+    "bottler_status", "origin_status", "warning_present", "warning_exact", "warning_anchor_caps", "decision", "note", "images", "elapsed_ms_in_batch", "exported_at"];
   const lines = [head.map(csvCell).join(",")];
   const st = (it, id) => it.result?.checks.find((c) => c.id === id)?.status || "";
   for (const it of state.items) {
