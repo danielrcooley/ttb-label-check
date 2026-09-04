@@ -72,6 +72,20 @@ def main() -> int:
             page.locator(".checklist tbody tr").first.click()
             print("   active polygons after row click:", page.locator(".overlay polygon.is-active").count())
 
+        # Decision, note and export on the single screen (the same controls as the batch screen)
+        page.locator("#decision .decision-btns button", has_text="Approve").click()
+        if page.locator("#decision button[aria-pressed='true']", has_text="Approve").count() != 1:
+            problems.append("single: Approve did not stay pressed")
+        page.fill("#decision .note-input", "checked the heading on the image")
+        page.locator("#decision .note-input").press("Tab")
+        with page.expect_download() as dl:
+            page.locator("#decision .decision-actions button", has_text="Export").click()
+        with open(dl.value.path(), encoding="utf-8-sig") as f:
+            lines = f.read().splitlines()
+        if len(lines) != 2 or '"approve"' not in lines[1] or "checked the heading" not in lines[1]:
+            problems.append("single: export lacks the decision or the note")
+        print("single: decision recorded and exported")
+
         # Accessibility page: the display choice applies at once, survives a reload, and restores.
         page.click("a[data-view=accessibility]")
         page.wait_for_selector("#view-accessibility:not([hidden])", timeout=5000)

@@ -121,12 +121,19 @@ main { flex: 1 0 auto; }
 .batch-table .issues li { margin: 0; }
 .batch-table .decision-btns { display: flex; flex-wrap: wrap; gap: .25rem; }
 .batch-table .decision-btns .usa-button { margin: 0; padding: .35rem .6rem; font-size: .9rem; }
-.batch-table .decision-btns .usa-button.is-on { background: #1b1b1b; color: #fff; }
+.decision-btns .usa-button.is-on { background: #1b1b1b; color: #fff; }
 .batch-table .note-input { margin-top: .35rem; width: 100%; max-width: 14rem; font-size: .9rem; padding: .3rem; border: 1px solid #565c65; }
 .batch-table tr.detail-row td { background: #f9f9f9; }
 .batch-table .files { font-size: .85rem; color: #565c65; word-break: break-all; }
 .batch-table tr.is-error td { background: #fdf2f1; }
 .pager { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+
+/* Decision block on the single screen (the batch table uses the same controls in a cell) */
+.decision-block .decision-btns { display: flex; flex-wrap: wrap; gap: .5rem; }
+.decision-block .decision-btns .usa-button { margin: 0; }
+.decision-block .note-input { display: block; margin-top: .75rem; width: 100%; max-width: 30rem; padding: .5rem; border: 1px solid #565c65; font-size: 1rem; }
+.decision-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.decision-actions .usa-button { margin: 0; }
 .pager .usa-button { margin: 0; }
 .detail-panel .label-stage img { max-height: 40vh; }
 
@@ -136,13 +143,13 @@ main { flex: 1 0 auto; }
   .overlay polygon { fill: none; stroke: Highlight; }
   .dropzone { border-color: CanvasText; }
   /* a pressed decision or filter button keeps a visible state without its fill */
-  .batch-table .decision-btns .usa-button.is-on, .filter-bar .usa-button.is-on {
+  .decision-btns .usa-button.is-on, .filter-bar .usa-button.is-on {
     forced-color-adjust: none; background: Highlight; color: HighlightText; border: 3px solid Highlight; outline: 2px solid CanvasText; outline-offset: 1px;
   }
 }
 
 @media print {
-  header, footer, .sample-bar, .submit-row, .usa-site-alert, #dropzone, details { display: none !important; }
+  header, footer, .sample-bar, .submit-row, .usa-site-alert, #dropzone, details, .decision-actions { display: none !important; }
   .results { margin-top: 0; }
 }
 
@@ -178,7 +185,7 @@ main { flex: 1 0 auto; }
 /* forms */
 :root[data-theme="dark"] .usa-input, :root[data-theme="dark"] .usa-select, :root[data-theme="dark"] .usa-textarea,
 :root[data-theme="dark"] input[type=text], :root[data-theme="dark"] input[type=search], :root[data-theme="dark"] select,
-:root[data-theme="dark"] textarea, :root[data-theme="dark"] .batch-table .note-input { background-color: #1a1f24; color: #f0f0f0; border-color: #b6bcc2; }
+:root[data-theme="dark"] textarea, :root[data-theme="dark"] .note-input { background-color: #1a1f24; color: #f0f0f0; border-color: #b6bcc2; }
 :root[data-theme="dark"] .usa-input::placeholder, :root[data-theme="dark"] .note-input::placeholder { color: #9da3a9; }
 :root[data-theme="dark"] .usa-radio__input--tile + .usa-radio__label { background: #1a1f24; color: #f0f0f0; border-color: #565c65; }
 :root[data-theme="dark"] .usa-radio__input--tile:checked + .usa-radio__label { background: #16232f; border-color: #8fc3ff; }
@@ -216,7 +223,7 @@ main { flex: 1 0 auto; }
 :root[data-theme="dark"] .batch-table .app-brand { color: #d0d5da; }
 :root[data-theme="dark"] .batch-table tr.detail-row td { background: #1a1f24; }
 :root[data-theme="dark"] .batch-table tr.is-error td { background: #3a1f1d; }
-:root[data-theme="dark"] .batch-table .decision-btns .usa-button.is-on { background: #f0f0f0; color: #0f1216; box-shadow: none; }
+:root[data-theme="dark"] .decision-btns .usa-button.is-on { background: #f0f0f0; color: #0f1216; box-shadow: none; }
 :root[data-theme="dark"] .detail-panel { color: inherit; }
 /* the design system sets a dark text color on tables and accordions themselves, and paints alert
    bodies; those must follow the theme too */

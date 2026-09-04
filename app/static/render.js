@@ -254,3 +254,64 @@ export function renderOcrLines(container, lines) {
       el("ol", { class: "ocr-lines" }, ls.map((l) => el("li", { text: `${l.text}  (${Math.round(l.confidence * 100)}%)` }))),
     ])));
 }
+
+// ------------------------------------------------------------------ decisions and export (both screens)
+
+/** The "What to look at" lines for a result: every check that is not a plain match, plus the warning. */
+export function issueTexts(result) {
+  if (!result) return [];
+  const probs = result.checks.filter((c) => c.status !== "match" && c.status !== "info" && c.status !== "not_checked").map((c) => `${c.label}: ${c.status.replace("_", " ")}`);
+  const w = result.warning;
+  if (w.assessment === "not_required") { /* under 0.5% alcohol: no statement required */ }
+  else if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
+  return probs;
+}
+
+/** Approve / Reject / Flag with a note. getCurrent() reads the live decision {decision, note} so a
+ * press never works from a stale copy; onChange(next) receives the whole new object. The pressed
+ * button carries a check mark in its text as well as a dark fill (Windows contrast themes drop fills). */
+export function decisionControls(getCurrent, onChange, noteLabel = "Note") {
+  const d = getCurrent() || {};
+  const btn = (val, label) => el("button", { type: "button", class: `usa-button usa-button--outline${d.decision === val ? " is-on" : ""}`,
+    text: d.decision === val ? `✓ ${label}` : label,
+    "aria-pressed": d.decision === val ? "true" : "false",
+    title: d.decision === val ? `${label}: press again to clear` : label,
+    onclick: () => { const cur = getCurrent() || {}; onChange({ ...cur, decision: cur.decision === val ? null : val }); } });
+  const note = el("input", { type: "text", class: "note-input", placeholder: "Note (optional)", value: d.note || "", "aria-label": noteLabel });
+  note.addEventListener("change", () => onChange({ ...(getCurrent() || {}), note: note.value }));
+  return el("div", {}, [el("div", { class: "decision-btns" }, [btn("approve", "Approve"), btn("reject", "Reject"), btn("flag", "Flag")]), note]);
+}
+
+export const EXPORT_HEAD = ["application_id", "brand_name", "class_type", "verdict", "what_to_look_at", "summary", "brand_status", "class_status",
+  "alcohol_status", "net_contents_status", "bottler_status", "origin_status", "warning_present", "warning_exact", "warning_anchor_caps",
+  "decision", "note", "images", "elapsed_ms", "exported_at"];
+
+/** One export row. elapsed_ms is the check's own time on the single screen and the time spent in the
+ * batch (queue plus reads) on the batch screen. */
+export function exportRow({ application, key, result, status, error, decision, files, elapsedMs }) {
+  const st = (id) => result?.checks.find((c) => c.id === id)?.status || "";
+  const w = result?.warning;
+  return [application?.application_id || key || "", application?.brand_name || "", application?.class_type || "",
+    result?.verdict || status || "", result ? (issueTexts(result).join("; ") || "All checks match") : "", result?.summary || error || "",
+    st("brand_name"), st("class_type"), st("alcohol_content"), st("net_contents"), st("bottler"), st("country_of_origin"),
+    w ? w.present : "", w ? w.exact : "", w ? w.anchor_caps : "", decision?.decision || "", decision?.note || "",
+    (files || []).map((f) => f.name).join(";"), elapsedMs ?? "", new Date().toISOString()];
+}
+
+export function csvCell(v) {
+  let s = v == null ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // neutralize spreadsheet formulas
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+/** Hand the browser a CSV file (UTF-8 with a byte order mark, so spreadsheets read accents). */
+export function downloadCsv(filename, rows) {
+  const lines = [EXPORT_HEAD.map(csvCell).join(","), ...rows.map((row) => row.map(csvCell).join(","))];
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: filename });
+  document.body.append(a); a.click(); a.remove();
+}
+
+export function exportStamp() {
+  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+}

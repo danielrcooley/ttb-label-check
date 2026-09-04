@@ -3,7 +3,7 @@
 // compared (/compare), rows stream into the table, the agent records decisions, and everything can
 // be exported. The server stays stateless; a refresh clears the session and the page says so.
 import { ApiError, compare, extract, health } from "./api.js";
-import { drawOverlays, el, makeCrops, renderChecklist, renderFigures, renderWarning, statusTag } from "./render.js";
+import { decisionControls, downloadCsv, drawOverlays, el, exportRow, exportStamp, issueTexts, makeCrops, renderChecklist, renderFigures, renderWarning, statusTag } from "./render.js";
 
 const VERDICT_WORD = { ready_for_approval: "Ready", needs_review: "Needs review", issues_found: "Issues found", unreadable: "Unreadable" };
 const VERDICT_STATUS = { ready_for_approval: "match", needs_review: "needs_review", issues_found: "mismatch", unreadable: "not_found" };
@@ -327,38 +327,18 @@ function visibleItems() {
   return items;
 }
 
-function issueTexts(item) {
-  // The "What to look at" column: one line per check that is not a plain match, plus the warning.
-  if (!item.result) return [];
-  const probs = item.result.checks.filter((c) => c.status !== "match" && c.status !== "info" && c.status !== "not_checked").map((c) => `${c.label}: ${c.status.replace("_", " ")}`);
-  const w = item.result.warning;
-  if (w.assessment === "not_required") { /* under 0.5% alcohol: no statement required */ }
-  else if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
-  return probs;
-}
-
 function issueList(item) {
   if (!item.result) return null;
-  const probs = issueTexts(item);
+  const probs = issueTexts(item.result);
   return probs.length ? el("ul", { class: "usa-list usa-list--unstyled issues" }, probs.map((p) => el("li", { text: p }))) : el("span", { class: "text-base", text: "All checks match" });
 }
 
 function decisionCell(item) {
-  const d = state.decisions.get(item.key) || {};
-  // The pressed button carries a check mark in its text as well as a dark fill, because Windows
-  // contrast themes drop fills; and the click reads the current decision, not the one rendered.
-  const btn = (val, label) => el("button", { type: "button", class: `usa-button usa-button--outline${d.decision === val ? " is-on" : ""}`,
-    text: d.decision === val ? `✓ ${label}` : label,
-    "aria-pressed": d.decision === val ? "true" : "false",
-    title: d.decision === val ? `${label}: press again to clear` : label,
-    onclick: () => {
-      const cur = state.decisions.get(item.key) || {};
-      state.decisions.set(item.key, { ...cur, decision: cur.decision === val ? null : val });
-      renderTable(); renderSummary();
-    } });
-  const note = el("input", { type: "text", class: "note-input", placeholder: "Note (optional)", value: d.note || "", "aria-label": `Note for ${item.key}` });
-  note.addEventListener("change", () => state.decisions.set(item.key, { ...(state.decisions.get(item.key) || {}), note: note.value }));
-  return el("div", {}, [el("div", { class: "decision-btns" }, [btn("approve", "Approve"), btn("reject", "Reject"), btn("flag", "Flag")]), note]);
+  return decisionControls(
+    () => state.decisions.get(item.key) || {},
+    (next) => { state.decisions.set(item.key, next); renderTable(); renderSummary(); },
+    `Note for ${item.key}`,
+  );
 }
 
 function renderTable() {
@@ -453,27 +433,13 @@ function renderUnpaired() {
 }
 
 // ------------------------------------------------------------------ export
-function csvCell(v) {
-  let s = v == null ? "" : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // neutralize spreadsheet formulas
-  return `"${s.replace(/"/g, '""')}"`;
-}
 function exportCsv() {
-  const head = ["application_id", "brand_name", "class_type", "verdict", "what_to_look_at", "summary", "brand_status", "class_status", "alcohol_status", "net_contents_status",
-    "bottler_status", "origin_status", "warning_present", "warning_exact", "warning_anchor_caps", "decision", "note", "images", "elapsed_ms_in_batch", "exported_at"];
-  const lines = [head.map(csvCell).join(",")];
-  const st = (it, id) => it.result?.checks.find((c) => c.id === id)?.status || "";
-  for (const it of state.items) {
-    const d = state.decisions.get(it.key) || {};
-    const w = it.result?.warning;
-    lines.push([it.application?.application_id || it.key, it.application?.brand_name || it.fields?.largest_text || "", it.application?.class_type || "",
-      it.result?.verdict || it.status, it.result ? (issueTexts(it).join("; ") || "All checks match") : "", it.result?.summary || it.error || "", st(it, "brand_name"), st(it, "class_type"), st(it, "alcohol_content"),
-      st(it, "net_contents"), st(it, "bottler"), st(it, "country_of_origin"), w ? w.present : "", w ? w.exact : "", w ? w.anchor_caps : "",
-      d.decision || "", d.note || "", it.files.map((f) => f.name).join(";"), it.ms, new Date().toISOString()].map(csvCell).join(","));
-  }
-  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = el("a", { href: URL.createObjectURL(blob), download: `label-check-batch-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv` });
-  document.body.append(a); a.click(); a.remove();
+  const rows = state.items.map((it) => exportRow({
+    application: it.application || (it.fields?.largest_text ? { brand_name: it.fields.largest_text } : null),
+    key: it.key, result: it.result, status: it.status, error: it.error,
+    decision: state.decisions.get(it.key), files: it.files, elapsedMs: it.ms,
+  }));
+  downloadCsv(`label-check-batch-${exportStamp()}.csv`, rows);
 }
 
 // ------------------------------------------------------------------ demo batch

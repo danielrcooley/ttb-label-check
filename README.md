@@ -20,7 +20,8 @@ label each answer came from. In a few seconds. The tool recommends; the agent de
    the warning is exact, and each row shows the label pixels it was read from.
 3. Press **Problem label**. The alcohol content mismatches (45% claimed, 47.5% on the label) and the
    warning heading is in title case. The brand differs only by letter case and is correctly treated
-   as a match with a note, which is Dave's "STONE'S THROW" example from the brief.
+   as a match with a note, which is Dave's "STONE'S THROW" example from the brief. Under the
+   result, record your decision (Approve, Reject or Flag, with a note), export it as CSV, or print it.
 4. Open **Batch** and press **Load a demo batch**. Five applications and ten images stream in;
    filter to "Needs attention", record a decision, export the CSV.
 

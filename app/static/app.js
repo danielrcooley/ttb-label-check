@@ -1,13 +1,13 @@
 // Controller for the single-application screen. Vanilla ES module, no build step.
 import { ApiError, health, verify } from "./api.js";
-import { drawOverlays, el, makeCrops, renderChecklist, renderFigures, renderOcrLines, renderVerdict, renderWarning } from "./render.js";
+import { decisionControls, downloadCsv, drawOverlays, el, exportRow, exportStamp, makeCrops, renderChecklist, renderFigures, renderOcrLines, renderVerdict, renderWarning } from "./render.js";
 
 const MAX_IMAGES = 6;
 const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = /^image\/(png|jpeg|gif|webp|tiff|bmp)$/;
 
 const $ = (sel) => document.querySelector(sel);
-const state = { files: [], result: null, overlays: new Map(), activeId: null, samples: null };
+const state = { files: [], result: null, overlays: new Map(), activeId: null, samples: null, app: null, decision: null, elapsedMs: 0 };
 
 // ------------------------------------------------------------------ icons (sprite inlined once)
 async function loadSprite() {
@@ -179,6 +179,8 @@ async function runCheck() {
   try {
     const result = await verify(state.files, app);
     state.result = result;
+    state.app = app;
+    state.decision = null;
     state.activeId = null;
     const crops = await makeCrops(state.files, result.images, result.checks);
     renderVerdict($("#verdict"), result);
@@ -187,6 +189,8 @@ async function runCheck() {
     state.overlays = renderFigures($("#figures"), result.images, state.files, result.lines);
     drawOverlays(state.overlays, result.checks, result.warning, null);
     renderOcrLines($("#ocr-lines"), result.lines);
+    state.elapsedMs = Math.round(performance.now() - t0);
+    renderDecision();
     const results = $("#results");
     results.hidden = false;
     results.focus({ preventScroll: false });
@@ -203,6 +207,28 @@ async function runCheck() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ------------------------------------------------------------------ decision, export, print
+function renderDecision() {
+  const box = $("#decision");
+  box.replaceChildren(
+    el("h3", { class: "margin-top-0", text: "Your decision" }),
+    el("p", { class: "usa-hint", text: "Goes into the export and the printout only; nothing is stored on the server." }),
+    decisionControls(() => state.decision || {}, (next) => { state.decision = next; renderDecision(); }, "Note for this application"),
+    el("div", { class: "decision-actions" }, [
+      el("button", { type: "button", class: "usa-button usa-button--outline", text: "Export result (CSV)", onclick: exportSingle }),
+      el("button", { type: "button", class: "usa-button usa-button--outline", text: "Print", onclick: () => window.print() }),
+    ]),
+  );
+}
+
+function exportSingle() {
+  const app = state.app || readApplication();
+  const stem = (app.application_id || app.brand_name || "result").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40);
+  downloadCsv(`label-check-${stem}-${exportStamp()}.csv`, [exportRow({
+    application: app, result: state.result, status: "done", decision: state.decision, files: state.files, elapsedMs: state.elapsedMs,
+  })]);
 }
 
 // ------------------------------------------------------------------ boot
