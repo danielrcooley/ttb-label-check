@@ -7,7 +7,7 @@ label each answer came from. In a few seconds. The tool recommends; the agent de
 > Prototype for the Treasury take-home exercise. Not an official U.S. Government system.
 > Built and documented by Daniel R. Cooley, directing AI coding agents (see [Tools](#tools-and-how-this-was-built)).
 
-- **Live prototype:** _DEPLOY_URL_ (Azure Container Apps, always on)
+- **Live prototype:** https://labelcheck.dev (Azure Container Apps, always on)
 - **Approach in two pages:** [docs/APPROACH.md](docs/APPROACH.md)
 - **Where each requirement is met:** [docs/REQUIREMENTS_TRACE.md](docs/REQUIREMENTS_TRACE.md)
 

@@ -121,18 +121,23 @@ Record the numbers in the README "Measured" section and keep `docs/LOADTEST.md`.
 
 ## 6. Custom domain (so the submitted URL survives a later move)
 
-1. In the DNS provider: `CNAME labelcheck.example -> <FQDN>` and
-   `TXT asuid.labelcheck.example -> <verification id>` where the id comes from
-   `az containerapp show ... --query properties.customDomainVerificationId -o tsv`.
+1. In the DNS provider, with no proxying in front of the records: `CNAME <host> -> <FQDN>` and
+   `TXT asuid.<host> -> <verification id>` where the id comes from
+   `az containerapp show ... --query properties.customDomainVerificationId -o tsv`. At a zone's
+   root, Cloudflare flattens the CNAME into A records for the environment's static IP
+   (`az containerapp env show ... --query properties.staticIp`); that works too, with the `HTTP`
+   validation method below instead of `CNAME`.
 2. Bind with a free managed certificate:
 
 ```bash
-DOMAIN=labelcheck.example
+DOMAIN=labelcheck.dev
 az containerapp hostname add  --name $APP --resource-group $RG --hostname $DOMAIN
-az containerapp hostname bind --name $APP --resource-group $RG --hostname $DOMAIN --environment $ENV --validation-method CNAME
+az containerapp hostname bind --name $APP --resource-group $RG --hostname $DOMAIN --environment $ENV --validation-method CNAME   # HTTP for a root A record
 ```
 
-Certificate issuance takes a few minutes. Test `https://$DOMAIN/api/v1/health`.
+Certificate issuance takes a few minutes. Test `https://$DOMAIN/api/v1/health`. The prototype is
+bound as `labelcheck.dev` (root, HTTP validation). Every extra hostname, `www` included, needs its
+own `asuid.<host>` TXT record before it can be added.
 
 ## 7. Redeploy
 
