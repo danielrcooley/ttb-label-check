@@ -44,3 +44,33 @@ _Appended by `tools/loadtest.py`. Each block names the host it ran against._
 - no browser errors
 - run at 2026-09-03 17:26:18
 
+### steady interactive: 20 x verify (2 image(s) each), concurrency 2, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 52.3 s, throughput 0.38 req/s (0.77 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 4979, p95 5887, max 6987
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-03 20:00:51
+
+### steady: 100 x extract (1 image(s) each), concurrency 2, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 102.0 s, throughput 0.98 req/s (0.98 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 2016, p95 2238, max 2425
+- final status codes: {200: 100}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-03 20:02:35
+
+### burst: 16 simultaneous extract requests, no backoff, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- status codes: {429: 14, 200: 2} (429 = refused immediately with Retry-After)
+- served latency ms: p50 4113, max 4172; wall 4.2 s
+- health during burst: HTTP 200, in_flight=0
+- run at 2026-09-03 20:02:39
+
+### steady interactive: 20 x verify (2 image(s) each), concurrency 1, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 61.8 s, throughput 0.32 req/s (0.65 images/s)
+- wall latency ms per successful request, including any backoff waits: p50 3056, p95 3126, max 3718
+- final status codes: {200: 20}; 429 responses absorbed by backoff along the way: 0
+- run at 2026-09-03 20:05:15
+
+### browser batch: 150 applications x 2 images through the batch screen, host https://label-check.proudmeadow-580dfc69.eastus.azurecontainerapps.io
+- wall 364 s (0.82 images/s end to end, including compare calls and rendering)
+- summary tiles: 150 Ready for approval | 0 Need review | 0 Issues / unreadable | 0 Errors | 0 Images not matched | 0/150 Decided | 2.7 s per image, median (p95 3.2 s)
+- no browser errors
+- run at 2026-09-03 20:11:24
+

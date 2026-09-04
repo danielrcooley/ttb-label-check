@@ -50,8 +50,8 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 6. **Standards of fill are advisory.** The container-size lists changed in January 2025 and stock
    can be grandfathered, so an off-list size is "Needs review", never a failure. The check uses the
    application's stated net contents, not the OCR reading.
-7. **English only.** The recognizer handles Latin text with accents; it is not tuned for other
-   scripts. Country-of-origin phrasing is compared, not validated against customs rules.
+7. **English only.** The recognizer is decoded with a printable-ASCII alphabet (item 11) and is not
+   tuned for other scripts. Country-of-origin phrasing is compared, not validated against customs rules.
 8. **No persistence, by design.** Refreshing the batch page clears the session. The page says so
    and the export is one click.
 9. **One container.** Throughput scales with CPUs and with replicas (the service is stateless), but
@@ -63,9 +63,13 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 11. **The recognizer's alphabet is restricted to printable ASCII.** The multilingual model occasionally
     emitted stray accented letters on clean English artwork, so decoding is constrained to the characters
     English label text can contain (`TTB_OCR_ASCII_ALPHABET`, on by default). A genuinely accented letter
-    on a label, such as a French back label or a brand like Château, is read as its base letter; field
-    comparisons already ignore accents and the evidence crop shows the print. Turn the flag off to read
-    accented text literally, at the cost of the stray-accent false alarms.
+    on a label, such as a French back label or a brand like Château, is read as the best remaining class:
+    usually its base letter, occasionally nothing (the character is dropped); field comparisons already
+    ignore accents and the evidence crop shows the print. The direction to know about: an accented
+    character printed inside the warning statement would be read as its base letter and could pass as
+    exact, so that particular typographic defect is not caught. Confidence values are renormalized over
+    the allowed classes. Turn the flag off to read accented text literally, at the cost of the
+    stray-accent false alarms measured in `docs/EVAL.md`.
 12. **Fuzzy pairing is not attempted.** Images that are not listed in the CSV or named with the
     application reference are shown as unmatched for the agent to assign. Guessing which back label
     belongs to which application would be confidently wrong too often.

@@ -14,9 +14,13 @@ deployment where they cost nothing, and it says plainly where it stops.
 - **Uploads stay in memory up to the per-image cap.** The web framework spools multipart parts above
   a threshold to a temporary directory while parsing; this app sets that threshold just above the
   10 MB per-image cap, so every accepted image stays in memory. A part larger than that is spooled
-  to `/tmp` until the route rejects it, which is why the deployment mounts `/tmp` in memory
-  (`--tmpfs /tmp`). Total memory is bounded by the 40 MB request cap times the global cap of 24
-  concurrent metered requests, which is enforced before parsing.
+  to the container's temporary directory until the route rejects it: the local `docker run` recipe
+  mounts `/tmp` in memory (`--tmpfs /tmp`); on Azure Container Apps it is the replica's ephemeral
+  disk, discarded with the replica. Total memory is bounded by the 40 MB request cap times the
+  global cap of 24 concurrent metered requests, which is enforced before parsing. Slow-client
+  protection (a body that trickles in for minutes) is delegated to the platform ingress in front of
+  the container, which enforces request timeouts; the container itself enforces the declared size
+  and a 15-second keep-alive.
 - **No outbound calls.** The verification path makes no network connections. OCR models are in
   the repository (hash-pinned in `app/models/MANIFEST.json`); frontend assets are self-hosted. A
   test blocks every socket connection and runs a full verification (`tests/integration/test_no_egress.py`).
@@ -27,7 +31,7 @@ deployment where they cost nothing, and it says plainly where it stops.
 |---|---|
 | Request body size guard (declared length required, 40 MB cap) and per-image cap (10 MB) enforced while reading | `app/security.py`, `app/routes/api.py` |
 | File type by signature, not extension; PDF, SVG, HEIC and unknown types refused with a specific message | `app/pipeline/images.py` |
-| Decompression-bomb guard (40 megapixels, checked from the header before decoding) | `app/pipeline/images.py` |
+| Decompression-bomb guard (25 megapixels, checked from the header before decoding; large JPEGs are decoded at reduced size) | `app/pipeline/images.py` |
 | Corrupt or truncated images fail cleanly with an error envelope, never a stack trace | `app/pipeline/images.py`, `app/security.py` |
 | Security headers: Content-Security-Policy (`default-src 'self'`, no inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, cross-origin isolation headers, `Cache-Control: no-store` | `app/security.py` |
 | Per-client in-flight cap (4 concurrent requests) with 429 and Retry-After; global cap with 503 | `app/security.py` |
@@ -38,7 +42,9 @@ deployment where they cost nothing, and it says plainly where it stops.
 | Container runs as a non-root user; only the runtime libraries the slim image needs | `Dockerfile` |
 | No inline event handlers or `innerHTML` with user or OCR text; all text rendered via `textContent` | `app/static/*.js` |
 | CSV export neutralizes spreadsheet formulas (`= + - @` prefixes) | `app/static/batch.js` |
-| Dependencies pinned to exact versions | `requirements.txt` |
+| Direct dependencies pinned to exact versions; transitive ones are resolved at build time (no hash lock in this build, see below) | `requirements.txt`, `requirements-ocr.txt` |
+| Dependency audit (`pip-audit`) on every CI run, advisory by design: a newly published advisory in a transitive package must not block a fix from shipping during the review window; findings are reviewed before release | `.github/workflows/ci.yml` |
+| Nothing is published to the registry unless lint, types, unit and integration tests passed; CI runs are serialized per branch so an older image cannot overwrite `latest` | `.github/workflows/ci.yml` |
 | Proxy trust is explicit: client identity from the LAST `X-Forwarded-For` value (the one the trusted ingress appends; the first can be forged) and only when `TTB_TRUST_PROXY=true` | `app/config.py`, `app/security.py` |
 
 ## Deliberately not in this build

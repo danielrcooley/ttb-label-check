@@ -24,9 +24,10 @@ RUN pip install -r requirements.txt \
 COPY --chown=app:app app ./app
 COPY --chown=app:app README.md LICENSE THIRD_PARTY_NOTICES.md ./
 ARG GIT_SHA=unknown
+# TTB_TRUST_PROXY is deliberately NOT set here: trusting X-Forwarded-For is a property of the
+# deployment (set it where a trusted ingress sits in front, see docs/DEPLOY.md), not of the image.
 ENV GIT_SHA=${GIT_SHA} \
-    TTB_OCR_WORKERS=2 \
-    TTB_TRUST_PROXY=true
+    TTB_OCR_WORKERS=2
 
 USER app
 EXPOSE 8000

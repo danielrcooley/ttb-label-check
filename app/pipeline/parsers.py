@@ -32,6 +32,7 @@ class Alcohol:
     percent: float | None
     proof: float | None
     raw: str
+    derived: bool = False  # percent computed from a proof-only statement ("90 Proof" -> 45%)
 
     @property
     def consistent(self) -> bool | None:
@@ -63,7 +64,7 @@ def parse_alcohol(text: str, *, allow_bare: bool = False) -> Alcohol | None:
         m = pat.search(t)
         if m:
             val = _to_float(m.group(1))
-            if 0 < val <= 100:
+            if 0 <= val <= 100:  # 0.0% is a real statement (the warning threshold is 0.5%, 27 CFR 16.10)
                 percent = val
                 break
     proof: float | None = None
@@ -72,17 +73,19 @@ def parse_alcohol(text: str, *, allow_bare: bool = False) -> Alcohol | None:
         pv = _to_float(pm.group(1))
         if 0 < pv <= 200:
             proof = pv
+    derived = False
     if percent is None and proof is not None:
         percent = round(proof / 2, 2)
+        derived = True
     if percent is None and allow_bare:
         bm = _BARE.match(t)
         if bm:
             val = _to_float(bm.group(1))
-            if 0 < val <= 100:
+            if 0 <= val <= 100:
                 percent = val
     if percent is None and proof is None:
         return None
-    return Alcohol(percent=percent, proof=proof, raw=text.strip())
+    return Alcohol(percent=percent, proof=proof, raw=text.strip(), derived=derived)
 
 
 def alcohol_matches(app: Alcohol, label: Alcohol, *, tolerance: float = 0.05) -> bool:

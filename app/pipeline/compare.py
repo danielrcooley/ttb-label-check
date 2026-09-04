@@ -6,6 +6,7 @@ Pure function: no I/O, deterministic for the same inputs.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from typing import Any
 
 from app.config import Settings
@@ -89,7 +90,9 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
 def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) -> Check:
     required, why = alcohol_statement_required(app.beverage_type, app.class_type)
     expected = parse_alcohol(app.alcohol_content, allow_bare=True) if app.alcohol_content else None
-    # Parse every line; prefer the statement that agrees with the application, else the first one.
+    # Parse every line. Explicit percent statements are compared with each other and proofs with each
+    # other (a label may not contradict itself). A proof on its own line ("(90 Proof)") is the second
+    # half of a wrapped statement: it is joined to the percent, not treated as a competing percent.
     candidates: list[tuple[Alcohol, OcrLine]] = []
     for ln in lines:
         got = parse_alcohol(ln.text)
@@ -97,12 +100,16 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
             candidates.append((got, ln))
     found: Alcohol | None = None
     ev: list[Evidence] = []
-    distinct = sorted({round(a.percent, 1) for a, _ in candidates if a.percent is not None})
+    distinct = sorted({round(a.percent, 1) for a, _ in candidates if a.percent is not None and not a.derived})
+    proofs = sorted({a.proof for a, _ in candidates if a.proof is not None})
     if candidates:
-        chosen = next(((a, ln) for a, ln in candidates if expected and alcohol_matches(expected, a)), candidates[0])
+        explicit = [(a, ln) for a, ln in candidates if not a.derived] or candidates
+        chosen = next(((a, ln) for a, ln in explicit if expected and alcohol_matches(expected, a)), explicit[0])
         found, _line = chosen
+        if found.proof is None and proofs:
+            found = replace(found, proof=proofs[0])
         ev = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for _, ln in candidates]
-    if found is None:  # statements sometimes wrap ("45% Alc./Vol." / "(90 Proof)")
+    if found is None:  # a statement split mid-phrase across lines ("Alc." / "45% by vol.")
         found = parse_alcohol(" ".join(ln.text for ln in lines))
     base: dict[str, Any] = {
         "id": "alcohol_content",
@@ -141,6 +148,15 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
             f"{expected.percent:g}%. A label may not contradict itself.",
             **base,
         )
+    if len(proofs) > 1:
+        stated = ", ".join(f"{p:g}" for p in proofs)
+        return Check(
+            status=Status.mismatch,
+            score=0.0,
+            note=f"The label images state different proofs ({stated}); the application says "
+            f"{expected.percent:g}%. A label may not contradict itself.",
+            **base,
+        )
     if alcohol_matches(expected, found):
         note = f"Both state {found.percent}% alcohol by volume."
         if expected.proof is not None and found.proof is not None and abs(expected.proof - found.proof) > 0.2:
@@ -172,7 +188,9 @@ def _net_contents_check(app: ApplicationFields, lines: list[OcrLine], s: Setting
     }
     if not expected:
         return Check(
-            status=Status.not_checked, note="Could not interpret the application's net contents value.", **base
+            status=Status.needs_review,
+            note="Could not interpret the application's net contents value; compare it with the label by eye.",
+            **base,
         ), None
     exp_ml = expected[0].ml
     best_line: OcrLine | None = None
@@ -232,7 +250,10 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
         return Verdict.unreadable, "None of the images could be read reliably. Request clearer label images."
     hard = {Status.mismatch, Status.not_found}
     soft = {Status.needs_review}
-    statuses = [c.status for c in checks if c.id != "standard_of_fill"]
+    # Only these may be "not checked" and still allow Ready: the application may omit them, and then
+    # there is nothing to compare. Any other check that could not be completed blocks Ready.
+    may_be_unchecked = {"bottler", "country_of_origin"}
+    statuses = [(c.id, c.status) for c in checks if c.id != "standard_of_fill"]
     issues = [c for c in checks if c.status in hard]
     reviews = [c for c in checks if c.status in soft]
     if warning.assessment == "not_required":
@@ -249,9 +270,16 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
     if reviews:
         names = ", ".join(c.label.lower() for c in reviews)
         return Verdict.needs_review, f"Everything else matches; please confirm: {names}."
-    if all(st in {Status.match, Status.info, Status.not_checked} for st in statuses) and (
-        warning.exact or warning.assessment == "not_required"
-    ):
+    complete = all(
+        st in {Status.match, Status.info} or (st is Status.not_checked and cid in may_be_unchecked)
+        for cid, st in statuses
+    )
+    if complete and warning.assessment == "not_required":
+        return Verdict.ready_for_approval, (
+            "All checks match; no health warning statement is required below 0.5% alcohol. "
+            "Ready for the agent's approval."
+        )
+    if complete and warning.exact:
         return Verdict.ready_for_approval, "All checks match and the warning is exact. Ready for the agent's approval."
     return Verdict.needs_review, "Some checks could not be completed. Review the items marked."
 
@@ -283,9 +311,9 @@ def compare(app: ApplicationFields, lines: list[OcrLine], images: list[ImageInfo
             Check(
                 id="country_of_origin",
                 label=_LABELS["country_of_origin"],
-                status=Status.not_checked,
+                status=Status.needs_review,
                 note="Marked as imported but the application gives no country of origin to compare. "
-                "Imports must state the country of origin.",
+                "Imports must state the country of origin: confirm it on the label and in the application.",
                 rule="19 CFR 134",
             )
         )

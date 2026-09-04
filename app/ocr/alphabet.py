@@ -9,8 +9,14 @@ not a normalization of the comparison: there is exactly one transcript, and "exa
 transcript equals the required text character for character.
 
 Consequence, stated in LIMITS.md: a genuinely accented letter on a label (a French back label, a
-brand like "Ch\u00e2teau") is read as its base letter. Field comparisons already fold accents, and the
-evidence crop shows the print as it is.
+brand like "Ch\u00e2teau") is read as the best remaining class, usually its base letter, occasionally
+the CTC blank (the character is dropped). Field comparisons already fold accents, and the evidence
+crop shows the print as it is. The direction that matters legally: an accented character printed
+inside the warning statement would be read as its base letter and could pass as exact. Confidence
+values are renormalized over the allowed classes, so they remain probabilities.
+
+The wrapper fails closed: an unexpected decoder class list or output shape raises instead of
+silently decoding with the full alphabet.
 """
 
 from __future__ import annotations
@@ -30,24 +36,37 @@ def ascii_mask(characters: list[str]) -> np.ndarray:
 
 
 class AlphabetConstrainedDecode:
-    """Wraps rapidocr's CTCLabelDecode: zeroes disallowed classes, then delegates.
+    """Wraps rapidocr's CTCLabelDecode: masks disallowed classes, then delegates.
 
-    Works on probabilities (softmax output, the PP-OCR export) and on logits (negative values):
-    disallowed classes get 0 or -1e9 respectively, so the argmax picks the best allowed class.
-    CTC blank stays allowed, so padding timesteps still decode to nothing.
+    Probabilities (softmax output, the PP-OCR export; every value in [0, 1]): disallowed classes are
+    zeroed and each timestep is renormalized over the allowed classes, so the confidence the rest of
+    the pipeline sees is P(class | allowed alphabet). Logits (any value outside [0, 1]): disallowed
+    classes get -1e9. Either way the argmax picks the best allowed class. CTC blank (index 0) stays
+    allowed, so padding timesteps still decode to nothing.
     """
 
     def __init__(self, inner: Any) -> None:
         self._inner = inner
-        self.character = list(inner.character)
+        chars = list(getattr(inner, "character", []))
+        if not chars or chars[0] != "blank":
+            raise RuntimeError("alphabet restriction: the decoder's class list must start with the CTC blank")
+        self.character = chars
         self._suppress = ascii_mask(self.character)
         self.suppressed_classes = int(self._suppress.sum())
 
     def __call__(self, preds: np.ndarray, *args: Any, **kwargs: Any) -> Any:
         p = np.array(preds, copy=True)
-        if p.ndim == 3 and p.shape[2] == self._suppress.shape[0]:
-            fill = -1e9 if float(p.min()) < 0.0 else 0.0
-            p[..., self._suppress] = fill
+        if p.ndim != 3 or p.shape[2] != self._suppress.shape[0]:
+            raise RuntimeError(
+                f"alphabet restriction: recognizer output has shape {p.shape}; "
+                f"expected (batch, time, {self._suppress.shape[0]})"
+            )
+        if float(p.min()) >= 0.0 and float(p.max()) <= 1.0 + 1e-6:  # probabilities
+            p[..., self._suppress] = 0.0
+            total = p.sum(axis=2, keepdims=True)
+            np.divide(p, total, out=p, where=total > 0)
+        else:  # logits
+            p[..., self._suppress] = -1e9
         return self._inner(p, *args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:  # everything else (decode, dict, ...) passes through

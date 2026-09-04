@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# One run at a time per branch, never cancelled: two pushes cannot finish out of order and leave
+# an older image tagged `latest`.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: lint, types, tests (Python 3.12, Linux)
@@ -48,6 +54,7 @@ jobs:
     name: container builds and answers health (linux/amd64)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: test  # nothing is published unless lint, types, unit and integration tests passed
     env:
       HAS_ACR: ${{ secrets.ACR_LOGIN_SERVER != '' }}
     steps:

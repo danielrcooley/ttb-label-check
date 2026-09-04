@@ -1,8 +1,9 @@
 # Browser smoke tests
 
-Headless Chromium checks of the real interface: console errors, CSP violations, failed requests,
-the three one-click samples, the demo batch (pairing, details, decisions, export, filters), and
-a phone-sized viewport with no horizontal scrolling.
+Headless Chromium checks of the real interface. They fail on console errors, CSP violations,
+failed requests, a wrong verdict on the artwork samples, and horizontal scrolling at phone width.
+What they print about the demo batch (pairing, details, decisions, export, filters) and about the
+photo sample is for a person to read; it is not asserted.
 
 They need a running server and Playwright with Chromium, so they are not part of CI:
 

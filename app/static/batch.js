@@ -71,6 +71,7 @@ async function setCsv(file) {
     ].filter(Boolean));
   } catch (e) {
     state.csv = null;
+    state.inputVersion++; // a failed replacement still changes the inputs: items must be rebuilt
     box.replaceChildren(el("p", { class: "text-secondary-dark text-bold", text: e.message || "Could not read the CSV." }));
   }
   updateStartButton();
@@ -82,6 +83,10 @@ function updateStartButton() {
 
 // ------------------------------------------------------------------ pairing (explicit only)
 function buildItems() {
+  if (state.items.length && state.builtVersion !== state.inputVersion) {
+    state.decisions.clear(); // decisions were made against the previous images or spreadsheet
+    state.times = [];
+  }
   const files = new Map(state.images);       // copy; we remove as we attach
   const items = [];
   if (state.csv) {
@@ -89,11 +94,16 @@ function buildItems() {
       if (!row.application) continue;
       const app = row.application;
       const key = app.application_id || `row-${row.row_number}`;
+      const slash = (s) => s.toLowerCase().replace(/\\/g, "/");
       const byName = (n) => [...files.keys()].filter((k) => norm(k) === norm(n));
+      // A relative path in the CSV ("folder-a/back.png") matches the file's path (which may start with
+      // the picked folder's own name) before falling back to the bare file name.
+      const byPath = (n) => { const p = slash(n); return [...files.keys()].filter((k) => slash(k) === p || slash(k).endsWith("/" + p)); };
       let keys = [];
       const missing = [];
       for (const listed of row.images) {
-        const hits = byName(listed);
+        const exact = byPath(listed);
+        const hits = exact.length ? exact : byName(listed);
         if (hits.length === 1) keys.push(hits[0]);
         else missing.push(hits.length ? `${listed} (ambiguous: ${hits.length} files)` : listed);
       }
@@ -311,7 +321,8 @@ function issueList(item) {
   if (!item.result) return null;
   const probs = item.result.checks.filter((c) => c.status !== "match" && c.status !== "info" && c.status !== "not_checked").map((c) => `${c.label}: ${c.status.replace("_", " ")}`);
   const w = item.result.warning;
-  if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
+  if (w.assessment === "not_required") { /* under 0.5% alcohol: no statement required */ }
+  else if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
   return probs.length ? el("ul", { class: "usa-list usa-list--unstyled issues" }, probs.map((p) => el("li", { text: p }))) : el("span", { class: "text-base", text: "All checks match" });
 }
 

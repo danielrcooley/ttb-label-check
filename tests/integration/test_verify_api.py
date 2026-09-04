@@ -170,9 +170,11 @@ def test_early_rejections_carry_security_headers_and_do_not_crash(client):
         headers={"Content-Type": "multipart/form-data; boundary=x", "Content-Length": "abc"},
     )
     assert r.status_code == 400 and "Content-Security-Policy" in r.headers
+    assert r.headers["Server-Timing"].startswith("total;dur=")
     r = client.post(
         "/api/v1/extract",
         content=b"x" * 10,
         headers={"Content-Type": "multipart/form-data; boundary=x", "Content-Length": "99999999999"},
     )
     assert r.status_code == 413 and r.json()["code"] == "request_too_large"
+    assert r.headers["Server-Timing"].startswith("total;dur=") and r.headers["X-Request-ID"]

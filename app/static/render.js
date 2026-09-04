@@ -120,12 +120,16 @@ function renderDiff(diff) {
 }
 
 export function renderWarning(container, w, onSelect) {
-  const overall = !w.present ? "not_found" : w.assessment === "exact" && w.anchor_caps === "match" ? "match"
+  const notRequired = w.assessment === "not_required"; // under 0.5% alcohol: absence is not a finding
+  const overall = notRequired ? (w.present ? "info" : "not_checked")
+    : !w.present ? "not_found" : w.assessment === "exact" && w.anchor_caps === "match" ? "match"
     : w.assessment === "wording" ? "mismatch" : "needs_review";
+  const headline = notRequired ? (w.present ? "Not required at this alcohol content; a statement is present" : "Not required at this alcohol content")
+    : !w.present ? "No warning statement found" : w.exact ? "Wording is exact" : "Wording is not exact";
   const card = el("div", { class: "warning-card" }, [
     el("div", { class: "warning-head" }, [
       statusTag(overall),
-      el("span", { class: "text-bold", text: !w.present ? "No warning statement found" : w.exact ? "Wording is exact" : "Wording is not exact" }),
+      el("span", { class: "text-bold", text: headline }),
       w.present ? el("button", { type: "button", class: "usa-button usa-button--unstyled", text: "Show on label", onclick: () => onSelect({ id: "warning", evidence: w.evidence }) }) : null,
     ]),
     w.present ? el("dl", { class: "margin-top-2" }, [
@@ -223,8 +227,9 @@ export async function makeCrops(files, images, checks) {
         continue; // browser and server disagree on orientation for this file: no crop rather than a wrong one
       }
       const sx = 1, sy = 1;
-      const xs = c.evidence.flatMap((e) => e.box.map((p) => p[0]));
-      const ys = c.evidence.flatMap((e) => e.box.map((p) => p[1]));
+      const onThisImage = c.evidence.filter((e) => e.image_index === ev.image_index); // one crop, one image
+      const xs = onThisImage.flatMap((e) => e.box.map((p) => p[0]));
+      const ys = onThisImage.flatMap((e) => e.box.map((p) => p[1]));
       const pad = 8;
       const x0 = Math.max(0, Math.min(...xs) - pad), y0 = Math.max(0, Math.min(...ys) - pad);
       const x1 = Math.min(im.width, Math.max(...xs) + pad), y1 = Math.min(im.height, Math.max(...ys) + pad);

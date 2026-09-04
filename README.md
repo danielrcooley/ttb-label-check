@@ -35,10 +35,10 @@ Each one is met by design and checked by a test or a measurement, not by a claim
 
 | Emphasized in the brief | What this prototype does | Evidence |
 |---|---|---|
-| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.3 s, p95 2.6 s on two workers. Deployed: _DEPLOY_P95_ (see [Measured](#measured)) |
+| "If we can't get results back in about **5 seconds**, nobody's going to use it." | OCR runs in-process on a small neural model; the images of one application are read in parallel; every result prints its own timing. | Local: front+back application median 2.5 s, p95 2.7 s on two workers. Deployed (Azure, 2 vCPU): one person, front+back, median 3.1 s, p95 3.1 s over 20 runs; two people submitting at once, p95 5.9 s (see [Measured](#measured)) |
 | "something **my mother could figure out**" | One screen, two numbered steps, one big button, three one-click samples, U.S. Web Design System, statuses as icon + word + color, keyboard and screen-reader friendly. | Observed usability test: _USABILITY_RESULT_ |
 | "**handle batch uploads**" (200 to 300 at once) | Batch screen: a folder of images plus a spreadsheet; rows stream in; filters, decisions, notes, export; pairing by CSV column or filename prefix; leftovers assigned by hand. | 300 images (150 applications) through the real screen in 275 s with zero errors: [docs/LOADTEST.md](docs/LOADTEST.md) |
-| The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes. Punctuation, accent and single-character differences are "Needs review" with a diff (usually OCR noise); a changed, added or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
+| The warning "has to be **exact**. Like, word-for-word" | Character-level comparison with 27 CFR 16.21 (text verified from the eCFR API). Only an exact match passes. Punctuation and single-character differences are "Needs review" with a diff (usually OCR noise); a changed, added or missing word is a mismatch. | `tests/unit/test_warning.py` golden cases; the "Problem label" sample |
 
 And the constraint behind the architecture: Marcus's network "blocks outbound traffic to a lot of
 domains". The verification path makes **no network calls**. Models are in the repository, the page
@@ -130,17 +130,17 @@ Numbers come from `tools/evaluate.py` and `tools/loadtest.py`; the files they wr
 |---|---|---|
 | Field match rate on clean artwork (recall) | 100% on all six fields (60 of 60 checks); warning exact on 10 of 10 | [docs/EVAL.md](docs/EVAL.md) |
 | False-alarm rate on clean artwork | 0.0% (0 of 60 field checks) | [docs/EVAL.md](docs/EVAL.md) |
-| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 16 of 20; 15 of 20 cases ready, 2 need review, 3 issues (labels shrunk to a third of their size and one sideways read) | [docs/EVAL.md](docs/EVAL.md) |
+| Degraded images (rotation, blur, glare, low contrast, perspective, small, JPEG, sideways) | fields 95% to 100%; warning exact on 16 of 20; 15 of 20 cases ready, 2 need review, 3 issues (one label shrunk to a third of its size and two sideways reads) | [docs/EVAL.md](docs/EVAL.md) |
 | Planted defects detected | 4 of the 4 the tool assesses (wrong ABV, title-case heading, altered wording, missing statement); the other two planted defects (tiny type, all-bold statement) are not assessed in this build and are reported as such | [docs/EVAL.md](docs/EVAL.md) |
-| Per-application latency, local (two images, 2 workers) | median 2,451 ms, p95 2,687 ms | [docs/EVAL.md](docs/EVAL.md) |
-| Per-application latency, deployed | _DEPLOY_LATENCY_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
-| Batch throughput, deployed | _DEPLOY_THROUGHPUT_ | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| Per-application latency, local (two images, 2 workers) | median 2,468 ms, p95 2,647 ms | [docs/EVAL.md](docs/EVAL.md) |
+| Per-application latency, deployed (Azure Container Apps, 2 vCPU, 2 workers, measured from outside) | one client: median 3,056 ms, p95 3,126 ms, max 3,718 ms over 20 front+back applications; two concurrent clients: median 4,979 ms, p95 5,887 ms; zero refusals | [docs/LOADTEST.md](docs/LOADTEST.md) |
+| Batch throughput, deployed (300 images, 150 applications, through the real batch screen from a laptop browser) | 364 s end to end, 0.82 images/s including comparison and rendering; 150 ready, 0 errors, no browser errors; 100 single-image requests at capacity: 100 of 100 served, p95 2.2 s | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Burst of 16 simultaneous requests | 2 served, 14 refused instantly with 429, health still answering | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | 300-image batch through the batch screen (150 applications, local, 2 workers) | 275 s end to end, 1.1 images/s including comparison and rendering; 120 ready, 30 need review, 0 errors, no browser errors | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | 300 sequential extract requests at advertised capacity | 300 of 300 served, p95 1.5 s, zero refusals | [docs/LOADTEST.md](docs/LOADTEST.md) |
 | Inside the CI container (GitHub runner, 1 worker, networking disabled) | ready 2.1 s after start; front+back application verified in 3.1 s | CI run 33821661824 |
 
-**Error analysis, and one decision worth reading.** The first evaluation showed the multilingual recognizer occasionally emitting an accented letter for a plain one on clean artwork ("alcoholič", "drivé"), which turned an exact warning into "Needs review" on 2 of 10 labels. An early build stripped accents before the comparison; the independent reviewer rejected that, correctly, because a legal "exact" must not paper over instrument error. I then tested a native-resolution re-read of the warning lines, which did not converge (one label fixed, a different accent on another, and a previously exact label lost a letter). The fix that shipped is a recognizer configuration, not a comparison shortcut: the decoder's alphabet is restricted to printable ASCII for every line, the same choice as using an English recognizer and with none of the latency. There is one transcript and it is compared literally. The consequence, stated in the limits: genuinely accented print is read as its base letter, which the field comparisons already tolerate and the evidence crop shows. The remaining degraded misses are text shrunk to a third of its size and one sideways image where the rotation retry picked up a partial read.
+**Error analysis, and one decision worth reading.** The first evaluation showed the multilingual recognizer occasionally emitting an accented letter for a plain one on clean artwork ("alcoholič", "drivé"), which turned an exact warning into "Needs review" on 2 of 10 labels. An early build stripped accents before the comparison; the independent reviewer rejected that, correctly, because a legal "exact" must not paper over instrument error. I then tested a native-resolution re-read of the warning lines, which did not converge (one label fixed, a different accent on another, and a previously exact label lost a letter). The fix that shipped is a recognizer configuration, not a comparison shortcut: the decoder's alphabet is restricted to printable ASCII for every line, the same choice as using an English recognizer and with none of the latency. There is one transcript and it is compared literally. The consequence, stated in the limits: genuinely accented print is read as its base letter, which the field comparisons already tolerate and the evidence crop shows; and the direction that matters legally, an accented character printed inside the warning would be read as its base letter and could pass as exact, is stated there too. The setting is a documented switch (`TTB_OCR_ASCII_ALPHABET`). The remaining degraded misses are text shrunk to a third of its size and two sideways images where the rotation retry picked up a partial read.
 
 Engine selection and thread scaling are in [docs/BAKEOFF.md](docs/BAKEOFF.md) and
 [docs/OCR_EVAL.md](docs/OCR_EVAL.md). Enforced limits and known weaknesses, stated plainly, are in
@@ -172,7 +172,7 @@ Runtime (vendored, hash-pinned), U.S. Web Design System 3.14 (vendored), pytest,
 Playwright, Docker, Azure Container Apps. Third-party licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 This was built by directing AI coding agents: Claude Code wrote code under my direction and Codex
-served as an independent reviewer. The requirements analysis, the architecture, the five review
+served as an independent reviewer. The requirements analysis, the architecture, the review
 passes, and every entry in [docs/DECISIONS.md](docs/DECISIONS.md) are mine, including the places
 where the agent's first proposal was wrong and how it was caught. The design review and its
 point-by-point dispositions are in [docs/reviews/](docs/reviews/). Conventions for the agents are in
@@ -190,7 +190,7 @@ _AUTHOR_SECTION_
 | `TTB_OCR_MAX_SIDE` | 1280 | Images are downscaled to this longest side before OCR |
 | `TTB_MAX_IMAGE_BYTES` | 10 MB | Per-image cap |
 | `TTB_MAX_REQUEST_BYTES` | 40 MB | Per-request cap |
-| `TTB_MAX_IMAGE_PIXELS` | 40,000,000 | Decompression-bomb guard |
+| `TTB_MAX_IMAGE_PIXELS` | 25,000,000 | Decompression-bomb guard |
 | `TTB_MAX_IMAGES_PER_APPLICATION` | 6 | Images per verify call |
 | `TTB_PER_CLIENT_INFLIGHT` | 4 | Concurrent requests per client |
 | `TTB_INTERACTIVE_WAIT_SECONDS` | 8 | How long an interactive request waits for a worker |

@@ -205,3 +205,101 @@ def test_conflicting_alcohol_statements_across_images_are_a_mismatch():
     alc = next(c for c in compare(app, front + back, [], s).checks if c.id == "alcohol_content")
     assert alc.status == "mismatch" and "40%" in alc.note and "45%" in alc.note
     assert len(alc.evidence) == 2
+
+
+def _spirits_app(**over):
+    from app.schemas import ApplicationFields
+
+    base = {
+        "beverage_type": "spirits",
+        "brand_name": "OLD TOM DISTILLERY",
+        "class_type": "Bourbon",
+        "alcohol_content": "45% Alc./Vol. (90 Proof)",
+        "net_contents": "750 mL",
+    }
+    base.update(over)
+    return ApplicationFields(**base)
+
+
+def _alc(app, lines):
+    from app.config import Settings
+    from app.pipeline.compare import compare
+
+    return next(c for c in compare(app, lines, [], Settings(ocr_workers=1)).checks if c.id == "alcohol_content")
+
+
+def test_wrapped_percent_and_proof_lines_are_one_statement():
+    from tests.unit.conftest import make_lines
+
+    lines = make_lines(["OLD TOM DISTILLERY", "Bourbon", "45% Alc./Vol.", "(90 Proof)", "750 mL"])
+    alc = _alc(_spirits_app(), lines)
+    assert alc.status == "match" and "45" in alc.note
+    # the two halves disagree: that is one inconsistent statement (review), not two contradicting labels
+    lines = make_lines(["OLD TOM DISTILLERY", "Bourbon", "45% Alc./Vol.", "(80 Proof)", "750 mL"])
+    alc = _alc(_spirits_app(alcohol_content="45% Alc./Vol."), lines)
+    assert alc.status == "needs_review" and "does not equal twice" in alc.note
+    # and when the application states a proof, a different proof on the label is a mismatch
+    alc = _alc(_spirits_app(), lines)
+    assert alc.status == "mismatch" and "proof differs" in alc.note
+
+
+def test_equal_percents_with_conflicting_proofs_are_a_mismatch():
+    from tests.unit.conftest import make_lines
+
+    front = make_lines(["OLD TOM DISTILLERY", "45% ALC/VOL (90 PROOF)"], image_index=0)
+    back = make_lines(["45% ALC/VOL (80 PROOF)", "750 mL"], image_index=1)
+    alc = _alc(_spirits_app(), front + back)
+    assert alc.status == "mismatch" and "different proofs" in alc.note
+
+
+def test_proof_only_statement_still_matches_the_application():
+    from tests.unit.conftest import make_lines
+
+    alc = _alc(_spirits_app(), make_lines(["OLD TOM DISTILLERY", "90 PROOF", "750 mL"]))
+    assert alc.status == "match"
+
+
+def test_zero_percent_parses_and_exempts_the_warning():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.schemas import ApplicationFields
+
+    from tests.unit.conftest import make_lines
+
+    assert parse_alcohol("0.0% ALC/VOL").percent == 0.0
+    lines = make_lines(["NEAR BEER", "Non-alcoholic malt beverage", "0.0% ALC/VOL", "12 FL OZ"])
+    app = ApplicationFields(
+        beverage_type="malt",
+        brand_name="NEAR BEER",
+        class_type="Non-alcoholic malt beverage",
+        alcohol_content="0.0%",
+        net_contents="12 FL OZ",
+    )
+    res = compare(app, lines, [], Settings(ocr_workers=1))
+    assert res.warning.assessment == "not_required"
+    assert res.verdict == "ready_for_approval" and "no health warning" in res.summary
+
+
+def test_unparseable_required_field_blocks_ready_and_omitted_optional_fields_do_not():
+    from app.config import Settings
+    from app.pipeline.compare import compare
+    from app.pipeline.warning import CANONICAL
+
+    from tests.unit.conftest import make_lines
+
+    s = Settings(ocr_workers=1)
+    lines = make_lines(["OLD TOM DISTILLERY", "Bourbon", "45% Alc./Vol. (90 Proof)", "750 mL", CANONICAL])
+    # bottler and country of origin omitted from the application: not compared, Ready still allowed
+    res = compare(_spirits_app(), lines, [], s)
+    assert res.warning.exact, res.warning
+    assert {c.status for c in res.checks if c.id in ("bottler", "country_of_origin")} == {"not_checked"}
+    assert res.verdict == "ready_for_approval"
+    # a required value the tool cannot interpret must never be silently skipped
+    res = compare(_spirits_app(net_contents="seven fifty"), lines, [], s)
+    net = next(c for c in res.checks if c.id == "net_contents")
+    assert net.status == "needs_review"
+    assert res.verdict == "needs_review" and "net contents" in res.summary
+    # imported without a stated country of origin is a question for the agent, not a pass
+    res = compare(_spirits_app(imported=True), lines, [], s)
+    assert next(c for c in res.checks if c.id == "country_of_origin").status == "needs_review"
+    assert res.verdict == "needs_review"

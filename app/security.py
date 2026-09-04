@@ -104,6 +104,7 @@ class AdmissionLimiter:
         cid = getattr(request.state, "admitted_client", None)
         if cid is None:
             return
+        request.state.admitted_client = None  # a second release for the same request is a no-op
         with self._lock:
             self._counts[cid] -= 1
             if self._counts[cid] <= 0:
@@ -129,45 +130,60 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         request.state.request_id = rid
         t0 = time.perf_counter()
         metered = request.method == "POST" and request.url.path.startswith(METERED_PREFIXES)
+
+        def early(resp: Response) -> Response:  # responses that never reach a route still carry timing
+            resp.headers["Server-Timing"] = f"total;dur={(time.perf_counter() - t0) * 1000:.0f}"
+            return resp
+
         if request.method in ("POST", "PUT", "PATCH"):
             length = request.headers.get("content-length")
             if length is None:
-                return error_response(411, "length_required", "Uploads must declare Content-Length.", request_id=rid)
+                return early(
+                    error_response(411, "length_required", "Uploads must declare Content-Length.", request_id=rid)
+                )
             try:
                 declared = int(length)
                 if declared < 0:
                     raise ValueError
             except ValueError:
-                return error_response(400, "bad_request", "Content-Length is not a valid number.", request_id=rid)
+                return early(
+                    error_response(400, "bad_request", "Content-Length is not a valid number.", request_id=rid)
+                )
             if declared > self.settings.max_request_bytes:
                 mb = self.settings.max_request_bytes // (1024 * 1024)
-                return error_response(
-                    413,
-                    "request_too_large",
-                    f"The upload is larger than the {mb} MB request limit.",
-                    "Send fewer or smaller images per request.",
-                    request_id=rid,
+                return early(
+                    error_response(
+                        413,
+                        "request_too_large",
+                        f"The upload is larger than the {mb} MB request limit.",
+                        "Send fewer or smaller images per request.",
+                        request_id=rid,
+                    )
                 )
         admitted = False
         if metered:
             reason = self.limiter.acquire(request)
             if reason == "too_many_inflight":
-                return error_response(
-                    429,
-                    reason,
-                    "Too many requests in flight from this client.",
-                    "Limit concurrent uploads and retry shortly.",
-                    request_id=rid,
-                    headers={"Retry-After": "1"},
+                return early(
+                    error_response(
+                        429,
+                        reason,
+                        "Too many requests in flight from this client.",
+                        "Limit concurrent uploads and retry shortly.",
+                        request_id=rid,
+                        headers={"Retry-After": "1"},
+                    )
                 )
             if reason == "service_busy":
-                return error_response(
-                    503,
-                    reason,
-                    "The service is handling as many requests as it can right now.",
-                    "Retry in a moment.",
-                    request_id=rid,
-                    headers={"Retry-After": "2"},
+                return early(
+                    error_response(
+                        503,
+                        reason,
+                        "The service is handling as many requests as it can right now.",
+                        "Retry in a moment.",
+                        request_id=rid,
+                        headers={"Retry-After": "2"},
+                    )
                 )
             admitted = True
         try:

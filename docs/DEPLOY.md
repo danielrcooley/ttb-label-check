@@ -54,7 +54,9 @@ az containerapp show --name $APP --resource-group $RG --query properties.configu
 ```
 
 `--registry-identity system` gives the app a managed identity with pull rights on the registry, so
-no registry password is stored anywhere.
+the running app holds no registry password. (CI pushes with the registry's admin credential kept as
+GitHub repository secrets, section 2; an `AcrPush` service principal is the production-grade
+replacement.)
 
 ## 4. Probes (readiness gates traffic until the models are warm)
 

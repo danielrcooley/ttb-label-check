@@ -115,6 +115,14 @@ def summarize(data: dict) -> tuple[str, dict]:
         "applications; front + back per case). Numbers are from the real pipeline on the machine "
         "that ran it; deployed numbers are in the README._",
         "",
+        "_Engine: {engine}; alphabet: {alphabet}; det {det}; rec {rec}; workers: {workers}._".format(
+            engine=data.get("engine", {}).get("engine", "?"),
+            alphabet=data.get("engine", {}).get("alphabet", "full"),
+            det=data.get("engine", {}).get("det", "?"),
+            rec=data.get("engine", {}).get("rec", "?"),
+            workers=data.get("workers", "?"),
+        ),
+        "",
     ]
     summary: dict = {}
     for tier in ("artwork", "degraded", "problem"):
