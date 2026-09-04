@@ -50,6 +50,9 @@ def build_applications(real: Path, limit: int | None) -> tuple[Path, list[str]]:
             continue
         images += [str(real / n) for n in names]
         imported = row["domestic"] == "no"
+        # the registry export separates the applicant's names, street, city, state and ZIP with " | ";
+        # the spreadsheet carries them comma-separated, as COLAs' item 8 reads (and as evaluate_real.py scores)
+        applicant = ", ".join(part.strip() for part in row["applicant"].split(" | ") if part.strip())
         body.append(
             [
                 row["ttbid"],
@@ -58,7 +61,7 @@ def build_applications(real: Path, limit: int | None) -> tuple[Path, list[str]]:
                 row["class_desc"],
                 "",
                 "",
-                row["applicant"],
+                applicant,
                 row["origin_desc"] if imported else "USA",
                 "yes" if imported else "no",
                 ";".join(names),
@@ -91,9 +94,12 @@ def main() -> int:
         page.wait_for_selector("#view-batch:not([hidden])", timeout=15000)
         page.set_input_files("#batch-files", images)
         page.set_input_files("#batch-csv", str(sheet))
-        page.wait_for_function(
-            "document.querySelector('#batch-csv-summary p')?.textContent.includes('row')", timeout=60000
-        )
+        for _ in range(120):  # the page's CSP forbids injected script, so poll from here
+            if "row" in (
+                page.inner_text("#batch-csv-summary p") if page.locator("#batch-csv-summary p").count() else ""
+            ):
+                break
+            page.wait_for_timeout(500)
         print("spreadsheet:", page.inner_text("#batch-csv-summary p"))
         t0 = time.time()
         page.click("#batch-start")

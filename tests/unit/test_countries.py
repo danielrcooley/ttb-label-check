@@ -71,3 +71,12 @@ def test_another_country_named_is_a_mismatch_and_the_same_country_in_another_for
 def test_an_unknown_expected_country_never_produces_a_mismatch():
     c = _origin("Atlantis", ["Product of France"])
     assert c.status == "needs_review"
+
+
+def test_georgia_on_a_domestic_application_is_ambiguous_and_goes_to_review():
+    """Seen in the real tally: a Georgia-state wine ("Made in Georgia") against a domestic
+    application. Georgia is a state and a country; with a U.S. application that is a question for
+    the person, not an issue. Against a foreign application it is still the country."""
+    c = _origin("USA", ["Made in Georgia"])
+    assert c.status == "needs_review" and "state" in (c.note or ""), c
+    assert _origin("Italy", ["Product of Georgia"]).status == "mismatch"

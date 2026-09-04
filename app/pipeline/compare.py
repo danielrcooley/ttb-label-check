@@ -111,6 +111,18 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
             check.score = 100.0
             check.evidence = [Evidence(image_index=same.image_index, box=same.box, text=same.text)]
             check.note = f"Label says '{same.text}'."
+        elif other is not None and want == "United States" and other[1] == "Georgia":
+            # Georgia is a state and a country. Against a domestic application a bare "Georgia"
+            # is most likely the state (the registry's origin for domestic products is the state):
+            # a question for the person, not an issue (seen in the real tally, D-045).
+            ln = other[0]
+            check.status = Status.needs_review
+            check.found = ln.text
+            check.evidence = [Evidence(image_index=ln.image_index, box=ln.box, text=ln.text)]
+            check.note = (
+                f"The label's origin statement reads '{ln.text}'. Georgia is a U.S. state as well as a country; "
+                f"the application says '{expected}'. Confirm on the image."
+            )
         elif other is not None and want is not None:
             ln, country = other
             check.status = Status.mismatch

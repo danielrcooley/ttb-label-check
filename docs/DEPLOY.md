@@ -112,9 +112,9 @@ az containerapp show --name $APP --resource-group $RG \
 ```bash
 FQDN=$(az containerapp show --name $APP --resource-group $RG --query properties.configuration.ingress.fqdn -o tsv)
 curl -s https://$FQDN/api/v1/health | python -m json.tool
-python tools/loadtest.py --url https://$FQDN --mode steady --endpoint verify --n 20
-python tools/loadtest.py --url https://$FQDN --mode steady --endpoint extract --n 100
-python tools/loadtest.py --url https://$FQDN --mode burst --endpoint extract --concurrency 16
+bash tools/measure_deployed.sh https://$FQDN      # the README's latency rows: one user, two users, front alone, batch path, burst
+LABEL_CHECK_URL=https://$FQDN python tests/browser/smoke_single.py   # and smoke_batch.py; batch_scale.py --apps 150 for the 300-image run
+python tools/batch_tally.py --url https://$FQDN --real tests/fixtures/real   # the real-application tally (corpus from tools/cola_fetch.py)
 ```
 
 Record the numbers in the README "Measured" section and keep `docs/LOADTEST.md`.
