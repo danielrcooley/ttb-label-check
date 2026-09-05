@@ -133,6 +133,7 @@
           <div class="submit-row margin-top-4">
             <button class="usa-button usa-button--big" type="submit" id="check-btn">Check label</button>
             <span id="status" class="status-line" role="status" aria-live="polite"></span>
+            <button type="button" class="usa-button usa-button--outline submit-row__end" id="start-over" hidden>Start over</button>
           </div>
           <div id="form-error" class="usa-alert usa-alert--error usa-alert--slim margin-top-2" role="alert" hidden>
             <div class="usa-alert__body"><p class="usa-alert__text"></p></div>
@@ -190,6 +191,7 @@
                 <input id="batch-folder" type="file" webkitdirectory multiple class="usa-sr-only">
               </div>
               <p id="batch-image-count" class="text-bold margin-top-1" aria-live="polite"></p>
+              <button type="button" id="batch-clear-images" class="usa-button usa-button--unstyled margin-bottom-2" hidden>Remove all images</button>
             </fieldset>
           </div>
           <div class="tablet:grid-col-8">
@@ -199,6 +201,7 @@
               <label class="usa-button usa-button--outline margin-top-1" for="batch-csv">Choose CSV</label>
               <input id="batch-csv" type="file" accept=".csv,text/csv" class="usa-sr-only">
               <div id="batch-csv-summary" class="margin-top-1" aria-live="polite"></div>
+              <button type="button" id="batch-clear-csv" class="usa-button usa-button--unstyled margin-top-1" hidden>Remove the spreadsheet</button>
             </fieldset>
           </div>
         </div>
@@ -207,6 +210,7 @@
           <button type="button" class="usa-button usa-button--big" id="batch-start" disabled>Start</button>
           <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-cancel" hidden>Pause</button>
           <span id="batch-status" class="status-line" role="status" aria-live="polite"></span>
+          <button type="button" class="usa-button usa-button--outline submit-row__end" id="batch-reset" hidden>Start over</button>
           <p id="batch-live" class="usa-sr-only" aria-live="polite"></p>
         </div>
         <div id="batch-error" class="usa-alert usa-alert--error usa-alert--slim margin-top-2" role="alert" hidden>

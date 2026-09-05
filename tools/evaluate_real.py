@@ -132,7 +132,8 @@ async def run(real: Path, workers: int) -> tuple[list[Record], Record]:
                 "warning_present": w.present,
                 "warning_assessment": w.assessment,
                 "warning_anchor_caps": str(w.anchor_caps),
-                "warning_type_weight": str(w.anchor_bold),  # match / needs_review / not_checked (D-044)
+                "warning_type_weight": str(w.anchor_bold),  # match / needs_review (D-047)
+                "warning_type_weight_reading": w.type_weight_reading or "",  # heavier / same / ... (D-047)
                 "warning_type_weight_basis": w.type_weight_basis or "",  # D-045: what was compared, or why not
                 "warning_type_weight_ratio": w.type_weight_ratio,
                 "warning_similarity": round(w.similarity, 3) if w.similarity is not None else None,
@@ -245,9 +246,10 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
     )
     out.append(
         row(
-            "Warning heading measured heavier than the body (of located)",
+            "Warning heading measured clearly heavier than the body, Match (of located)",
             lambda g: pct(
-                sum(r.get("warning_type_weight") == "match" for r in g), sum(r["warning_present"] for r in g)
+                sum(r.get("warning_type_weight_reading") == "heavier" for r in g),
+                sum(r["warning_present"] for r in g),
             ),
         )
     )
@@ -255,30 +257,25 @@ def summarize(results: list[Record], meta: Record, window: str) -> str:
         row(
             "Warning heading and body measured the same weight, Needs review (of located)",
             lambda g: pct(
-                sum(r.get("warning_type_weight") == "needs_review" for r in g), sum(r["warning_present"] for r in g)
-            ),
-        )
-    )
-    out.append(
-        row(
-            "Warning type weight measured but inconclusive, no finding (of located)",
-            lambda g: pct(
-                sum(
-                    r.get("warning_type_weight") == "not_checked" and r.get("warning_type_weight_ratio") is not None
-                    for r in g
-                ),
+                sum(r.get("warning_type_weight_reading") == "same" for r in g),
                 sum(r["warning_present"] for r in g),
             ),
         )
     )
     out.append(
         row(
-            "Warning type weight not measured: print too small, sizes differ, or no heading line (of located)",
+            "Warning type weight measured but inconclusive, Needs review (of located)",
             lambda g: pct(
-                sum(
-                    r.get("warning_type_weight") == "not_checked" and r.get("warning_type_weight_ratio") is None
-                    for r in g
-                ),
+                sum(r.get("warning_type_weight_reading") in ("inconclusive", "boundary_uncertain") for r in g),
+                sum(r["warning_present"] for r in g),
+            ),
+        )
+    )
+    out.append(
+        row(
+            "Warning type weight not measured (print too small, sizes differ, or no heading line), Needs review (of located)",
+            lambda g: pct(
+                sum(r.get("warning_type_weight_reading") == "not_measured" for r in g),
                 sum(r["warning_present"] for r in g),
             ),
         )

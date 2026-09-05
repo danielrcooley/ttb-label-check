@@ -83,6 +83,40 @@ async function setCsv(file) {
 
 function updateStartButton() {
   $("#batch-start").disabled = state.running || state.images.size === 0;
+  $("#batch-clear-images").hidden = state.images.size === 0;
+  $("#batch-clear-csv").hidden = !state.csv;
+  $("#batch-reset").hidden = !(state.images.size || state.csv || state.items.length);
+}
+
+// ------------------------------------------------------------------ clearing
+function clearImages() {
+  state.images = new Map(); state.inputVersion++;
+  $("#batch-image-count").textContent = "";
+  updateStartButton();
+}
+function clearCsv() {
+  state.csv = null; state.inputVersion++;
+  $("#batch-csv-summary").replaceChildren();
+  updateStartButton();
+}
+/** Back to an empty screen. While a run is in progress it pauses first and clears when the images
+ * in flight have finished; with results on screen it asks first, because nothing is stored. */
+function resetBatch(force = false) {
+  if (state.running) { state.resetRequested = true; pause(); return; }
+  if (!force && state.items.some((i) => i.status === "done") && !window.confirm("Clear the images, the spreadsheet and the results? Export first if you need them.")) return;
+  state.images = new Map(); state.csv = null; state.items = []; state.unpaired = []; state.extractions = new Map(); state.decisions = new Map();
+  state.times = []; state.startedAt = 0; state.inputVersion++; state.builtVersion = -1; state.detailCache.clear();
+  state.filter = "all"; state.page = 0; state.expanded = null; state.successes = 0;
+  $("#batch-image-count").textContent = "";
+  $("#batch-csv-summary").replaceChildren();
+  for (const id of ["#batch-results", "#batch-summary", "#batch-progress", "#batch-export", "#batch-cancel"]) $(id).hidden = true;
+  $("#batch-start").hidden = false; $("#batch-start").textContent = "Start";
+  document.querySelectorAll("[data-filter]").forEach((x) => { const on = x.dataset.filter === "all"; x.classList.toggle("is-on", on); x.setAttribute("aria-pressed", on ? "true" : "false"); });
+  showError("");
+  setStatus("Cleared. Start with the label images.");
+  updateStartButton();
+  const h = document.querySelector('[data-view-panel="batch"] h1');
+  if (h) { h.setAttribute("tabindex", "-1"); h.focus(); h.scrollIntoView({ block: "start" }); }
 }
 
 // ------------------------------------------------------------------ pairing (explicit only)
@@ -270,6 +304,7 @@ async function start() {
   $("#batch-export").hidden = false;
   updateStartButton();
   renderProgress(); renderSummary(); renderTable();
+  if (state.resetRequested) { state.resetRequested = false; resetBatch(true); }
 }
 
 function pause() { state.abort?.abort(); setStatus("Pausing after the images in progress…", true); }
@@ -485,6 +520,9 @@ function boot() {
   $("#batch-cancel").addEventListener("click", pause);
   $("#batch-export").addEventListener("click", exportCsv);
   $("#batch-demo").addEventListener("click", loadDemo);
+  $("#batch-clear-images").addEventListener("click", clearImages);
+  $("#batch-clear-csv").addEventListener("click", clearCsv);
+  $("#batch-reset").addEventListener("click", () => resetBatch(false));
   document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => {
     state.filter = b.dataset.filter; state.page = 0;
     document.querySelectorAll("[data-filter]").forEach((x) => { x.classList.toggle("is-on", x === b); x.setAttribute("aria-pressed", x === b ? "true" : "false"); });

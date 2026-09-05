@@ -117,7 +117,10 @@ def test_rescue_is_one_round_across_the_workers_and_keeps_the_best_read():
     engine, res = _run(Settings(ocr_workers=2))
     assert len(engine.calls) == 3 and engine.calls[0] == (400, 200)
     assert res.warning.present and res.warning.exact, res.warning
-    assert res.verdict == "ready_for_approval", res.summary
+    # D-047: a blank test image cannot show bold type, so the heading's weight is the one thing left to confirm
+    assert res.verdict == "needs_review" and "government warning" in res.summary, res.summary
+    assert res.warning.type_weight_reading == "not_measured", res.warning
+    assert all(c.status in ("match", "not_checked") for c in res.checks), res.checks
     engine, res = _run(Settings(ocr_workers=1))
     assert len(engine.calls) == 2
     assert res.warning.present and res.warning.assessment == "wording", res.warning

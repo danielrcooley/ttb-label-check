@@ -295,15 +295,18 @@ def type_weight_ratio(span: WarningSpan) -> TypeWeight:
 
 def type_weight_status(
     span: WarningSpan, *, heading_min_ratio: float, same_max_ratio: float
-) -> tuple[Status, str, TypeWeight]:
+) -> tuple[Status, str, str, TypeWeight]:
     """Bold type from the stroke weights measured on the pixels (app/pipeline/typeface.py): the
     heading must be in bold type (27 CFR 16.22(a)(2)). A heading clearly heavier than the rest of
-    the statement is a Match; a heading of the same weight as the rest is Needs review, because it
-    does not stand out as bold. A small difference is inconclusive; a boundary found only by
-    counting characters never yields a Match; print too small, too faint, or set in a different
-    size is Not checked with the reason. Never a failure: it measures print, not wording."""
+    the statement is a Match. Anything the measurement cannot confirm is Needs review with the
+    reason, so the agent confirms it on the image (D-047): the same weight (either the heading is
+    not bold or the whole statement is), a small difference, a boundary found only by counting
+    characters, print too small or too faint, or a heading set in a different size. Never a
+    failure: it measures print, not wording. Returns (status, reading, note, measurement); the
+    reading is one of heavier, same, inconclusive, boundary_uncertain, not_measured."""
     tw = type_weight_ratio(span)
     rule = "(27 CFR 16.22(a)(2))"
+    confirm = f"Confirm on the image that GOVERNMENT WARNING is in bold type {rule}."
     if tw.ratio is None:
         reason = {
             "too small": "the print is too small or too faint at the working size",
@@ -313,35 +316,35 @@ def type_weight_status(
                 "strokes at the same weight"
             ),
         }.get(tw.basis, tw.basis)
-        return (
-            Status.not_checked,
-            f"Bold type could not be measured: {reason}. Check it on the image {rule}.",
-            tw,
-        )
+        return (Status.needs_review, "not_measured", f"Bold type could not be measured: {reason}. {confirm}", tw)
     if tw.ratio <= same_max_ratio:
         return (
             Status.needs_review,
-            f"The heading and {tw.basis} measure the same weight, so the heading does not stand out as bold type "
-            f"{rule}. Confirm on the image.",
+            "same",
+            f"The heading and {tw.basis} measure the same weight, so the heading does not stand out as bold type. "
+            f"{confirm}",
             tw,
         )
     if tw.ratio >= heading_min_ratio and tw.split == "share":
         return (
-            Status.not_checked,
+            Status.needs_review,
+            "boundary_uncertain",
             "The heading measures heavier than the rest of its line, but the boundary between them could not be "
-            f"found in the print, so it is not counted. Check it on the image {rule}.",
+            f"found in the print, so it is not counted. {confirm}",
             TypeWeight(tw.ratio, "boundary uncertain", tw.split),
         )
     if tw.ratio >= heading_min_ratio:
         return (
             Status.match,
+            "heavier",
             f"The heading is set about {tw.ratio:.1f} times heavier than {tw.basis}: bold heading {rule}.",
             tw,
         )
     return (
-        Status.not_checked,
-        f"Bold type could not be judged with confidence from this image (the heading measures only slightly "
-        f"heavier than {tw.basis}); check it on the image {rule}.",
+        Status.needs_review,
+        "inconclusive",
+        f"Bold type could not be judged with confidence from this image: the heading measures only slightly "
+        f"heavier than {tw.basis}. {confirm}",
         tw,
     )
 
@@ -377,7 +380,7 @@ def build_report(
         )
     exact, similarity = compare_warning(span.text)
     caps_status, caps_note = anchor_caps_status(span.anchor_text)
-    bold_status, bold_note, tw = type_weight_status(
+    bold_status, bold_reading, bold_note, tw = type_weight_status(
         span, heading_min_ratio=heading_min_ratio, same_max_ratio=same_max_ratio
     )
     if exact:
@@ -406,6 +409,7 @@ def build_report(
         diff=None if exact else word_diff(CANONICAL, span.text),
         anchor_caps=caps_status,
         anchor_bold=bold_status,
+        type_weight_reading=bold_reading,
         type_weight_ratio=round(tw.ratio, 3) if tw.ratio is not None else None,
         type_weight_basis=tw.basis + (f" ({tw.split})" if tw.split in ("gap", "share") else ""),
         evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],

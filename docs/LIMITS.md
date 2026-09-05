@@ -36,17 +36,18 @@ Readiness (`/api/v1/ready`) returns 503 until the OCR engines are warm, so a pla
 1. **Bold type is measured, not read, and only relatively.** 27 CFR 16.22 requires "GOVERNMENT
    WARNING" in bold type. The tool measures the thickness of the ink strokes in the heading against
    the rest of its own line, at the word gap where the heading ends in the print
-   (`app/pipeline/typeface.py`, decisions D-044 and D-045, consult 008). A heading clearly heavier
-   than the rest (1.20 times or more) is a Match; a heading of the same weight as the rest is Needs
-   review, because it does not stand out as bold; a small difference is inconclusive. A heading set
-   on its own line is compared by stroke pixels with the other lines only when its type is within a
-   tenth of theirs in size; print under 24 pixels tall or with strokes under 3.8 pixels at the
-   working size, and a heading whose boundary cannot be found in the print, are "Not checked" with
-   that reason, which covers most registry artwork of small labels. In one sentence: the heuristic
-   detects a clear relative stroke increase in sufficiently large, comparable print and flags its
-   absence; it often abstains. It has been checked for false alarms on approved labels (none) but
-   not against a hand-labelled set of headings, which is future work. Never a failure: it is a
-   measurement of print, and the crop is shown.
+   (`app/pipeline/typeface.py`, decisions D-044, D-045 and D-047, consult 008). A heading clearly
+   heavier than the rest (1.20 times or more) is a Match. Everything else asks the agent to confirm
+   bold type on the image, with the reason: the same weight (the heading does not stand out, or the
+   whole statement is bold), a borderline difference, a heading on its own line whose type is not
+   within a tenth of the body's size (a larger size has thicker strokes at the same weight), print
+   under 24 pixels tall or with strokes under 3.8 pixels at the working size, or a heading whose
+   boundary cannot be found in the print. Registry artwork of small labels is mostly in that last
+   group, so on real labels the row asks for a look more often than it matches. In one sentence:
+   the heuristic detects a clear relative stroke increase in sufficiently large, comparable print
+   and asks for a look whenever it cannot. It has been checked for false alarms on approved labels
+   (none measured as the same weight) but not against a hand-labelled set of headings, which is
+   future work. Never a failure: it is a measurement of print, and the crop is shown.
 2. **Physical type size and characters per inch are not assessed.** They need a known scale.
    Artwork files that carry DPI metadata would allow it; this build does not read DPI.
 3. **Photographs are best effort.** The primary input is label artwork as submitted to COLA.

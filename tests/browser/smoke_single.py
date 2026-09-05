@@ -59,8 +59,8 @@ def main() -> int:
             ),
         )
         page.on(
-            "dialog", lambda d: d.accept() if d.type == "beforeunload" else d.dismiss()
-        )  # leave-page prompt on reload
+            "dialog", lambda d: d.accept() if d.type in ("beforeunload", "confirm") else d.dismiss()
+        )  # leave-page prompt on reload; the Start over confirmation
         page.goto(BASE + "/", wait_until="networkidle")
         print("title:", page.title())
         page.screenshot(path=f"{OUT}/ui_home.png", full_page=True)
@@ -115,6 +115,24 @@ def main() -> int:
             problems.append("single: a failed check left the previous result on screen")
         print("single: a failed re-check clears the previous result")
         page.click("#clear-files")
+
+        # Start over clears the images, the application fields, the sample text and the result
+        page.click("[data-sample=clean]")
+        page.wait_for_selector("#results:not([hidden]) .verdict", timeout=60000)
+        page.click("#start-over")
+        for _ in range(20):
+            if "Cleared" in page.inner_text("#status"):
+                break
+            page.wait_for_timeout(200)
+        if (
+            not page.is_hidden("#results")
+            or page.input_value("#brand_name")
+            or page.locator("#file-list li").count()
+            or page.inner_text("#sample-blurb").strip()
+            or not page.is_hidden("#start-over")
+        ):
+            problems.append("single: Start over left something behind")
+        print("single: Start over clears images, fields and result")
 
         # Accessibility page: the display choice applies at once, survives a reload, and restores.
         page.click("a[data-view=accessibility]")

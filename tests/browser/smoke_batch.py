@@ -47,7 +47,7 @@ def main() -> int:
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("requestfailed", lambda r: problems.append(f"requestfailed: {r.url} {r.failure}"))
         page.on("response", lambda r: problems.append(f"http {r.status}: {r.url}") if r.status >= 400 else None)
-        page.on("dialog", lambda d: d.dismiss())
+        page.on("dialog", lambda d: d.accept() if d.type == "confirm" else d.dismiss())  # Start over asks first
         page.goto(BASE + "/#batch", wait_until="networkidle")
         page.wait_for_selector("#view-batch:not([hidden])")
         page.click("#batch-demo")
@@ -91,6 +91,22 @@ def main() -> int:
             or page.get_attribute("[data-filter=all]", "aria-pressed") != "false"
         ):
             problems.append("batch: filter buttons do not expose their pressed state")
+
+        # Start over clears the images, the spreadsheet and the results
+        page.click("#batch-reset")
+        for _ in range(20):
+            if "Cleared" in page.inner_text("#batch-status"):
+                break
+            page.wait_for_timeout(200)
+        if (
+            not page.is_hidden("#batch-results")
+            or page.inner_text("#batch-image-count").strip()
+            or page.inner_text("#batch-csv-summary").strip()
+            or not page.is_disabled("#batch-start")
+            or not page.is_hidden("#batch-reset")
+        ):
+            problems.append("batch: Start over left something behind")
+        print("batch: Start over clears images, spreadsheet and results")
         browser.close()
 
     print("\nPROBLEMS:" if problems else "\nno problems detected")

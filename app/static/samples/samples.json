@@ -22,7 +22,7 @@
   {
     "id": "photo",
     "title": "Phone photo",
-    "blurb": "Same product, but the images are tilted and blurred the way a phone photo often is. The tool should still read them.",
+    "blurb": "Same product, but the images are tilted and blurred the way a phone photo often is. The tool should still read them; bold type is hard to judge on a blurred photo, so the heading may be left for you to confirm.",
     "application": {
       "application_id": "COLA-2026-000123",
       "beverage_type": "spirits",

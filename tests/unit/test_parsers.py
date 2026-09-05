@@ -313,6 +313,10 @@ def test_unparseable_required_field_blocks_ready_and_omitted_optional_fields_do_
 
     s = Settings(ocr_workers=1)
     lines = make_lines(["OLD TOM DISTILLERY", "Bourbon", "45% Alc./Vol. (90 Proof)", "750 mL", CANONICAL])
+    # D-047: Ready needs the heading measured bold, so the statement line carries a heavier heading than its rest
+    lines[-1] = lines[-1].model_copy(
+        update={"weight": 0.145, "weight_head": 0.145, "weight_tail": 0.118, "weight_split": "gap"}
+    )
     # bottler and country of origin omitted from the application: not compared, Ready still allowed
     res = compare(_spirits_app(), lines, [], s)
     assert res.warning.exact, res.warning

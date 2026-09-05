@@ -43,7 +43,7 @@ PROBLEM_EXPECTATIONS = {
     "altered": lambda r: r.warning.present and not r.warning.exact and r.verdict == "issues_found",
     "missing": lambda r: not r.warning.present and r.verdict == "issues_found",
     "tiny": None,  # planted defect the tool does not assess (physical type size)
-    "allbold": lambda r: r.warning.present and r.warning.anchor_bold == "needs_review",
+    "allbold": lambda r: r.warning.present and r.warning.type_weight_reading == "same",
 }
 
 
@@ -98,7 +98,8 @@ async def run(labels: Path, workers: int) -> dict:
                     "checks": {c.id: c.status for c in res.checks},
                     "warning_exact": res.warning.exact,
                     "warning_present": res.warning.present,
-                    "type_weight": str(res.warning.anchor_bold),  # match / needs_review / not_checked (D-045)
+                    "type_weight": str(res.warning.anchor_bold),  # match / needs_review (D-047)
+                    "type_weight_reading": res.warning.type_weight_reading or "",
                     "type_weight_basis": res.warning.type_weight_basis or "",
                     "type_weight_ratio": res.warning.type_weight_ratio,
                     "detected": (PROBLEM_EXPECTATIONS[variant](res) if PROBLEM_EXPECTATIONS.get(variant) else None)
@@ -112,22 +113,18 @@ async def run(labels: Path, workers: int) -> dict:
 
 
 def _type_weight_line(cases: list[dict]) -> str:
-    """One line of counts for the bold-type measurement (D-045): what it found and where it abstained."""
-    st = Counter(c.get("type_weight", "") for c in cases if c["warning_present"])
+    """One line of counts for the bold-type measurement (D-045, D-047): a clearly heavier heading is
+    a Match; every other reading asks for review with the reason."""
+    rd = Counter(c.get("type_weight_reading", "") for c in cases if c["warning_present"])
     basis = Counter(c.get("type_weight_basis", "") for c in cases if c["warning_present"])
-    measured_unsure = sum(
-        1
-        for c in cases
-        if c["warning_present"] and c.get("type_weight") == "not_checked" and c.get("type_weight_ratio") is not None
-    )
-    unmeasured = st.get("not_checked", 0) - measured_unsure
     reasons = ", ".join(
         f"{k} {v}" for k, v in sorted(basis.items()) if k in ("too small", "size differs", "no heading line")
     )
+    unsure = rd.get("inconclusive", 0) + rd.get("boundary_uncertain", 0)
     return (
-        f"- Warning type weight of the statements located: heading heavier {st.get('match', 0)}, "
-        f"same weight (Needs review) {st.get('needs_review', 0)}, measured but inconclusive {measured_unsure}, "
-        f"not measured {unmeasured}" + (f" ({reasons})" if reasons else "")
+        f"- Warning type weight of the statements located: heading heavier (Match) {rd.get('heavier', 0)}; "
+        f"asked for review: same weight {rd.get('same', 0)}, inconclusive {unsure}, "
+        f"not measured {rd.get('not_measured', 0)}" + (f" ({reasons})" if reasons else "")
     )
 
 

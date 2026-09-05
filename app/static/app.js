@@ -73,6 +73,7 @@ function renderFileList() {
     ]);
   }));
   $("#clear-files").hidden = state.files.length === 0;
+  updateStartOver();
 }
 
 function addFiles(fileList) {
@@ -206,7 +207,7 @@ async function runCheck() {
     results.hidden = false;
     results.focus({ preventScroll: false });
     results.scrollIntoView({ behavior: "smooth", block: "start" });
-    setStatus(`Done in ${((performance.now() - t0) / 1000).toFixed(1)} s.`);
+    setStatus(doneText(performance.now() - t0, result.timing?.total_ms));
   } catch (err) {
     if (err instanceof ApiError) {
       const extra = err.status === 429 ? " The service is busy; try again in a moment." : "";
@@ -218,6 +219,42 @@ async function runCheck() {
   } finally {
     btn.disabled = false;
   }
+}
+
+/** "Done in 7.2 s (3.1 s reading the labels, 4.1 s sending and receiving)": the split shows when the
+ * connection adds a second or more, so a slow network is not read as a slow tool. */
+function doneText(wallMs, serverMs) {
+  const wall = (wallMs / 1000).toFixed(1);
+  if (!serverMs || wallMs - serverMs < 1000) return `Done in ${wall} s.`;
+  return `Done in ${wall} s (${(serverMs / 1000).toFixed(1)} s reading the labels, ${((wallMs - serverMs) / 1000).toFixed(1)} s sending and receiving).`;
+}
+
+// ------------------------------------------------------------------ start over
+const TEXT_FIELDS = ["brand_name", "class_type", "alcohol_content", "net_contents", "bottler", "country_of_origin", "application_id"];
+function hasInput() {
+  const form = $("#check-form");
+  if (state.files.length || state.result) return true;
+  if (form.querySelector("input[name=beverage_type]:checked").value !== "spirits" || form.querySelector("#imported").checked) return true;
+  return TEXT_FIELDS.some((id) => form.querySelector(`#${id}`).value.trim());
+}
+function updateStartOver() { $("#start-over").hidden = !hasInput(); }
+/** Back to an empty screen: images, application fields, sample text and result. Asks first when a
+ * result is on screen, because nothing is stored anywhere else. */
+function startOver() {
+  if (state.result && !window.confirm("Clear the images, the application fields and the result? Export first if you need them.")) return;
+  state.files = []; state.result = null; state.app = null; state.decision = null; state.checkedFiles = []; state.activeId = null; state.overlays = new Map();
+  const form = $("#check-form");
+  form.reset();
+  const more = form.querySelector("[aria-controls=optional-fields]");
+  if (more.getAttribute("aria-expanded") === "true") more.click();
+  renderFileList();
+  $("#sample-blurb").textContent = "";
+  $("#results").hidden = true;
+  showFormError("");
+  setStatus("Cleared. Start with the label images.");
+  updateStartOver();
+  const h = document.querySelector('[data-view-panel="check"] h1');
+  if (h) { h.setAttribute("tabindex", "-1"); h.focus(); h.scrollIntoView({ block: "start" }); }
 }
 
 // ------------------------------------------------------------------ decision, export, print
@@ -257,6 +294,8 @@ async function boot() {
   routeFromHash();
   window.addEventListener("hashchange", () => routeFromHash(true));
   $("#check-form").addEventListener("submit", (e) => { e.preventDefault(); runCheck(); });
+  $("#check-form").addEventListener("input", updateStartOver);
+  $("#start-over").addEventListener("click", startOver);
   document.querySelectorAll("[data-sample]").forEach((b) => b.addEventListener("click", () => useSample(b.dataset.sample)));
   window.addEventListener("beforeunload", (e) => { if (state.result) { e.preventDefault(); e.returnValue = ""; } });
   loadSamples();

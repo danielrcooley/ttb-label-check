@@ -112,6 +112,11 @@ class WarningReport(BaseModel):
     diff: str | None = Field(default=None, description="Compact word diff: -expected +found")
     anchor_caps: Status
     anchor_bold: Status
+    type_weight_reading: str | None = Field(
+        default=None,
+        description="What the bold measurement found: heavier (a Match) | same | inconclusive | boundary_uncertain "
+        "| not_measured (each of those is Needs review, D-047); absent when no statement was found",
+    )
     type_weight_ratio: float | None = Field(
         default=None, description="Heading stroke weight over the body's, when measured (D-044 / D-045)"
     )

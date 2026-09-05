@@ -262,37 +262,41 @@ def test_type_weight_bold_heading_over_regular_body_matches():
     """D-045: the heading measures clearly heavier than the rest of its line, a Match with the
     ratio and the basis in the report."""
     r = report(_weighted(0.145, 0.118, 0.118))
-    assert r.exact and r.anchor_bold is Status.match
+    assert r.exact and r.anchor_bold is Status.match and r.type_weight_reading == "heavier"
     assert "heavier" in r.notes[2] and "bold heading" in r.notes[2]
     assert r.type_weight_ratio == 1.229 and r.type_weight_basis == "the rest of its line (gap)"
 
 
 def test_type_weight_boundary_by_character_count_never_yields_a_match():
     """Consult 008: when no word gap was found in the print, the heading's share of the characters
-    is a weaker boundary; it may still show the same weight (Needs review), never a Match."""
+    is a weaker boundary; it may still show the same weight, never a Match. D-047: what cannot be
+    confirmed asks the agent to confirm on the image."""
     r = report(_weighted(0.145, 0.118, 0.118, split="share"))
-    assert r.anchor_bold is Status.not_checked and "boundary" in r.notes[2]
+    assert r.anchor_bold is Status.needs_review and r.type_weight_reading == "boundary_uncertain"
+    assert "boundary" in r.notes[2] and "Confirm on the image" in r.notes[2]
     assert r.type_weight_basis == "boundary uncertain (share)"
     same = report(_weighted(0.120, 0.118, 0.118, split="share"))
-    assert same.anchor_bold is Status.needs_review
+    assert same.anchor_bold is Status.needs_review and same.type_weight_reading == "same"
 
 
 def test_type_weight_same_weight_is_review():
     """A heading no heavier than the rest (all bold, or a heading that is not bold) does not stand
     out as bold, so the heading row asks the person, with the note saying why."""
     all_bold = report(_weighted(0.146, 0.141, 0.141))
-    assert all_bold.anchor_bold is Status.needs_review
+    assert all_bold.anchor_bold is Status.needs_review and all_bold.type_weight_reading == "same"
     assert "same weight" in all_bold.notes[2] and "stand out as bold" in all_bold.notes[2]
     light = report(_weighted(0.115, 0.113, 0.113))
     assert light.anchor_bold is Status.needs_review
 
 
-def test_type_weight_unmeasured_or_inconclusive_is_not_checked():
+def test_type_weight_unmeasured_or_inconclusive_asks_for_review():
+    """D-047: the row is Match or Needs review, never Not checked; the reading says why."""
     r = report(_weighted(None, None, None))
-    assert r.anchor_bold is Status.not_checked
-    assert "could not be measured" in r.notes[2]
+    assert r.anchor_bold is Status.needs_review and r.type_weight_reading == "not_measured"
+    assert "could not be measured" in r.notes[2] and "Confirm on the image" in r.notes[2]
     r2 = report(_weighted(0.160, 0.145, 0.145))  # ratio 1.10: between "same" (1.05) and "heavier" (1.20)
-    assert r2.anchor_bold is Status.not_checked and "confidence" in r2.notes[2]
+    assert r2.anchor_bold is Status.needs_review and r2.type_weight_reading == "inconclusive"
+    assert "confidence" in r2.notes[2] and "Confirm on the image" in r2.notes[2]
 
 
 def _alone(head_px, body_px, head_type=40.0, body_type=40.0):
@@ -324,6 +328,7 @@ def test_type_weight_heading_alone_in_a_different_size_is_not_compared():
     """Consult 008: a larger size has thicker strokes at the same weight, so a standalone heading
     is compared only when its type height is within a tenth of the body's."""
     r = report(_alone(8.0, 5.2, head_type=50.0, body_type=40.0))
-    assert r.anchor_bold is Status.not_checked and "different size" in r.notes[2]
+    assert r.anchor_bold is Status.needs_review and r.type_weight_reading == "not_measured"
+    assert "different size" in r.notes[2]
     assert r.type_weight_basis == "size differs"
     assert report(_alone(8.0, 5.2, head_type=43.0, body_type=40.0)).anchor_bold is Status.match
