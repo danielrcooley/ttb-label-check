@@ -310,9 +310,9 @@ def type_weight_status(
     if tw.ratio is None:
         reason = {
             "too small": "the print is too small or too faint at the working size",
-            "no heading line": "the heading was not read as its own words",
+            "no heading line": "GOVERNMENT WARNING was not read as its own words",
             "size differs": (
-                "the heading is set in a different size from the statement, and a larger size has thicker "
+                "GOVERNMENT WARNING is set in a different size from the statement, and a larger size has thicker "
                 "strokes at the same weight"
             ),
         }.get(tw.basis, tw.basis)
@@ -321,7 +321,7 @@ def type_weight_status(
         return (
             Status.needs_review,
             "same",
-            f"The heading and {tw.basis} measure the same weight, so the heading does not stand out as bold type. "
+            f"GOVERNMENT WARNING and {tw.basis} measure the same weight, so it does not stand out as bold type. "
             f"{confirm}",
             tw,
         )
@@ -329,7 +329,7 @@ def type_weight_status(
         return (
             Status.needs_review,
             "boundary_uncertain",
-            "The heading measures heavier than the rest of its line, but the boundary between them could not be "
+            "GOVERNMENT WARNING measures heavier than the rest of its line, but the boundary between them could not be "
             f"found in the print, so it is not counted. {confirm}",
             TypeWeight(tw.ratio, "boundary uncertain", tw.split),
         )
@@ -337,13 +337,13 @@ def type_weight_status(
         return (
             Status.match,
             "heavier",
-            f"The heading is set about {tw.ratio:.1f} times heavier than {tw.basis}: bold heading {rule}.",
+            f"GOVERNMENT WARNING is set about {tw.ratio:.1f} times heavier than {tw.basis}: bold type {rule}.",
             tw,
         )
     return (
         Status.needs_review,
         "inconclusive",
-        f"Bold type could not be judged with confidence from this image: the heading measures only slightly "
+        f"Bold type could not be judged with confidence from this image: GOVERNMENT WARNING measures only slightly "
         f"heavier than {tw.basis}. {confirm}",
         tw,
     )

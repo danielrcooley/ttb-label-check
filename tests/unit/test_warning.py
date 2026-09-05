@@ -263,7 +263,7 @@ def test_type_weight_bold_heading_over_regular_body_matches():
     ratio and the basis in the report."""
     r = report(_weighted(0.145, 0.118, 0.118))
     assert r.exact and r.anchor_bold is Status.match and r.type_weight_reading == "heavier"
-    assert "heavier" in r.notes[2] and "bold heading" in r.notes[2]
+    assert "heavier" in r.notes[2] and "bold type" in r.notes[2]
     assert r.type_weight_ratio == 1.229 and r.type_weight_basis == "the rest of its line (gap)"
 
 
