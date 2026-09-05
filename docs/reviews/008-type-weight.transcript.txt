@@ -1,7 +1,7 @@
 Reading additional input from stdin...
 OpenAI Codex v0.153.1
 --------
-workdir: C:\Users\dcwes\AppData\Local\Temp\claude\C--Projects\e02f4c8e-8b9f-407b-a848-9cbfe91c6de6\scratchpad\codex008
+workdir: C:\Users\<user>\AppData\Local\Temp\claude\C--Projects\e02f4c8e-8b9f-407b-a848-9cbfe91c6de6\scratchpad\codex008
 model: gpt-5.6-sol
 provider: openai
 approval: never

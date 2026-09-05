@@ -46,7 +46,7 @@ next to it.
 
 | # | Finding | Disposition |
 |---|---|---|
-| 3.1, 3.2 | Every line of every read measured, on the event loop, while the slot is held | **Accepted.** The measurement runs only on the lines of a located statement (the author's direction: "detect bold where it is needed"), after `find_warning`, for the kept read and for a losing or rescue read only when a statement is found there. That is a handful of crops per image instead of every line; it stays synchronous. |
+| 3.1, 3.2 | Every line of every read measured, on the event loop, while the slot is held | **Accepted.** The measurement runs only on the lines of a located statement (the engineer's direction: "detect bold where it is needed"), after `find_warning`, for the kept read and for a losing or rescue read only when a statement is found there. That is a handful of crops per image instead of every line; it stays synchronous. |
 | 3.3 | Greyscale once; thread pin is process-global | Noted. |
 | 3.4 | `ocr_ms` excludes the measurement; `total_ms` excludes parsing | **Partially.** The names are kept; the load tool and the README now say which figure is which (server header vs pipeline). |
 | 3.5, 3.6 | Two-user wall p95 over five seconds on an earlier build; D-018's "under concurrent batch load" never measured | **Accepted as the measurement to run.** After deploying this commit the standard runs are repeated with the header figure and nearest-rank percentiles (`tools/measure_deployed.sh`), plus one run of the interactive path while a browser batch is in progress, and the README states what was measured, wall and server, one and two users. |
@@ -81,7 +81,7 @@ next to it.
 
 | # | Finding | Disposition |
 |---|---|---|
-| 6.1 | README placeholders | The author's: the observed usability test and the "From the author" section are written by him before submission. |
+| 6.1 | README placeholders | **Resolved (2026-09-04).** The usability clause is withdrawn (the row cites the browser tests); the personal section is replaced by a statement of the judgment calls. |
 | 6.2 | Stale local latency row | **Accepted.** From the regenerated EVAL.md. |
 | 6.3 | D-044's totals contradict EVAL_REAL; README mislabels non-Match as "too small" | **Accepted.** D-044's counts came from a 50-record calibration pass, not the corpus; D-045 records the corpus-wide counts per basis (heavier, same weight, inconclusive, too small, size differs, no heading), which the evaluator now emits as its own rows. README reworded. |
 | 6.4 | REQUIREMENTS_TRACE said bold is not assessed | **Accepted.** |
@@ -113,6 +113,6 @@ next to it.
 
 ## 8. Submission readiness
 
-- (a) Placeholders: the author's. D-044's overclaims: corrected by D-045. The five-second framing: the README rows now cite the server header figure with the wall figure and the two-user figure beside it, measured on the submitted build. The tally and batch throughput: reproducers committed. The README narrative and the reviewers' section: left to the author, who wrote them in his voice. D-041's "address corroborates": now true of the code (1.3).
-- (b) Nothing found; the stakeholder names and quotations are from the assignment's public repository; the author's identity and workflow are deliberate.
-- (c) Every "must" item is done in this commit except the measurements, which follow the deploy; of the "can wait" items, measuring only the statement's lines, `extract_only`, and the header-only message are done; shortening the README narrative is the author's call.
+- (a) Placeholders: the engineer's. D-044's overclaims: corrected by D-045. The five-second framing: the README rows now cite the server header figure with the wall figure and the two-user figure beside it, measured on the submitted build. The tally and batch throughput: reproducers committed. The README narrative and the reviewers' section: left to the engineer, who wrote them in his voice. D-041's "address corroborates": now true of the code (1.3).
+- (b) Nothing found; the stakeholder names and quotations are from the assignment's public repository; the engineer's identity and workflow are deliberate.
+- (c) Every "must" item is done in this commit except the measurements, which follow the deploy; of the "can wait" items, measuring only the statement's lines, `extract_only`, and the header-only message are done; shortening the README narrative is the engineer's call.

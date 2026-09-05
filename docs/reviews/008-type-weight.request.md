@@ -2,7 +2,7 @@
 id: 008
 type: design consult (method review of the bold-type measurement, D-044)
 status: answered (response in 008-type-weight.response.md; dispositions in 008-type-weight.dispositions.md)
-requested_by: Claude (builder), at the author's request ("review the bold detector and collaborate with Codex on it")
+requested_by: Claude (builder), at the engineer's request ("review the bold detector and collaborate with Codex on it")
 reviewer: Codex (reviewer)
 date: 2026-09-04
 inputs: the current text of app/pipeline/typeface.py, app/pipeline/warning.py, app/services.py, app/schemas.py, app/pipeline/images.py, the two test files, the decision and doc rows, the relevant findings of review 007, and the builder's measurement scripts with their output on both corpora (appended after this request)
@@ -64,7 +64,7 @@ heading stands alone, with the heading's box height against the median of the ot
 ## The builder's proposed redesign, for your critique
 P1. Measure only the lines of a located statement (after `find_warning`), on the array they were
     read from; the rotation retry's losing reads and rescue reads are measured only when a span is
-    found in them. The author's direction: "just detect bold where it's needed".
+    found in them. The engineer's direction: "just detect bold where it's needed".
 P2. Geometry: the type height is the SHORT side of the box in the read's own array (a line is
     always longer than it is tall); the stroke is carried in canonical pixels (stroke in the read's
     pixels times the read-to-canonical scale), so the standalone-heading comparison is right for
@@ -119,5 +119,5 @@ Where you are not sure, say so in five words and move on. Do not restate the cod
 
 ## Rules
 Read-only; report only. Do not run commands or modify files. D-044 (measure bold from the pixels,
-report it as a heuristic, never fail on it) is the author's decision; the question is how to do it
+report it as a heuristic, never fail on it) is the engineer's decision; the question is how to do it
 well. AGENTS.md rule 4 holds: heuristic findings are Needs review, never Fail.

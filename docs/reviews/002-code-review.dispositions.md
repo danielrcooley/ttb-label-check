@@ -68,7 +68,7 @@ fail (found while investigating; see D-028 in the decision log).
 | # | Finding | Disposition |
 |---|---|---|
 | 5.1 | Five-second gate not enforced | **Accepted.** The gate is measured on the deployed host (interactive front+back p95 under concurrent batch load) with `tools/loadtest.py --endpoint verify --interactive`; the number goes in the README. The local CI threshold stays loose because runner speed varies. |
-| 5.2 | Usability evidence is a placeholder | **Accepted.** Scheduled with the author before submission. |
+| 5.2 | Usability evidence is a placeholder | **Accepted, then withdrawn (2026-09-04).** No usability observation is claimed; the row cites the browser tests. |
 | 5.3 | No 300-item evidence | **Accepted.** A 300-image browser batch run and a 300-request steady load test are recorded before submission. |
 | 5.4 | Batch unsafe for realistic folders | **Accepted** via 1.11 to 1.13. |
 | 5.5 | Exactness weakened by normalization | **Partially.** Accent removal reverted (1.6). Whitespace collapse and typographic-quote unification remain, because line wrapping and curly quotes are rendering, not wording; both are stated in the docs. Single-character differences are Needs review, never a pass. |

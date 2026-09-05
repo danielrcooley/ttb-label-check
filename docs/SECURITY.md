@@ -9,15 +9,16 @@ deployment where they cost nothing, and it says plainly where it stops.
 - **Nothing is stored.** Uploaded images are decoded in memory, read by the OCR engine, and
   discarded when the response is sent. There is no database, no upload directory, no cache of
   results. Batch state (files, results, decisions) lives only in the agent's browser tab.
-- **Nothing sensitive is logged.** Request logs carry method, path, status and timing. Label text,
-  filenames, application values and results never reach a log line.
-- **Uploads stay in memory up to the per-image cap.** The web framework spools multipart parts above
-  a threshold to a temporary directory while parsing; this app sets that threshold just above the
-  10 MB per-image cap, so every accepted image stays in memory. A part larger than that is spooled
-  to the container's temporary directory until the route rejects it: the local `docker run` recipe
-  mounts `/tmp` in memory (`--tmpfs /tmp`); on Azure Container Apps it is the replica's ephemeral
-  disk, discarded with the replica. Total memory is bounded by the 40 MB request cap times the
-  global cap of 24 concurrent metered requests, which is enforced before parsing. Slow-client
+- **Label content is not logged.** Request logs carry method, path, status, timing and a request
+  id; the server's access log adds the client address. Label text, filenames, application values
+  and results are never written to a log line by the application; an unhandled exception logs its
+  traceback, which is why exceptions in the pipeline are converted to error envelopes.
+- **Uploads stay in memory.** The web framework spools multipart parts above a threshold to a
+  temporary directory while parsing; this app sets that threshold above the 40 MB request cap,
+  which is enforced from `Content-Length` before the body is read, so no upload touches the
+  filesystem, including one the route then refuses as over the 10 MB per-image limit. Upload memory
+  is bounded by the request cap times the global cap of 24 concurrent metered requests, which is
+  enforced before parsing. Slow-client
   protection (a body that trickles in for minutes) is delegated to the platform ingress in front of
   the container, which enforces request timeouts; the container itself enforces the declared size
   and a 15-second keep-alive.
@@ -33,7 +34,7 @@ deployment where they cost nothing, and it says plainly where it stops.
 | File type by signature, not extension; PDF, SVG, HEIC and unknown types refused with a specific message | `app/pipeline/images.py` |
 | Decompression-bomb guard (25 megapixels, checked from the header before decoding; large JPEGs are decoded at reduced size) | `app/pipeline/images.py` |
 | Corrupt or truncated images fail cleanly with an error envelope, never a stack trace | `app/pipeline/images.py`, `app/security.py` |
-| Security headers: Content-Security-Policy (`default-src 'self'`, no inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, cross-origin isolation headers, `Cache-Control: no-store` | `app/security.py` |
+| Security headers: Content-Security-Policy (`default-src 'self'`, no inline scripts or styles), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`, `Cache-Control: no-store` | `app/security.py` |
 | Per-client in-flight cap (4 concurrent requests) with 429 and Retry-After; global cap with 503 | `app/security.py` |
 | Capacity limiter with interactive priority: batch never queues, it is refused with 429 when capacity is full or a person is waiting | `app/ocr/pool.py`, `tests/unit/test_pool.py` |
 | Capacity is held for as long as an OCR thread actually runs, even if the client disconnects (inference cannot be interrupted, so freeing the slot early would oversubscribe the CPU) | `app/ocr/pool.py`, `tests/unit/test_pool.py` |
@@ -64,11 +65,11 @@ deployment where they cost nothing, and it says plainly where it stops.
 ## Path to production (summary)
 
 Azure Government region; private ingress with the identity provider in front; images and results
-never leaving the agency boundary (they already never leave the container); a retention policy
+never leaving the agency boundary (the container itself keeps nothing after the response); a retention policy
 for the audit record only; model files versioned and evaluated before each change; the same
 container image promoted from test to production; monitoring on the health endpoint and the
 `Server-Timing` header every response carries.
 
 ## Reporting a problem
 
-Open an issue in the repository or contact the author. Do not include real label data in a report.
+Open an issue in the repository or contact the engineer. Do not include real label data in a report.

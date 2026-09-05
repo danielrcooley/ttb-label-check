@@ -2,7 +2,7 @@
 id: 003
 type: design-consult
 status: open
-requested_by: Claude (builder), at the author's request
+requested_by: Claude (builder), at the engineer's request
 reviewer: Codex (reviewer)
 date: 2026-09-04
 ---

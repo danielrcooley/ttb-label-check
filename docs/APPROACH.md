@@ -2,7 +2,7 @@
 
 Two pages, as the brief asked. Depth lives in the linked documents.
 
-## What I built and why
+## What was built and why
 
 A compliance agent uploads the label images for one application, enters what the application
 says, and gets a checklist in a few seconds: brand, class/type, alcohol content, net contents,
@@ -24,7 +24,8 @@ from those four plus Marcus's firewall.
 - **Usable by anyone** meant one screen, two numbered steps, one button, three one-click samples,
   and the U.S. Web Design System, which is what federal agents already see every day and is built
   for Section 508. Statuses are always an icon, a word and a color.
-- **Batch** meant the browser orchestrates: it reads each image once, pairs images to applications
+- **Batch** meant the browser orchestrates: it reads each image once (with the orientation retry when a
+  first read is poor, never the single screen's rescue round), pairs images to applications
   by an explicit rule (a CSV column or a filename prefix; leftovers are assigned by hand, never
   guessed), compares each application as soon as its images are read, and streams rows in. The
   bulk compare endpoint serves scripted clients. The server stays stateless, which is also why it
@@ -34,7 +35,7 @@ from those four plus Marcus's firewall.
   (a dropped colon, a `0` read as `O`) from a wording change (`can` for `may`). Noise is "Needs
   review" with a diff; a wording change is a mismatch.
 
-Two decisions I would defend first. Automatic approval was never on the table, because Dave is
+Two decisions the engineer would defend first. Automatic approval was never on the table, because Dave is
 right that judgment is the job and because federal AI guidance requires human oversight for
 decisions like this. And no LLM sits in the verification path: the firewall forbids it, the
 five-second budget punishes it, and a compliance tool should give the same answer for the same
@@ -61,8 +62,8 @@ The frontend is vanilla JavaScript modules with no build step, so a reviewer can
 - pytest, ruff, mypy in strict mode; Playwright for headless browser checks; Docker; Azure
   Container Apps.
 - **AI coding agents, openly:** Claude Code as the builder and Codex as an independent reviewer,
-  directed by me. The requirements analysis, the architecture, the review passes, and every
-  decision in `docs/DECISIONS.md` are mine; where the builder's first proposal was wrong, the log
+  directed by the engineer. The requirements analysis, the architecture, the review passes, and every
+  decision in `docs/DECISIONS.md` are the engineer's; where the builder's first proposal was wrong, the log
   says so and says who caught it. The design review and its dispositions are in `docs/reviews/`.
   Commits carry the agent trailer.
 
@@ -85,8 +86,8 @@ The frontend is vanilla JavaScript modules with no build step, so a reviewer can
 
 ## Trade-offs and limitations
 
-Physical type size is not assessed and is shown as "Not checked" rather than guessed; bold type
-is measured from the pixels: a clearly heavier heading is a match, and anything less asks for a
+Physical type size is outside the report (it needs a known scale, which an image does not carry);
+bold type is measured from the pixels: a clearly heavier heading is a match, and anything less asks for a
 look with the reason. Photographs are best effort. Class/type validity, age statements and laboratory
 tolerances are out of scope. Fuzzy pairing of unlabeled images is deliberately absent. The full
 list, with the enforced limits and the measured numbers, is in `docs/LIMITS.md`; the regulatory

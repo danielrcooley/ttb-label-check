@@ -1,7 +1,7 @@
 Reading additional input from stdin...
 OpenAI Codex v0.153.1
 --------
-workdir: C:\Users\dcwes\AppData\Local\Temp\claude\C--Projects\c9c0f080-f2e8-4108-9668-168ed686c1c6\scratchpad\codex_review_001
+workdir: C:\Users\<user>\AppData\Local\Temp\claude\C--Projects\c9c0f080-f2e8-4108-9668-168ed686c1c6\scratchpad\codex_review_001
 model: gpt-5.6-sol
 provider: openai
 approval: never
@@ -825,7 +825,7 @@ Documented as a heuristic with its failure modes (all-bold labels, extreme fonts
   requests with concurrency ~3, table fills in live, filter and export.
 - Accessibility: WCAG 2.1 AA targets, 18 px base type, 44 px hit targets, visible focus,
   aria-live results, respects prefers-reduced-motion and prefers-contrast. No color-only
-  meaning. This is also where Daniel's lived low-vision experience shows without being said.
+  meaning. [one sentence about the engineer removed]
 - No external assets. System font stack. Everything self-hosted.
 
 ### Backend API

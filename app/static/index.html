@@ -251,13 +251,13 @@
       <div class="grid-container usa-prose">
         <h1 class="margin-top-0">About this tool</h1>
         <h2>What it does</h2>
-        <p>It reads the text on label images with an on-device text-recognition model, compares what it read with what the application says, checks the government warning statement word for word against 27 CFR 16.21, and shows you exactly where on the label it found each item. It works in a few seconds and makes no calls to outside services.</p>
+        <p>It reads the text on label images with a text-recognition model that runs inside the service itself, compares what it read with what the application says, checks the government warning statement word for word against 27 CFR 16.21, and shows you exactly where on the label it found each item. It works in a few seconds and makes no calls to outside services.</p>
         <h2>What it does not do</h2>
         <ul>
           <li>It does not approve or reject applications. Every result is a recommendation for a compliance agent.</li>
           <li>It does not store images, application data, or results. Refreshing the page clears everything.</li>
           <li>It does not check permits, formulas, class/type validity, age statements or laboratory tolerances.</li>
-          <li>It does not measure physical type size or bold type from a photograph reliably; those items are marked for you to confirm.</li>
+          <li>It does not measure physical type size. Bold type is measured from the print; whenever the measurement cannot confirm it, the warning is marked for you to confirm.</li>
         </ul>
         <h2>How it decides</h2>
         <p><strong>Match</strong> means the label says the same thing, allowing for letter case and accents. <strong>Needs review</strong> means it is close but you should look, which is usually OCR noise. <strong>Mismatch</strong> and <strong>Not found</strong> mean the label disagrees or the item could not be read. For the warning statement, only an exact match passes.</p>
@@ -284,7 +284,7 @@
         <ul>
           <li>Built with the U.S. Web Design System. Target: WCAG 2.1 AA and Section 508.</li>
           <li>Every status is an icon, a word and a color, never a color alone. A pressed button carries a check mark in its text.</li>
-          <li>Works with the keyboard alone, at 200 percent zoom and on a phone (checked by the browser tests), and in Windows contrast themes (checked by hand by the author, who uses one); progress, results and recorded decisions are announced to screen readers; moving between pages puts the focus on the new page's heading.</li>
+          <li>Works with the keyboard alone, at 200 percent zoom and on a phone (checked by the browser tests), and in Windows contrast themes (checked by hand); progress, results and recorded decisions are announced to screen readers; moving between pages puts the focus on the new page's heading.</li>
           <li>No time limits; the only motion is a progress spinner, which stops when your system asks for reduced motion.</li>
         </ul>
         <h2>If something does not work for you</h2>

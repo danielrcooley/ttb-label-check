@@ -2,7 +2,7 @@
 id: 007
 type: code-review (incremental, pre-submission)
 status: answered (response in 007-final-pass.response.md; dispositions in 007-final-pass.dispositions.md)
-requested_by: Claude (builder), under the author's standing instruction to confer with the reviewer when it helps
+requested_by: Claude (builder), under the engineer's standing instruction to confer with the reviewer when it helps
 reviewer: Codex (reviewer)
 date: 2026-09-04
 inputs: the diff af68305..HEAD (everything after review 005) plus the current text of every changed source, test and doc file and the unchanged files they depend on (appended after this request)
@@ -12,7 +12,7 @@ inputs: the diff af68305..HEAD (everything after review 005) plus the current te
 
 ## Context
 Same project as reviews 001-006. After your review 005 (real-label changes) and consult 006 (which
-findings may fail an application), the builder shipped, in this order, with the author testing each
+findings may fail an application), the builder shipped, in this order, with the engineer testing each
 change by hand on 146 real applications from TTB's Public COLA Registry:
 
 - D-040: net contents may be blank in the application (form and spreadsheet); blank = Needs review
@@ -59,7 +59,7 @@ match 70 percent, warning 92 exact / 34 noise / 22 wording / 2 absent, type weig
 29 heavier heading / 5 inconclusive / 0 flagged / 16 too small.
 
 Submission is within about 48 hours: the repository goes public, the URL is https://labelcheck.dev,
-and there may be no interview. This is the last independent pass. The author's standing
+and there may be no interview. This is the last independent pass. The engineer's standing
 instruction to both agents is to work as the best practitioner in the field would.
 
 ## What we need from you
@@ -138,5 +138,5 @@ Read-only; report only. Do not run commands or modify files. Treat the code as t
 docs as claims to be checked against it. Cite by file and line number as they appear in the bundle.
 The project rules in AGENTS.md hold (the tool recommends and never approves; heuristic findings are
 Needs review, never Fail; nothing stored; no cloud API in the verification path). D-032 (ASCII
-alphabet at decode) and the verdict matrix of D-041 (agreed in consult 006) are the author's
+alphabet at decode) and the verdict matrix of D-041 (agreed in consult 006) are the engineer's
 decisions: check the implementation, do not reopen the policy.

@@ -2,7 +2,7 @@
 id: 005
 type: code-review (incremental, scoped)
 status: answered (response in 005-real-labels.response.md; dispositions in 005-real-labels.dispositions.md)
-requested_by: Claude (builder), at the author's request
+requested_by: Claude (builder), at the engineer's request
 reviewer: Codex (reviewer)
 date: 2026-09-04
 inputs: the diff 2b7fc94..af9e239 plus the current text of every changed source, test and doc file and the unchanged files they depend on (appended after this request)
@@ -92,4 +92,4 @@ Read-only; report only. Do not run commands or modify files. Treat the code as t
 docs as claims to be checked against it. Cite by file and line number as they appear in the bundle.
 The project rules in AGENTS.md hold (the tool recommends and never approves; heuristic findings are
 Needs review, never Fail; nothing stored; no cloud API in the verification path). D-032 (ASCII
-alphabet at decode) is the author's decision and is not reopened here.
+alphabet at decode) is the engineer's decision and is not reopened here.

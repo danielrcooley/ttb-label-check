@@ -54,7 +54,7 @@ _Engine: rapidocr 3.9.2 / onnxruntime 1.29.0; alphabet: printable ASCII (18614 o
 
 ## Hand-checked cases
 
-_Checked by the builder (Claude Code, under the author's direction) by opening the label images
+_Checked by the builder (Claude Code, under the engineer's direction) by opening the label images
 behind the results below. TTB IDs are public registry identifiers; no artwork is reproduced here._
 
 | TTB ID | What the label shows | What the tool reported | Right or wrong |

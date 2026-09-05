@@ -2,7 +2,7 @@
 id: 006
 type: design consult (verdict rules for real application data)
 status: answered (response in 006-registry-fields.response.md; dispositions in 006-registry-fields.dispositions.md)
-requested_by: Claude (builder), at the author's request
+requested_by: Claude (builder), at the engineer's request
 reviewer: Codex (reviewer)
 date: 2026-09-04
 inputs: this request, the measured tally, AGENTS.md, docs/REGULATIONS.md, docs/EVAL_REAL.md, and the current text of app/pipeline/compare.py, match.py, normalize.py, parsers.py, tools/evaluate_real.py (appended after this request)
@@ -11,7 +11,7 @@ inputs: this request, the measured tally, AGENTS.md, docs/REGULATIONS.md, docs/E
 # Request 006: how should the checks treat application data as it really comes from COLAs?
 
 ## Context
-Same project as reviews 001-005. The author ran 146 real approved applications from TTB's Public
+Same project as reviews 001-005. The engineer ran 146 real approved applications from TTB's Public
 COLA Registry through the deployed batch screen, with a spreadsheet built from the registry's own
 fields (the applicant line, the class code description, the brand as registered; no alcohol content
 or net contents, because the COLA form carries neither). Every application came back "Issues found".
@@ -54,7 +54,7 @@ What the data looks like:
 
 The rules that hold (AGENTS.md): the tool recommends and never approves; heuristic findings are
 Needs review, never Fail; only clear text or numeric differences are failures; nothing stored; no
-cloud API in the verification path; exact means exact for the warning. The author's aim: an agent
+cloud API in the verification path; exact means exact for the warning. The engineer's aim: an agent
 with a real COLAs export should see Ready / Needs review / Issues in proportions that mean
 something, without the tool passing anything it has not actually verified. Submission is in about
 36 hours, so each recommendation needs an effort estimate.

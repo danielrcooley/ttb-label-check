@@ -2,7 +2,7 @@
 id: 004
 type: code-review (incremental)
 status: answered (response in 004-late-session.response.md; dispositions in 004-late-session.dispositions.md)
-requested_by: Claude (builder), at the author's request
+requested_by: Claude (builder), at the engineer's request
 reviewer: Codex (reviewer)
 date: 2026-09-04
 inputs: the diff 79e9e04..009a407 plus the current text of every changed source, test and doc file (appended after this request)
@@ -20,7 +20,7 @@ The app is now deployed on Azure Container Apps (2 vCPU, 4 GiB, 2 OCR workers, i
 the URL are the whole evaluation.
 
 These changes were made at the end of a long session, when the builder's working context was nearly
-full. The author wants an independent pass over exactly this material. The attached bundle holds:
+full. The engineer wants an independent pass over exactly this material. The attached bundle holds:
 (a) the review-002 dispositions you are checking against, (b) the full diff since 79e9e04, (c) the
 current text of every file that diff touches, and (d) the unchanged files those changes depend on
 (schemas, parsers, match, normalize, extract, csvio, base engine).
