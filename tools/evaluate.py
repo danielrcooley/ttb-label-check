@@ -43,7 +43,7 @@ PROBLEM_EXPECTATIONS = {
     "altered": lambda r: r.warning.present and not r.warning.exact and r.verdict == "issues_found",
     "missing": lambda r: not r.warning.present and r.verdict == "issues_found",
     "tiny": None,  # planted defect the tool does not assess (physical type size)
-    "allbold": lambda r: r.warning.present and r.warning.body_not_bold == "needs_review",
+    "allbold": lambda r: r.warning.present and r.warning.anchor_bold == "needs_review",
 }
 
 

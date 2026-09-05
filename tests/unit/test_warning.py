@@ -258,12 +258,12 @@ def _weighted(head, tail, body, split="gap"):
     return out
 
 
-def test_type_weight_bold_heading_over_regular_body_matches_the_heading_row_only():
-    """D-045: a relative measurement shows the heading heavier than the body; it cannot show that
-    the body is itself regular (extra-bold over bold looks the same), so that row stays Not checked."""
+def test_type_weight_bold_heading_over_regular_body_matches():
+    """D-045: the heading measures clearly heavier than the rest of its line, a Match with the
+    ratio and the basis in the report."""
     r = report(_weighted(0.145, 0.118, 0.118))
-    assert r.exact and r.anchor_bold is Status.match and r.body_not_bold is Status.not_checked
-    assert "heavier" in r.notes[2] and "not measured" in r.notes[2]
+    assert r.exact and r.anchor_bold is Status.match
+    assert "heavier" in r.notes[2] and "bold heading" in r.notes[2]
     assert r.type_weight_ratio == 1.229 and r.type_weight_basis == "the rest of its line (gap)"
 
 
@@ -277,19 +277,19 @@ def test_type_weight_boundary_by_character_count_never_yields_a_match():
     assert same.anchor_bold is Status.needs_review
 
 
-def test_type_weight_same_weight_is_review_on_both_counts():
-    """All bold, or a heading that is not bold: the measurement cannot tell them apart, so both
-    format rows ask the person, with one note saying why."""
+def test_type_weight_same_weight_is_review():
+    """A heading no heavier than the rest (all bold, or a heading that is not bold) does not stand
+    out as bold, so the heading row asks the person, with the note saying why."""
     all_bold = report(_weighted(0.146, 0.141, 0.141))
-    assert all_bold.anchor_bold is Status.needs_review and all_bold.body_not_bold is Status.needs_review
-    assert "same weight" in all_bold.notes[2] and "whole statement" in all_bold.notes[2]
+    assert all_bold.anchor_bold is Status.needs_review
+    assert "same weight" in all_bold.notes[2] and "stand out as bold" in all_bold.notes[2]
     light = report(_weighted(0.115, 0.113, 0.113))
-    assert light.anchor_bold is Status.needs_review and light.body_not_bold is Status.needs_review
+    assert light.anchor_bold is Status.needs_review
 
 
 def test_type_weight_unmeasured_or_inconclusive_is_not_checked():
     r = report(_weighted(None, None, None))
-    assert r.anchor_bold is Status.not_checked and r.body_not_bold is Status.not_checked
+    assert r.anchor_bold is Status.not_checked
     assert "could not be measured" in r.notes[2]
     r2 = report(_weighted(0.160, 0.145, 0.145))  # ratio 1.10: between "same" (1.05) and "heavier" (1.20)
     assert r2.anchor_bold is Status.not_checked and "confidence" in r2.notes[2]

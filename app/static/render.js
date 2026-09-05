@@ -123,7 +123,7 @@ export function renderWarning(container, w, onSelect) {
   const notRequired = w.assessment === "not_required"; // under 0.5% alcohol: absence is not a finding
   const overall = notRequired ? (w.present ? "info" : "not_checked")
     : !w.present ? "not_found"
-    : w.assessment === "exact" && w.anchor_caps === "match" && w.anchor_bold !== "needs_review" && w.body_not_bold !== "needs_review" ? "match"
+    : w.assessment === "exact" && w.anchor_caps === "match" && w.anchor_bold !== "needs_review" ? "match"
     : w.assessment === "wording" ? "mismatch" : "needs_review";
   const headline = notRequired ? (w.present ? "Not required at this alcohol content; a statement is present" : "Not required at this alcohol content")
     : !w.present ? "No warning statement found" : w.exact ? "Wording is exact" : "Wording is not exact";
@@ -142,7 +142,6 @@ export function renderWarning(container, w, onSelect) {
       el("dd", { class: "margin-left-0 margin-top-05" }, el("ul", { class: "usa-list usa-list--unstyled" }, [
         el("li", {}, [statusTag(w.anchor_caps), " ", "GOVERNMENT WARNING in capital letters"]),
         el("li", { class: "margin-top-05" }, [statusTag(w.anchor_bold), " ", "GOVERNMENT WARNING in bold type"]),
-        el("li", { class: "margin-top-05" }, [statusTag(w.body_not_bold), " ", "Remainder of the statement not in bold"]),
       ])),
     ]) : null,
     el("ul", { class: "usa-list" }, w.notes.map((n) => el("li", { text: n }))),
@@ -266,7 +265,6 @@ export function issueTexts(result) {
   if (w.assessment === "not_required") { /* under 0.5% alcohol: no statement required */ }
   else if (!w.present) probs.push("Warning: missing"); else if (!w.exact) probs.push("Warning: wording not exact"); else if (w.anchor_caps !== "match") probs.push("Warning: heading not all caps");
   if (w.present && w.anchor_bold === "needs_review") probs.push("Warning: heading may not be bold");
-  if (w.present && w.body_not_bold === "needs_review") probs.push("Warning: statement may be all bold");
   return probs;
 }
 

@@ -493,11 +493,7 @@ def _verdict(checks: list[Check], warning: WarningReport, images: list[ImageInfo
         pass
     elif warning.assessment in ("absent", "wording"):
         issues.append(Check(id="warning", label="Government warning", status=Status.mismatch))
-    elif warning.assessment == "noise" or Status.needs_review in (
-        warning.anchor_caps,
-        warning.anchor_bold,
-        warning.body_not_bold,
-    ):
+    elif warning.assessment == "noise" or Status.needs_review in (warning.anchor_caps, warning.anchor_bold):
         reviews.append(Check(id="warning", label="Government warning", status=Status.needs_review))
     if issues:
         names = ", ".join(c.label.lower() for c in issues)

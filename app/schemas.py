@@ -112,7 +112,6 @@ class WarningReport(BaseModel):
     diff: str | None = Field(default=None, description="Compact word diff: -expected +found")
     anchor_caps: Status
     anchor_bold: Status
-    body_not_bold: Status
     type_weight_ratio: float | None = Field(
         default=None, description="Heading stroke weight over the body's, when measured (D-044 / D-045)"
     )

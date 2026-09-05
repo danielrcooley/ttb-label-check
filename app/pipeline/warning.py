@@ -295,14 +295,12 @@ def type_weight_ratio(span: WarningSpan) -> TypeWeight:
 
 def type_weight_status(
     span: WarningSpan, *, heading_min_ratio: float, same_max_ratio: float
-) -> tuple[Status, Status, str, TypeWeight]:
+) -> tuple[Status, str, TypeWeight]:
     """Bold type from the stroke weights measured on the pixels (app/pipeline/typeface.py): the
-    heading must be bold and the rest must not be (27 CFR 16.22(a)(2)). A heading clearly heavier
-    than the body is a Match on the heading row; the body row stays Not checked, because a relative
-    measurement cannot tell a regular body under a bold heading from a bold body under a heavier
-    one. Heading and body of the same weight is Needs review on both rows (either the heading is
-    not bold or the whole statement is). A small difference is inconclusive; a boundary found only
-    by counting characters never yields a Match; print too small, too faint, or set in a different
+    heading must be in bold type (27 CFR 16.22(a)(2)). A heading clearly heavier than the rest of
+    the statement is a Match; a heading of the same weight as the rest is Needs review, because it
+    does not stand out as bold. A small difference is inconclusive; a boundary found only by
+    counting characters never yields a Match; print too small, too faint, or set in a different
     size is Not checked with the reason. Never a failure: it measures print, not wording."""
     tw = type_weight_ratio(span)
     rule = "(27 CFR 16.22(a)(2))"
@@ -317,21 +315,18 @@ def type_weight_status(
         }.get(tw.basis, tw.basis)
         return (
             Status.not_checked,
-            Status.not_checked,
             f"Bold type could not be measured: {reason}. Check it on the image {rule}.",
             tw,
         )
     if tw.ratio <= same_max_ratio:
         return (
             Status.needs_review,
-            Status.needs_review,
-            f"The heading and {tw.basis} measure the same weight: either the heading is not in bold, or the whole "
-            f"statement is. Only the heading may be bold {rule}. Confirm on the image.",
+            f"The heading and {tw.basis} measure the same weight, so the heading does not stand out as bold type "
+            f"{rule}. Confirm on the image.",
             tw,
         )
     if tw.ratio >= heading_min_ratio and tw.split == "share":
         return (
-            Status.not_checked,
             Status.not_checked,
             "The heading measures heavier than the rest of its line, but the boundary between them could not be "
             f"found in the print, so it is not counted. Check it on the image {rule}.",
@@ -340,13 +335,10 @@ def type_weight_status(
     if tw.ratio >= heading_min_ratio:
         return (
             Status.match,
-            Status.not_checked,
-            f"The heading is set about {tw.ratio:.1f} times heavier than {tw.basis}: bold heading {rule}. The "
-            "remainder measures lighter than the heading; whether it is itself regular weight is not measured.",
+            f"The heading is set about {tw.ratio:.1f} times heavier than {tw.basis}: bold heading {rule}.",
             tw,
         )
     return (
-        Status.not_checked,
         Status.not_checked,
         f"Bold type could not be judged with confidence from this image (the heading measures only slightly "
         f"heavier than {tw.basis}); check it on the image {rule}.",
@@ -363,7 +355,7 @@ def build_report(
 ) -> WarningReport:
     """Assess the warning statement. ``assessment`` drives the verdict:
     exact -> pass; noise -> Needs review; wording/absent -> issue. The anchor's capitals and the
-    type weight are separate format checks (``anchor_caps``, ``anchor_bold``, ``body_not_bold``)
+    type weight are separate format checks (``anchor_caps``, ``anchor_bold``)
     that can send an exact statement to Needs review, never to an issue."""
     span = find_warning(lines)
     if span is None:
@@ -376,7 +368,6 @@ def build_report(
             diff=None,
             anchor_caps=Status.not_found,
             anchor_bold=Status.not_checked,
-            body_not_bold=Status.not_checked,
             notes=[
                 "No GOVERNMENT WARNING statement was found on any image. It is mandatory on all alcoholic "
                 "beverages of 0.5% alcohol or more (27 CFR 16.21). If the warning is on a label image not "
@@ -386,7 +377,7 @@ def build_report(
         )
     exact, similarity = compare_warning(span.text)
     caps_status, caps_note = anchor_caps_status(span.anchor_text)
-    bold_status, body_status, bold_note, tw = type_weight_status(
+    bold_status, bold_note, tw = type_weight_status(
         span, heading_min_ratio=heading_min_ratio, same_max_ratio=same_max_ratio
     )
     if exact:
@@ -415,7 +406,6 @@ def build_report(
         diff=None if exact else word_diff(CANONICAL, span.text),
         anchor_caps=caps_status,
         anchor_bold=bold_status,
-        body_not_bold=body_status,
         type_weight_ratio=round(tw.ratio, 3) if tw.ratio is not None else None,
         type_weight_basis=tw.basis + (f" ({tw.split})" if tw.split in ("gap", "share") else ""),
         evidence=[Evidence(image_index=ln.image_index, box=ln.box, text=ln.text) for ln in span.lines],

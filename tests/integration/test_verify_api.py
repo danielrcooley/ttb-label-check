@@ -215,15 +215,14 @@ def test_all_bold_warning_is_flagged_for_review_and_a_bold_heading_matches(clien
         files=image_files("APP-003_front_clean.png", "APP-003_back_allbold.png"),
     ).json()
     assert bold["warning"]["exact"], bold["warning"]
-    assert bold["warning"]["body_not_bold"] == "needs_review", bold["warning"]
+    assert bold["warning"]["anchor_bold"] == "needs_review", bold["warning"]
     assert bold["verdict"] == "needs_review", bold["summary"]
     clean = client.post(
         "/api/v1/verify",
         data={"application": app_json(app)},
         files=image_files("APP-003_front_clean.png", "APP-003_back_clean.png"),
     ).json()
-    assert clean["warning"]["anchor_bold"] == "match" and clean["warning"]["body_not_bold"] == "not_checked", clean[
-        "warning"
-    ]
+    assert clean["warning"]["anchor_bold"] == "match", clean["warning"]
+    assert "body_not_bold" not in clean["warning"], clean["warning"]  # the heading is the format check (D-046)
     assert clean["warning"]["type_weight_basis"] == "the rest of its line (gap)", clean["warning"]
     assert clean["verdict"] == "ready_for_approval", clean["summary"]

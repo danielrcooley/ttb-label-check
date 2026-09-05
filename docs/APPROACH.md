@@ -85,8 +85,9 @@ The frontend is vanilla JavaScript modules with no build step, so a reviewer can
 
 ## Trade-offs and limitations
 
-Bold type and physical type size are not assessed and are shown as "Not checked" rather than
-guessed. Photographs are best effort. Class/type validity, age statements and laboratory
+Physical type size is not assessed and is shown as "Not checked" rather than guessed; bold type
+is measured from the pixels and becomes a finding only when the reading is confident. Photographs
+are best effort. Class/type validity, age statements and laboratory
 tolerances are out of scope. Fuzzy pairing of unlabeled images is deliberately absent. The full
 list, with the enforced limits and the measured numbers, is in `docs/LIMITS.md`; the regulatory
 basis of every check is in `docs/REGULATIONS.md`; security and data handling in `docs/SECURITY.md`.
