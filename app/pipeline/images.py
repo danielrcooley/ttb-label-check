@@ -99,6 +99,12 @@ def decode_image(data: bytes, *, max_pixels: int, max_side: int, filename: str |
             # because scale is computed against the canonical size recorded above.
             im.draft("RGB", (max_side, max_side))
         im = ImageOps.exif_transpose(im) or im
+        if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+            # Artwork on a transparent background is composited on white first: dropping the alpha
+            # channel would leave the transparent pixels' own colour, often black, so black text on
+            # a transparent background became a black image (review 009)
+            rgba = im.convert("RGBA")
+            im = Image.alpha_composite(Image.new("RGBA", rgba.size, (255, 255, 255, 255)), rgba)
         im = im.convert("RGB")
     except ImageError:
         raise

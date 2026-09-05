@@ -35,9 +35,11 @@ def create_app(
 ) -> FastAPI:
     settings = settings or get_settings()
     make_engine = engine_factory or (lambda s: RapidEngine(s))
-    # Multipart parts larger than this are spooled to disk by Starlette. Keep every image (per-image cap)
-    # in memory so uploads never touch the filesystem; the request-size cap bounds total memory.
-    MultiPartParser.spool_max_size = settings.max_image_bytes + 1024 * 1024
+    # Multipart parts larger than this are spooled to disk by Starlette. The threshold sits above the
+    # whole-request cap (checked from Content-Length before the body is read), so no upload ever
+    # touches the filesystem, including one the route will refuse as over the per-image limit; the
+    # request cap bounds the memory per request (review 009).
+    MultiPartParser.spool_max_size = settings.max_request_bytes + 1024 * 1024
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

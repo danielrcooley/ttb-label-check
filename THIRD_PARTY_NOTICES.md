@@ -27,7 +27,6 @@ software and assets. Versions are pinned in `requirements.txt`; licenses were ch
 | uvicorn | BSD-3-Clause |
 | pydantic, pydantic-settings, pydantic-core | MIT |
 | python-multipart | Apache-2.0 |
-| jinja2 | BSD-3-Clause |
 | shapely | BSD-3-Clause |
 | pyclipper | MIT |
 | omegaconf | BSD-3-Clause |

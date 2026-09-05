@@ -298,11 +298,12 @@ export const EXPORT_HEAD = ["application_id", "brand_name", "class_type", "verdi
 
 /** One export row. elapsed_ms is the check's own time on the single screen and the time spent in the
  * batch (queue plus reads) on the batch screen. */
-export function exportRow({ application, key, result, status, error, decision, files, elapsedMs }) {
+export function exportRow({ application, key, result, status, error, decision, files, elapsedMs, missing }) {
   const st = (id) => result?.checks.find((c) => c.id === id)?.status || "";
   const w = result?.warning;
+  const look = [...(result ? issueTexts(result) : []), ...(missing || []).map((m) => `Listed image not uploaded: ${m}`)];
   return [application?.application_id || key || "", application?.brand_name || "", application?.class_type || "",
-    result?.verdict || (status === "done" ? "extract_only" : status) || "", result ? (issueTexts(result).join("; ") || "All checks match") : "", result?.summary || error || "",
+    result?.verdict || (status === "done" ? "extract_only" : status) || "", result ? (look.join("; ") || "All checks match") : look.join("; "), result?.summary || error || "",
     st("brand_name"), st("class_type"), st("alcohol_content"), st("net_contents"), st("bottler"), st("country_of_origin"),
     w ? w.present : "", w ? w.exact : "", w ? w.anchor_caps : "", decision?.decision || "", decision?.note || "",
     (files || []).map((f) => f.name).join(";"), elapsedMs ?? "", new Date().toISOString()];

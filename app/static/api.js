@@ -13,15 +13,18 @@ export class ApiError extends Error {
     this.hint = body.hint || "";
     this.requestId = body.request_id || "";
     this.retryAfter = retryAfter;
+    if (status >= 500 && this.requestId) this.hint = `${this.hint} Request id ${this.requestId}.`.trim(); // the 500 text asks for it
   }
 }
 
 async function parse(resp) {
   const text = await resp.text();
   let body = {};
-  try { body = text ? JSON.parse(text) : {}; } catch { body = { message: text.slice(0, 200) }; }
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { message: text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200) }; }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) body = {}; // "null" or a bare value is not an envelope
   if (!resp.ok) {
     const ra = resp.headers.get("Retry-After");
+    if (!body.message && typeof body.detail === "string") body.message = body.detail; // a framework error without our envelope
     throw new ApiError(resp.status, body, ra ? Number(ra) : null);
   }
   return body;

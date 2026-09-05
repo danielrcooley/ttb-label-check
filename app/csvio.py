@@ -16,6 +16,10 @@ from pydantic import ValidationError
 
 from app.schemas import ApplicationFields, BeverageType
 
+# A single cell may hold most of a 2 MB upload; the default limit (128 KB) would raise csv.Error
+# and answer 500 for a file the size guard accepted (review 009)
+csv.field_size_limit(8 * 1024 * 1024)
+
 _ALIASES: dict[str, str] = {
     "application_id": "application_id",
     "applicationid": "application_id",
@@ -191,7 +195,10 @@ def parse_csv(data: bytes, *, max_rows: int) -> CsvResult:
         for i, cell in enumerate(rec):
             key = mapping.get(i)
             if key and cell.strip():
-                fields[key] = cell.strip() if key not in fields else fields[key] + " " + cell.strip()
+                value = cell.strip()
+                if headers[i] == "proof" and re.fullmatch(r"\d{1,3}(?:[.,]\d)?", value):
+                    value = f"{value} proof"  # a bare number under a Proof header is a proof, not a percentage
+                fields[key] = value if key not in fields else fields[key] + " " + value
         errors: list[str] = []
         images = [s.strip() for s in re.split(r"[;|]", fields.pop("images", "")) if s.strip()]
         bev_raw = fields.pop("beverage_type", "")

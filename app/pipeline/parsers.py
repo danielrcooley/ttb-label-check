@@ -13,7 +13,7 @@ from app.schemas import BeverageType
 
 from .normalize import fold, fold_digits
 
-_NUM = r"(\d{1,3}(?:[.,]\d{1,3})?)"
+_NUM = r"(?<!\d)(\d{1,3}(?:[.,]\d{1,3})?)"  # never the tail of a longer number ("1045%" is not 45%)
 
 
 def _to_float(num: str) -> float:
@@ -52,7 +52,7 @@ _ABV_PATTERNS = [
     # 13.5% by volume
     re.compile(_NUM + r"\s*%\s*(?:alc\.?\s*)?by\s*vol", re.I),
 ]
-_PROOF = re.compile(r"(\d{2,3}(?:[.,]\d)?)\s*(?:°\s*)?proof", re.I)
+_PROOF = re.compile(r"(?<!\d)(\d{2,3}(?:[.,]\d)?)\s*(?:°\s*)?proof", re.I)
 _BARE = re.compile(r"^\s*" + _NUM + r"\s*%?\s*$")
 # "table wine", "light wine", and the registry's "table red wine" / "table white wine" (a colour word
 # between, or "red table wine"); not "light sparkling wine" or "table dessert wine", which are not the
@@ -130,7 +130,7 @@ _UNIT_ML: dict[str, float] = {
     "gallon": 3785.411784,
 }
 _NET = re.compile(
-    r"(\d{1,4}(?:[.,]\d{1,3})?)\s*"
+    r"(?<!\d)(\d{1,4}(?:[.,]\d{1,3})?)\s*"  # never the tail of a longer number ("17500 mL" is not 7500)
     r"(fl\.?\s*oz\.?|fluid\s*ounces?|ounces?|oz\.?|milliliters?|millilitres?|ml|"
     r"centiliters?|centilitres?|cl|liters?|litres?|ltr|l|pints?|pt\.?|quarts?|qt\.?|gallons?|gal\.?)"
     r"(?![a-z])",

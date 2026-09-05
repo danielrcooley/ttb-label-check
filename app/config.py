@@ -24,7 +24,10 @@ class Settings(BaseSettings):
     app_name: str = "Label Check (prototype)"
     agency_name: str | None = Field(default=None, description="Optional agency name for internal branding")
     git_sha: str = Field(default_factory=lambda: os.environ.get("GIT_SHA", "dev"))
-    trust_proxy: bool = Field(default=False, description="Trust the first X-Forwarded-For hop for client identity")
+    trust_proxy: bool = Field(
+        default=False,
+        description="Trust the last X-Forwarded-For value (the one the ingress appended) for client identity",
+    )
 
     # --- OCR engine
     ocr_workers: int = Field(default_factory=lambda: max(1, min(8, os.cpu_count() or 1)))

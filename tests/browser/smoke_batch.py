@@ -107,6 +107,26 @@ def main() -> int:
         ):
             problems.append("batch: Start over left something behind")
         print("batch: Start over clears images, spreadsheet and results")
+
+        # Files that are not images are named, not silently dropped (review 009)
+        page.set_input_files(
+            "#batch-files",
+            [
+                {"name": "notes.txt", "mimeType": "text/plain", "buffer": b"not an image"},
+                {"name": "empty.png", "mimeType": "image/png", "buffer": b""},
+            ],
+        )
+        count_text = page.inner_text("#batch-image-count")
+        if "notes.txt" not in count_text or "empty.png" not in count_text:
+            problems.append(f"batch: skipped files are not named: {count_text!r}")
+        print("batch: skipped files are named:", count_text[:120])
+
+        # The skip link is an in-page anchor, not a navigation: the Batch view stays (review 009)
+        page.evaluate("location.hash = '#main-content'")
+        page.wait_for_timeout(200)
+        if page.is_hidden("#view-batch"):
+            problems.append("batch: the skip-to-content link switched the view")
+        print("batch: skip link keeps the view")
         browser.close()
 
     print("\nPROBLEMS:" if problems else "\nno problems detected")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import cast
 
@@ -152,10 +153,16 @@ async def compare_route(
 
     if len(body.items) > settings.max_compare_items:
         raise HTTPException(status_code=422, detail=f"At most {settings.max_compare_items} items per compare call.")
-    results = [
-        CompareResponseItem(
-            item_id=item.item_id, **compare(item.application, item.lines, item.images, settings).model_dump()
-        )
-        for item in body.items
-    ]
+
+    def _run() -> list[CompareResponseItem]:
+        return [
+            CompareResponseItem(
+                item_id=item.item_id, **compare(item.application, item.lines, item.images, settings).model_dump()
+            )
+            for item in body.items
+        ]
+
+    # Pure CPU (fuzzy matching over up to 100 applications): a worker thread keeps the event loop,
+    # and with it /health and the other requests, responsive (review 009)
+    results = await asyncio.to_thread(_run)
     return CompareResponse(request_id=request_id_of(request), results=results)

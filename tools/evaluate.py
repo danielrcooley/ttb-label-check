@@ -94,10 +94,11 @@ async def run(labels: Path, workers: int) -> dict:
                     "variant": variant,
                     "files": files,
                     "ms": ms,
-                    "verdict": res.verdict,
+                    "verdict": res.verdict.value,
                     "checks": {c.id: c.status for c in res.checks},
                     "warning_exact": res.warning.exact,
                     "warning_present": res.warning.present,
+                    "warning_assessment": res.warning.assessment,
                     "type_weight": str(res.warning.anchor_bold),  # match / needs_review (D-047)
                     "type_weight_reading": res.warning.type_weight_reading or "",
                     "type_weight_basis": res.warning.type_weight_basis or "",
@@ -178,10 +179,15 @@ def summarize(data: dict) -> tuple[str, dict]:
                     else f"| {f} | - | - | - | - |"
                 )
             wex = sum(1 for c in cases if c["warning_exact"])
-            out.append(
-                f"| warning exact | {wex} | {sum(1 for c in cases if c['warning_present'] and not c['warning_exact'])} | "
-                f"{sum(1 for c in cases if not c['warning_present'])} | {100 * wex / len(cases):.0f}% |"
+            noise = sum(
+                1
+                for c in cases
+                if c["warning_present"] and not c["warning_exact"] and c.get("warning_assessment") != "wording"
             )
+            wording_or_absent = sum(
+                1 for c in cases if not c["warning_present"] or c.get("warning_assessment") == "wording"
+            )
+            out.append(f"| warning exact | {wex} | {noise} | {wording_or_absent} | {100 * wex / len(cases):.0f}% |")
             verdicts = Counter(c["verdict"] for c in cases)
             out += ["", f"- Verdicts: {dict(verdicts)}", _type_weight_line(cases)]
             if tier == "artwork":

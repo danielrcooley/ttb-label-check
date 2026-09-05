@@ -104,7 +104,11 @@ def _origin_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
         origin_lines = [ln for ln in lines if _ORIGIN_PREFIX.match(ln.text)]
         named = [(ln, country_named(_ORIGIN_PREFIX.sub("", ln.text))) for ln in origin_lines]
         same = next((ln for ln, c in named if c and c == want), None)
-        other = next(((ln, c) for ln, c in named if c and c != want), None)
+        # A Mismatch needs a country NAMED on the line. A U.S. state or a state code ("Napa, CA")
+        # counts as the United States for a match against a domestic application, not as evidence
+        # against an import: a wine bottled in California can still be a product of Italy (review 009)
+        strict = [(ln, country_named(_ORIGIN_PREFIX.sub("", ln.text), states=False)) for ln in origin_lines]
+        other = next(((ln, c) for ln, c in strict if c and c != want), None)
         if same is not None:
             check.status = Status.match
             check.found = same.text
@@ -262,6 +266,7 @@ def bottler_check(expected: str, lines: list[OcrLine], s: Settings) -> Check:
 def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) -> Check:
     required, why = alcohol_statement_required(app.beverage_type, app.class_type)
     expected = parse_alcohol(app.alcohol_content, allow_bare=True) if app.alcohol_content else None
+    given_but_unreadable = bool(app.alcohol_content and app.alcohol_content.strip()) and expected is None
     # Parse every line. Explicit percent statements are compared with each other and proofs with each
     # other (a label may not contradict itself). A proof on its own line ("(90 Proof)") is the second
     # half of a wrapped statement: it is joined to the percent, not treated as a competing percent.
@@ -291,6 +296,24 @@ def _alcohol_check(app: ApplicationFields, lines: list[OcrLine], s: Settings) ->
         "evidence": ev,
         "rule": "27 CFR 5.65 / 4.36 / 7.65",
     }
+    if given_but_unreadable:
+        # A value the application gives but the tool cannot read as a percentage or a proof is not
+        # "no value": it must never pass as Info on its way to Ready (review 009)
+        stated = f"; the label states {found.percent:g}%" if found and found.percent is not None else ""
+        return Check(
+            status=Status.needs_review,
+            note=f"The application's alcohol content ('{app.alcohol_content}') could not be read as a "
+            f"percentage or a proof{stated}. Compare it with the label by eye. " + why,
+            **base,
+        )
+    if expected is None and len(distinct) > 1:
+        stated = ", ".join(f"{v:g}%" for v in distinct)
+        return Check(
+            status=Status.needs_review,
+            note=f"The application gives no alcohol content and the label images state different values "
+            f"({stated}). Confirm which is right. " + why,
+            **base,
+        )
     if expected is None:
         if found is None:
             if required:  # nothing read is a heuristic miss, not a proven defect (D-041)

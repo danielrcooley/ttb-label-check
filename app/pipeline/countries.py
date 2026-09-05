@@ -71,21 +71,23 @@ _STATE_NAMES = sorted((name for name in _STATES.values() if name != "georgia"), 
 _STATE_CODE = re.compile(r"(?:,|\b)\s*(" + "|".join(sorted(_STATES)) + r")(?:\s+\d{5}(?:-\d{4})?)?\s*\.?$")
 
 
-def country_named(text: str) -> str | None:
-    """The country a piece of label or application text names, or None. United States forms and
-    U.S. state names (and a trailing state code such as ", CA") count as the United States."""
+def country_named(text: str, *, states: bool = True) -> str | None:
+    """The country a piece of label or application text names, or None. United States forms and,
+    unless ``states`` is False, U.S. state names (and a trailing state code such as ", CA") count as
+    the United States."""
     f, k = fold(text), key(text)  # fold keeps punctuation (the comma test); key keeps letters and digits only
     if not k:
         return None
     if re.search(r"republic of georgia(?![a-z])", k):
         return "Georgia"
-    if re.search(r",\s*georgia(?![a-z])", f):  # an address: "Atlanta, Georgia"
+    if states and re.search(r",\s*georgia(?![a-z])", f):  # an address: "Atlanta, Georgia"
         return "United States"
-    for state in _STATE_NAMES:
-        if re.search(rf"(?<![a-z]){state}(?![a-z])", k):
+    if states:
+        for state in _STATE_NAMES:
+            if re.search(rf"(?<![a-z]){state}(?![a-z])", k):
+                return "United States"
+        if _STATE_CODE.search(text.strip()):
             return "United States"
-    if _STATE_CODE.search(text.strip()):
-        return "United States"
     for name in _ORDER:
         if re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", k):
             return _BY_FOLD[name]

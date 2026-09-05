@@ -7,7 +7,8 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = /^image\/(png|jpeg|gif|webp|tiff|bmp)$/;
 
 const $ = (sel) => document.querySelector(sel);
-const state = { files: [], result: null, overlays: new Map(), activeId: null, samples: null, app: null, decision: null, elapsedMs: 0 };
+const state = { files: [], result: null, overlays: new Map(), activeId: null, samples: null, app: null, decision: null, elapsedMs: 0, run: 0 };
+const scrollBehavior = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
 
 // ------------------------------------------------------------------ icons (sprite inlined once)
 async function loadSprite() {
@@ -28,8 +29,14 @@ function showView(name) {
     if (a.dataset.view === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
 }
+const VIEWS = ["check", "batch", "about", "accessibility"];
 function routeFromHash(moveFocus = false) {
-  const name = ["check", "batch", "about", "accessibility"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "check";
+  const hash = location.hash.slice(1);
+  if (hash && !VIEWS.includes(hash)) { // an in-page anchor (the skip link's #main-content) is not a navigation: the view stays
+    if (!moveFocus) showView("check");
+    return;
+  }
+  const name = hash || "check";
   showView(name);
   if (moveFocus) { // a navigation: put the keyboard and the screen reader at the top of the new page
     const h = document.querySelector(`[data-view-panel="${name}"] h1`);
@@ -147,15 +154,24 @@ async function loadSamples() {
   try { state.samples = await (await fetch("/static/samples/samples.json")).json(); } catch { state.samples = []; }
 }
 async function useSample(id) {
+  if (!state.samples) await loadSamples(); // the click came before the sample list arrived
   const s = (state.samples || []).find((x) => x.id === id);
-  if (!s) return;
+  if (!s) { showFormError("The sample could not be loaded.", "Reload the page and try again."); return; }
   $("#sample-blurb").textContent = s.blurb;
   fillApplication(s.application);
   setStatus("Loading sample images…", true);
   const files = [];
-  for (const name of s.images) {
-    const blob = await (await fetch(`/static/samples/${name}`)).blob();
-    files.push(new File([blob], name, { type: blob.type || "image/png" }));
+  try {
+    for (const name of s.images) {
+      const resp = await fetch(`/static/samples/${name}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      files.push(new File([blob], name, { type: blob.type || "image/png" }));
+    }
+  } catch {
+    setStatus("");
+    showFormError("The sample images could not be loaded.", "Check your connection and try again.");
+    return;
   }
   state.files = files;
   renderFileList();
@@ -171,7 +187,7 @@ function selectCheck(check) {
   const ev = check.evidence && check.evidence[0];
   if (ev) {
     const fig = $("#figures").children[ev.image_index];
-    fig?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" });
+    fig?.scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
   }
 }
 
@@ -180,35 +196,43 @@ async function runCheck() {
   const missing = validate(app);
   if (missing.length) { showFormError(`Please add ${missing.join(", ")}.`); return; }
   showFormError("");
-  // A new check starts clean: the previous result, decision and export must not outlive it (review 007)
+  // A new check starts clean: the previous result, decision and export must not outlive it (review 007).
+  // The files are snapshotted now, so the result describes the images that were sent even if the list
+  // is edited while the request is in flight; a run superseded by Start over or another check is dropped (review 009)
+  const files = [...state.files];
+  const run = ++state.run;
   state.result = null; state.app = null; state.decision = null; state.checkedFiles = [];
   $("#results").hidden = true;
   const btn = $("#check-btn");
   btn.disabled = true;
-  setStatus(`Reading ${state.files.length} image${state.files.length === 1 ? "" : "s"}…`, true);
+  setStatus(`Reading ${files.length} image${files.length === 1 ? "" : "s"}…`, true);
   const t0 = performance.now();
   try {
-    const result = await verify(state.files, app);
+    const result = await verify(files, app);
+    const wallMs = performance.now() - t0; // the request only: the crops and the rendering below are not "sending and receiving"
+    if (run !== state.run) return; // superseded while in flight: nothing of it is shown
     state.result = result;
     state.app = app;
-    state.checkedFiles = [...state.files]; // the export names the files that were checked, not the list as edited later
+    state.checkedFiles = files; // the export names the files that were checked, not the list as edited later
     state.decision = null;
     state.activeId = null;
-    const crops = await makeCrops(state.files, result.images, result.checks);
+    const crops = await makeCrops(files, result.images, result.checks);
+    if (run !== state.run) return;
     renderVerdict($("#verdict"), result);
     renderChecklist($("#checklist"), result.checks, selectCheck, crops);
     renderWarning($("#warning-report"), result.warning, selectCheck);
-    state.overlays = renderFigures($("#figures"), result.images, state.files, result.lines);
+    state.overlays = renderFigures($("#figures"), result.images, files, result.lines);
     drawOverlays(state.overlays, result.checks, result.warning, null);
     renderOcrLines($("#ocr-lines"), result.lines);
-    state.elapsedMs = Math.round(performance.now() - t0);
+    state.elapsedMs = Math.round(wallMs);
     renderDecision();
     const results = $("#results");
     results.hidden = false;
     results.focus({ preventScroll: false });
-    results.scrollIntoView({ behavior: "smooth", block: "start" });
-    setStatus(doneText(performance.now() - t0, result.timing?.total_ms));
+    results.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+    setStatus(doneText(wallMs, result.timing?.total_ms));
   } catch (err) {
+    if (run !== state.run) return;
     if (err instanceof ApiError) {
       const extra = err.status === 429 ? " The service is busy; try again in a moment." : "";
       showFormError(err.message + extra, err.hint);
@@ -217,7 +241,7 @@ async function runCheck() {
     }
     setStatus("");
   } finally {
-    btn.disabled = false;
+    if (run === state.run) btn.disabled = false;
   }
 }
 
@@ -242,6 +266,8 @@ function updateStartOver() { $("#start-over").hidden = !hasInput(); }
  * result is on screen, because nothing is stored anywhere else. */
 function startOver() {
   if (state.result && !window.confirm("Clear the images, the application fields and the result? Export first if you need them.")) return;
+  state.run++; // a check still in flight must not bring its result back onto the cleared screen
+  $("#check-btn").disabled = false;
   state.files = []; state.result = null; state.app = null; state.decision = null; state.checkedFiles = []; state.activeId = null; state.overlays = new Map();
   const form = $("#check-form");
   form.reset();
@@ -265,7 +291,15 @@ function renderDecision(previous = null) {
   box.replaceChildren(
     el("h3", { class: "margin-top-0", text: "Your decision" }),
     el("p", { class: "usa-hint", text: "Goes into the export and the printout only; nothing is stored on the server." }),
-    decisionControls(() => state.decision || {}, (next) => { const before = state.decision || {}; state.decision = next; renderDecision(before); }, "Note for this application"),
+    decisionControls(() => state.decision || {}, (next) => {
+      const before = state.decision || {};
+      state.decision = next;
+      if ((before.decision || null) === (next.decision || null)) { // a note alone: no rebuild, so a click that took the focus away (Export) is not lost
+        box.querySelector(".print-only").textContent = decisionSummary(next);
+        return;
+      }
+      renderDecision(before);
+    }, "Note for this application"),
     el("p", { class: "print-only", text: decisionSummary(state.decision) }),
     el("div", { class: "decision-actions" }, [
       el("button", { type: "button", class: "usa-button usa-button--outline", text: "Export result (CSV)", onclick: exportSingle }),
@@ -302,7 +336,16 @@ async function boot() {
   try {
     const h = await health();
     $("#build-info").textContent = `Build ${h.git_sha} · engine ${h.engine.name} · ${h.max_concurrency} worker${h.max_concurrency === 1 ? "" : "s"}.`;
-    if (!h.ready) setStatus("The text-recognition engine is starting up…", true);
+    if (!h.ready) {
+      const starting = "The text-recognition engine is starting up…";
+      setStatus(starting, true);
+      const poll = setInterval(async () => { // until it is warm; the message clears itself
+        try {
+          const again = await health();
+          if (again.ready) { clearInterval(poll); if ($("#status").textContent === starting) setStatus("Ready. Start with the label images."); }
+        } catch { /* keep polling */ }
+      }, 2000);
+    }
   } catch { /* footer stays generic */ }
 }
 

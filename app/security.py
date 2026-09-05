@@ -8,9 +8,10 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -223,8 +224,8 @@ def install_error_handlers(app: FastAPI) -> None:
             headers={"Retry-After": str(exc.retry_after)},
         )
 
-    @app.exception_handler(HTTPException)
-    async def _http(request: Request, exc: HTTPException) -> JSONResponse:
+    @app.exception_handler(StarletteHTTPException)  # FastAPI's HTTPException is a subclass; framework errors
+    async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:  # (a bad multipart body) count too
         detail = exc.detail if isinstance(exc.detail, str) else "error"
         messages = {
             "not_ready": ("The OCR engine is still starting.", "Retry in a few seconds."),

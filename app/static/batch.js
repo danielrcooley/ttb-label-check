@@ -28,6 +28,8 @@ const state = {
 const norm = (name) => name.split(/[\\/]/).pop().toLowerCase();          // basename, lower-cased
 const stem = (name) => norm(name).replace(/\.[a-z0-9]+$/, "");
 const fileKey = (f) => (f.webkitRelativePath || f.name).toLowerCase();  // folder-aware identity
+const cacheKey = (f) => `${fileKey(f)}|${f.size}|${f.lastModified}`;   // OCR cache identity: a replaced file with the same name is read again
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|tiff?|bmp)$/i;
 function setStatus(text, busy = false) { const s = $("#batch-status"); s.textContent = text; s.classList.toggle("is-busy", busy); }
 function showError(msg) { const box = $("#batch-error"); box.querySelector("p").textContent = msg; box.hidden = !msg; }
 function seconds(ms) { return `${(ms / 1000).toFixed(1)} s`; }
@@ -36,9 +38,11 @@ function percentile(arr, p) { if (!arr.length) return 0; const s = [...arr].sort
 // ------------------------------------------------------------------ intake
 function addImages(files) {
   let added = 0;
+  const skipped = { type: [], size: [], empty: [] };
   for (const f of files) {
-    if (f.type && !ACCEPT.test(f.type)) continue;
-    if (f.size === 0 || f.size > 10 * 1024 * 1024) continue;
+    if ((f.type && !ACCEPT.test(f.type)) || (!f.type && !IMAGE_EXT.test(f.name))) { skipped.type.push(f.name); continue; }
+    if (f.size === 0) { skipped.empty.push(f.name); continue; }
+    if (f.size > 10 * 1024 * 1024) { skipped.size.push(f.name); continue; }
     const key = fileKey(f);
     if (!state.images.has(key)) { state.images.set(key, f); added++; }
   }
@@ -48,6 +52,10 @@ function addImages(files) {
   const dupes = [...byName.entries()].filter(([, n]) => n > 1);
   let msg = `${state.images.size} image${state.images.size === 1 ? "" : "s"} ready${added ? ` (${added} added)` : ""}.`;
   if (dupes.length) msg += ` ${dupes.length} file name${dupes.length === 1 ? "" : "s"} appear${dupes.length === 1 ? "s" : ""} in more than one folder (${dupes.slice(0, 3).map(([n]) => n).join(", ")}${dupes.length > 3 ? ", …" : ""}); those are kept apart and cannot be paired by name alone.`;
+  const few = (names) => names.slice(0, 3).join(", ") + (names.length > 3 ? ", …" : "");
+  if (skipped.type.length) msg += ` Not added, not an image (PNG, JPEG, GIF, WebP, TIFF, BMP): ${few(skipped.type)}.`;
+  if (skipped.size.length) msg += ` Not added, over the 10 MB limit: ${few(skipped.size)}.`;
+  if (skipped.empty.length) msg += ` Not added, empty file: ${few(skipped.empty)}.`;
   $("#batch-image-count").textContent = msg;
   updateStartButton();
 }
@@ -58,8 +66,11 @@ async function setCsv(file) {
   const box = $("#batch-csv-summary");
   try {
     const resp = await fetch("/api/v1/csv/parse", { method: "POST", body: fd });
-    const body = await resp.json();
-    if (!resp.ok) throw new ApiError(resp.status, body);
+    const text = await resp.text();
+    let body = {};
+    try { body = JSON.parse(text); } catch { body = { message: "The service could not read the spreadsheet." }; }
+    if (!body || typeof body !== "object") body = {};
+    if (!resp.ok) { if (!body.message && typeof body.detail === "string") body.message = body.detail; throw new ApiError(resp.status, body); }
     state.csv = body;
     state.inputVersion++;
     const bad = body.rows.filter((r) => r.errors.length);
@@ -70,19 +81,21 @@ async function setCsv(file) {
       el("p", { class: `text-bold margin-0${none || empty ? " text-secondary-dark" : ""}`,
         text: empty ? `${file.name}: no data rows under the header.` : none ? `${file.name}: ${count}, none usable (every row has a problem).` : `${file.name}: ${count}${bad.length ? `, ${bad.length} with problems` : ""}.` }),
       body.warnings.length ? el("ul", { class: "usa-list usa-list--unstyled text-secondary-dark" }, body.warnings.map((w) => el("li", { text: w }))) : null,
+      body.unmapped_columns?.length ? el("p", { class: "usa-hint margin-0", text: `Columns not used: ${body.unmapped_columns.join(", ")}.` }) : null,
       bad.length ? el("details", none ? { open: "" } : {}, [el("summary", { text: "Rows with problems (they will be skipped)" }),
         el("ul", { class: "usa-list" }, bad.slice(0, 20).map((r) => el("li", { text: `Row ${r.row_number}: ${r.errors.join("; ")}` })))]) : null,
     ].filter(Boolean));
   } catch (e) {
     state.csv = null;
     state.inputVersion++; // a failed replacement still changes the inputs: items must be rebuilt
-    box.replaceChildren(el("p", { class: "text-secondary-dark text-bold", text: e.message || "Could not read the CSV." }));
+    box.replaceChildren(el("p", { class: "text-secondary-dark text-bold", text: `${e.message || "Could not read the CSV."}${e.hint ? " " + e.hint : ""}` }));
   }
   updateStartButton();
 }
 
 function updateStartButton() {
   $("#batch-start").disabled = state.running || state.images.size === 0;
+  $("#batch-demo").disabled = state.running;
   $("#batch-clear-images").hidden = state.images.size === 0;
   $("#batch-clear-csv").hidden = !state.csv;
   $("#batch-reset").hidden = !(state.images.size || state.csv || state.items.length);
@@ -90,7 +103,7 @@ function updateStartButton() {
 
 // ------------------------------------------------------------------ clearing
 function clearImages() {
-  state.images = new Map(); state.inputVersion++;
+  state.images = new Map(); state.extractions = new Map(); state.inputVersion++; // the OCR cache goes with the images
   $("#batch-image-count").textContent = "";
   updateStartButton();
 }
@@ -127,11 +140,14 @@ function buildItems() {
   }
   const files = new Map(state.images);       // copy; we remove as we attach
   const items = [];
+  const seen = new Set();
   if (state.csv) {
     for (const row of state.csv.rows) {
       if (!row.application) continue;
       const app = row.application;
-      const key = app.application_id || `row-${row.row_number}`;
+      const base = app.application_id || `row-${row.row_number}`;
+      const key = seen.has(base) ? `${base} (row ${row.row_number})` : base; // two rows with one reference stay two applications
+      seen.add(key);
       const slash = (s) => s.toLowerCase().replace(/\\/g, "/");
       const byName = (n) => [...files.keys()].filter((k) => norm(k) === norm(n));
       // A relative path in the CSV ("folder-a/back.png") matches the file's path (which may start with
@@ -181,7 +197,7 @@ function releaseSlot() {
 }
 
 async function extractOne(file, signal) {
-  const key = fileKey(file);
+  const key = cacheKey(file);
   if (state.extractions.has(key)) return state.extractions.get(key);
   let delay = 0;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -213,7 +229,7 @@ async function extractOne(file, signal) {
 function linesForItem(item) {
   const lines = [], images = [];
   item.files.forEach((f, idx) => {
-    const ex = state.extractions.get(fileKey(f));
+    const ex = state.extractions.get(cacheKey(f));
     if (!ex) return;
     for (const im of ex.images) images.push({ ...im, index: idx });
     for (const ln of ex.lines) lines.push({ ...ln, image_index: idx });
@@ -229,11 +245,13 @@ async function processItem(item, signal) {
     const { lines, images } = linesForItem(item);
     if (item.application) {
       const resp = await compare([{ item_id: item.key, application: item.application, lines, images }], { signal });
-      item.result = resp.results[0];
+      const res = resp?.results?.[0];
+      if (!res || !res.verdict) throw new ApiError(502, { message: "The comparison came back empty.", hint: "Resume to try again." });
+      item.result = res;
       item.lines = lines;
       item.images = images;
     } else {
-      const ex = state.extractions.get(fileKey(item.files[0]));
+      const ex = state.extractions.get(cacheKey(item.files[0]));
       item.result = null;
       item.fields = ex.fields;
       item.lines = lines;
@@ -272,6 +290,8 @@ async function runPool(items, signal) {
 }
 
 async function start() {
+  if (state.running || state.starting) return; // one run at a time: a double click or the demo button during a run must not start a second pool (review 009)
+  state.starting = true;
   showError("");
   if (!state.items.length || state.builtVersion !== state.inputVersion || state.items.every((i) => i.status === "done")) buildItems();
   const pending = state.items.filter((i) => i.status === "pending" || i.status === "error");
@@ -282,11 +302,17 @@ async function start() {
     } else {
       showError("Add images first.");
     }
+    state.starting = false;
     return;
   }
-  try { const h = await health(); state.maxConcurrency = Math.max(1, Math.min(4, h.max_concurrency)); } catch { state.maxConcurrency = 2; }
+  try {
+    const h = await health();
+    const mc = Number(h?.max_concurrency);
+    state.maxConcurrency = Number.isFinite(mc) && mc >= 1 ? Math.min(4, Math.floor(mc)) : 2; // an unexpected health body must not hang the pool
+  } catch { state.maxConcurrency = 2; }
   state.concurrency = state.maxConcurrency;
   state.running = true;
+  state.starting = false;
   state.abort = new AbortController();
   state.startedAt = state.startedAt || performance.now();
   $("#batch-start").hidden = true;
@@ -334,7 +360,7 @@ function renderProgress() {
   const elapsed = performance.now() - state.startedAt;
   const avgItem = finished ? elapsed / finished : 0;
   const remaining = workable - finished;
-  const eta = state.running && finished ? ` · about ${seconds(avgItem * remaining / Math.max(1, state.concurrency))} left` : "";
+  const eta = state.running && finished ? ` · about ${seconds(avgItem * remaining)} left` : ""; // elapsed per finished item already reflects the concurrency
   $("#batch-progress .progress__text").textContent = `${finished} of ${workable} applications checked (${pct}%)${eta}`;
   setStatus(state.running ? `Reading images, ${state.concurrency} at a time…` : finished ? `Done. ${finished} checked in ${seconds(elapsed)}.` : "", state.running);
   renderSummary();
@@ -377,6 +403,7 @@ function decisionCell(item) {
       const before = state.decisions.get(item.key)?.decision || null;
       const focused = document.activeElement?.dataset?.decision || null; // the table is rebuilt: keep the focus
       state.decisions.set(item.key, next);
+      if ((next.decision || null) === before) { renderSummary(); return; } // a note alone: no rebuild, so a click that took the focus away (Export) is not lost
       renderTable();
       renderSummary();
       if (focused) $("#batch-table")?.querySelector(`[data-item="${CSS.escape(item.key)}"] [data-decision="${focused}"]`)?.focus();
@@ -391,6 +418,10 @@ function decisionCell(item) {
 }
 
 function renderTable() {
+  // A note being typed lives only in its input until it is committed: carry it across the rebuild
+  const active = document.activeElement;
+  const typing = active?.classList?.contains("note-input") && $("#batch-table")?.contains(active)
+    ? { item: active.closest("[data-item]")?.dataset.item, value: active.value, pos: active.selectionStart } : null;
   const items = visibleItems();
   const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   state.page = Math.min(state.page, pages - 1);
@@ -415,7 +446,8 @@ function renderTable() {
           el("li", { text: `Warning: ${it.fields.warning_present ? "present" : "not found"}` })]) : null)),
       el("td", {}, it.status === "done" && it.application ? decisionCell(it) : null),
       el("td", {}, it.status === "done" ? el("button", { type: "button", class: "usa-button usa-button--unstyled", text: state.expanded === it.key ? "Hide" : "Details",
-        "aria-expanded": state.expanded === it.key ? "true" : "false", onclick: () => { state.expanded = state.expanded === it.key ? null : it.key; renderTable(); } }) : null),
+        "aria-expanded": state.expanded === it.key ? "true" : "false", "data-details": it.key,
+        onclick: () => { state.expanded = state.expanded === it.key ? null : it.key; renderTable(); $("#batch-table")?.querySelector(`[data-details="${CSS.escape(it.key)}"]`)?.focus(); } }) : null),
     ]);
     rows.push(tr);
     if (state.expanded === it.key && it.status === "done") {
@@ -432,6 +464,10 @@ function renderTable() {
     el("thead", {}, el("tr", {}, ["Result", "Application", "Images", "What to look at", "Your decision", ""].map((h) => el("th", { scope: "col", text: h })))),
     el("tbody", {}, rows.length ? rows : el("tr", {}, el("td", { colspan: "6", text: "Nothing to show for this filter." }))),
   ]));
+  if (typing?.item != null) {
+    const again = $("#batch-table").querySelector(`[data-item="${CSS.escape(typing.item)}"] .note-input`);
+    if (again) { again.value = typing.value; again.focus(); try { again.setSelectionRange(typing.pos, typing.pos); } catch { /* not all inputs allow it */ } }
+  }
   $("#pager-text").textContent = `Page ${state.page + 1} of ${pages} · ${items.length} application${items.length === 1 ? "" : "s"}`;
   $("#pager-prev").disabled = state.page === 0;
   $("#pager-next").disabled = state.page >= pages - 1;
@@ -470,7 +506,9 @@ function renderUnpaired() {
     sel.addEventListener("change", async () => {
       const it = state.items.find((i) => i.key === sel.value);
       if (!it) return;
-      it.files.push(f); it.method = "assigned by agent"; it.status = "pending"; state.detailCache.delete(it.key);
+      it.files.push(f); it.method = "assigned by agent"; it.status = "pending"; it.result = null; it.error = null;
+      state.detailCache.delete(it.key);
+      if (state.decisions.delete(it.key)) $("#batch-live").textContent = `${it.key}: image added, checking again; the decision was cleared.`; // it was made on other images
       state.unpaired = state.unpaired.filter((n) => n !== name);
       renderUnpaired();
       const ac = new AbortController();
@@ -485,7 +523,7 @@ function renderUnpaired() {
 function exportCsv() {
   const rows = state.items.map((it) => exportRow({
     application: it.application || (it.fields?.largest_text ? { brand_name: it.fields.largest_text } : null),
-    key: it.key, result: it.result, status: it.status, error: it.error,
+    key: it.key, result: it.result, status: it.status, error: it.error, missing: it.missing,
     decision: state.decisions.get(it.key), files: it.files, elapsedMs: it.ms,
   }));
   downloadCsv(`label-check-batch-${exportStamp()}.csv`, rows);
@@ -493,14 +531,28 @@ function exportCsv() {
 
 // ------------------------------------------------------------------ demo batch
 async function loadDemo() {
+  if (state.running || state.starting) return;
   setStatus("Loading demo batch…", true);
   const names = ["APP-001_front.png", "APP-001_back.png", "APP-002_front.png", "APP-002_back.png", "APP-003_front.png", "APP-003_back.png",
     "APP-005_front.png", "APP-005_back.png", "APP-007_front.png", "APP-007_back.png"];
   const files = [];
-  for (const n of names) { const b = await (await fetch(`/static/samples/batch/${n}`)).blob(); files.push(new File([b], n, { type: "image/png" })); }
+  let csvBlob;
+  try {
+    for (const n of names) {
+      const resp = await fetch(`/static/samples/batch/${n}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      files.push(new File([await resp.blob()], n, { type: "image/png" }));
+    }
+    const csvResp = await fetch("/static/samples/batch/applications.csv");
+    if (!csvResp.ok) throw new Error(`HTTP ${csvResp.status}`);
+    csvBlob = await csvResp.blob();
+  } catch {
+    setStatus("");
+    showError("The demo batch could not be loaded. Check your connection and try again.");
+    return;
+  }
   state.images = new Map(); state.items = []; state.extractions = new Map(); state.decisions = new Map(); state.times = []; state.startedAt = 0;
   addImages(files);
-  const csvBlob = await (await fetch("/static/samples/batch/applications.csv")).blob();
   await setCsv(new File([csvBlob], "applications.csv", { type: "text/csv" }));
   setStatus("");
   await start();

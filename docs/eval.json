@@ -2,8 +2,8 @@
  "summary": {
   "artwork": {
    "cases": 10,
-   "p50_ms": 2457.5,
-   "p95_ms": 2955,
+   "p50_ms": 2448.5,
+   "p95_ms": 2783,
    "rates": {
     "brand_name": 1.0,
     "class_type": 1.0,
@@ -16,8 +16,8 @@
   "false_alarm_rate": 0.0,
   "degraded": {
    "cases": 20,
-   "p50_ms": 2343.5,
-   "p95_ms": 6141,
+   "p50_ms": 2295.0,
+   "p95_ms": 6289,
    "rates": {
     "brand_name": 0.95,
     "class_type": 1.0,
@@ -29,8 +29,8 @@
   },
   "problem": {
    "cases": 6,
-   "p50_ms": 2446.5,
-   "p95_ms": 3671
+   "p50_ms": 2447.0,
+   "p95_ms": 3518
   },
   "problem_detection": 1.0
  },
@@ -43,7 +43,7 @@
      "APP-001_front_clean.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2955,
+    "ms": 2783,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -55,6 +55,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -69,7 +70,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_clean.png"
     ],
-    "ms": 2411,
+    "ms": 2449,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -81,6 +82,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -95,7 +97,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_clean.png"
     ],
-    "ms": 2439,
+    "ms": 2574,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -107,6 +109,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -121,7 +124,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_clean.png"
     ],
-    "ms": 2615,
+    "ms": 2347,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -133,6 +136,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -147,7 +151,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_clean.png"
     ],
-    "ms": 2750,
+    "ms": 2611,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -159,6 +163,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -173,7 +178,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_clean.png"
     ],
-    "ms": 2460,
+    "ms": 2417,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -185,6 +190,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -199,7 +205,7 @@
      "APP-007_front_clean.png",
      "APP-007_back_clean.png"
     ],
-    "ms": 2594,
+    "ms": 2593,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -211,6 +217,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -225,7 +232,7 @@
      "APP-008_front_clean.png",
      "APP-008_back_clean.png"
     ],
-    "ms": 2388,
+    "ms": 2281,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -237,6 +244,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -251,7 +259,7 @@
      "APP-009_front_clean.png",
      "APP-009_back_clean.png"
     ],
-    "ms": 2455,
+    "ms": 2448,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -263,6 +271,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -277,7 +286,7 @@
      "APP-010_front_clean.png",
      "APP-010_back_clean.png"
     ],
-    "ms": 2288,
+    "ms": 2185,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -289,6 +298,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -305,7 +315,7 @@
      "APP-001_front_rotate7.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2469,
+    "ms": 2521,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "needs_review",
@@ -317,6 +327,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -331,7 +342,7 @@
      "APP-001_front_clean.png",
      "APP-001_back_blur.png"
     ],
-    "ms": 2453,
+    "ms": 2451,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -343,6 +354,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "needs_review",
     "type_weight_reading": "inconclusive",
     "type_weight_basis": "the rest of its line (gap)",
@@ -357,7 +369,7 @@
      "APP-002_front_glare.png",
      "APP-002_back_clean.png"
     ],
-    "ms": 2188,
+    "ms": 2133,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -369,6 +381,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -383,7 +396,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_lowcontrast.png"
     ],
-    "ms": 2539,
+    "ms": 2392,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -395,6 +408,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -409,7 +423,7 @@
      "APP-003_front_perspective.png",
      "APP-003_back_clean.png"
     ],
-    "ms": 2205,
+    "ms": 2129,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -421,6 +435,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -435,7 +450,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_small.png"
     ],
-    "ms": 2142,
+    "ms": 2115,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -447,6 +462,7 @@
     },
     "warning_exact": false,
     "warning_present": true,
+    "warning_assessment": "wording",
     "type_weight": "needs_review",
     "type_weight_reading": "not_measured",
     "type_weight_basis": "too small",
@@ -461,7 +477,7 @@
      "APP-004_front_jpeg.png",
      "APP-004_back_clean.png"
     ],
-    "ms": 2210,
+    "ms": 2125,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -473,6 +489,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -487,7 +504,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_rotate90.png"
     ],
-    "ms": 6632,
+    "ms": 6375,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -499,6 +516,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -513,7 +531,7 @@
      "APP-005_front_rotate7.png",
      "APP-005_back_clean.png"
     ],
-    "ms": 2517,
+    "ms": 2639,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -525,6 +543,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -539,7 +558,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_blur.png"
     ],
-    "ms": 2730,
+    "ms": 2572,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -551,6 +570,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "needs_review",
     "type_weight_reading": "inconclusive",
     "type_weight_basis": "the rest of its line (gap)",
@@ -565,7 +585,7 @@
      "APP-006_front_glare.png",
      "APP-006_back_clean.png"
     ],
-    "ms": 2388,
+    "ms": 2177,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -577,6 +597,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -591,7 +612,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_lowcontrast.png"
     ],
-    "ms": 2299,
+    "ms": 2173,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -603,6 +624,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -617,7 +639,7 @@
      "APP-007_front_perspective.png",
      "APP-007_back_clean.png"
     ],
-    "ms": 2203,
+    "ms": 2271,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -629,6 +651,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -643,7 +666,7 @@
      "APP-007_front_clean.png",
      "APP-007_back_small.png"
     ],
-    "ms": 2049,
+    "ms": 2082,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -655,6 +678,7 @@
     },
     "warning_exact": false,
     "warning_present": true,
+    "warning_assessment": "noise",
     "type_weight": "needs_review",
     "type_weight_reading": "not_measured",
     "type_weight_basis": "too small",
@@ -669,7 +693,7 @@
      "APP-008_front_jpeg.png",
      "APP-008_back_clean.png"
     ],
-    "ms": 2179,
+    "ms": 2203,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -681,6 +705,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -695,7 +720,7 @@
      "APP-008_front_clean.png",
      "APP-008_back_rotate90.png"
     ],
-    "ms": 6141,
+    "ms": 6289,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -707,6 +732,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -721,7 +747,7 @@
      "APP-009_front_rotate7.png",
      "APP-009_back_clean.png"
     ],
-    "ms": 2516,
+    "ms": 2427,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -733,6 +759,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -747,7 +774,7 @@
      "APP-009_front_clean.png",
      "APP-009_back_blur.png"
     ],
-    "ms": 2396,
+    "ms": 2350,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -759,6 +786,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "needs_review",
     "type_weight_reading": "inconclusive",
     "type_weight_basis": "the rest of its line (gap)",
@@ -773,7 +801,7 @@
      "APP-010_front_glare.png",
      "APP-010_back_clean.png"
     ],
-    "ms": 2284,
+    "ms": 2319,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -785,6 +813,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -799,7 +828,7 @@
      "APP-010_front_clean.png",
      "APP-010_back_lowcontrast.png"
     ],
-    "ms": 2274,
+    "ms": 2168,
     "verdict": "ready_for_approval",
     "checks": {
      "brand_name": "match",
@@ -811,6 +840,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -827,7 +857,7 @@
      "APP-001_front_wrong_abv.png",
      "APP-001_back_clean.png"
     ],
-    "ms": 2468,
+    "ms": 2517,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -839,6 +869,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -853,7 +884,7 @@
      "APP-002_front_clean.png",
      "APP-002_back_titlecase.png"
     ],
-    "ms": 2352,
+    "ms": 2377,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -865,6 +896,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -879,7 +911,7 @@
      "APP-003_front_clean.png",
      "APP-003_back_allbold.png"
     ],
-    "ms": 2425,
+    "ms": 2344,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -891,6 +923,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "needs_review",
     "type_weight_reading": "same",
     "type_weight_basis": "the rest of its line (gap)",
@@ -905,7 +938,7 @@
      "APP-004_front_clean.png",
      "APP-004_back_altered.png"
     ],
-    "ms": 2357,
+    "ms": 2202,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -917,6 +950,7 @@
     },
     "warning_exact": false,
     "warning_present": true,
+    "warning_assessment": "wording",
     "type_weight": "match",
     "type_weight_reading": "heavier",
     "type_weight_basis": "the rest of its line (gap)",
@@ -931,7 +965,7 @@
      "APP-005_front_clean.png",
      "APP-005_back_tiny.png"
     ],
-    "ms": 3059,
+    "ms": 2835,
     "verdict": "needs_review",
     "checks": {
      "brand_name": "match",
@@ -943,6 +977,7 @@
     },
     "warning_exact": true,
     "warning_present": true,
+    "warning_assessment": "exact",
     "type_weight": "needs_review",
     "type_weight_reading": "not_measured",
     "type_weight_basis": "too small",
@@ -957,7 +992,7 @@
      "APP-006_front_clean.png",
      "APP-006_back_missing.png"
     ],
-    "ms": 3671,
+    "ms": 3518,
     "verdict": "issues_found",
     "checks": {
      "brand_name": "match",
@@ -969,6 +1004,7 @@
     },
     "warning_exact": false,
     "warning_present": false,
+    "warning_assessment": "absent",
     "type_weight": "not_checked",
     "type_weight_reading": "",
     "type_weight_basis": "",

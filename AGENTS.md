@@ -5,14 +5,13 @@ Codex as reviewer). These conventions keep that workflow safe and legible. `CLAU
 
 ## Roles
 - **Builder** writes application code, tests, docs. One builder at a time.
-- **Reviewer** reads and reports. Reviewers write only under `docs/reviews/` and
-  `tools/adversarial/`. Reviewers never edit application code directly; findings are filed and
-  the builder acts on them.
+- **Reviewer** reads and reports. Reviewers write only under `docs/reviews/`. Reviewers never
+  edit application code directly; findings are filed and the builder acts on them.
 - **Human** decides scope, approves deploys, and owns every decision in `docs/DECISIONS.md`.
 
 ## Non-negotiable rules (all enforced by tests where possible)
 1. **No outbound network calls in the verification path.** OCR runs in-process. Models are baked
-   into the image at build time. `tests/test_no_egress.py` blocks sockets and must stay green.
+   into the image at build time. `tests/integration/test_no_egress.py` blocks sockets and must stay green.
 2. **Nothing is stored.** No database, no upload directory, no logging of label text, filenames,
    or application data. Images live in memory for the duration of one request.
 3. **The tool recommends; the agent decides.** No code path approves or rejects an application.
@@ -35,7 +34,7 @@ tools/          make_labels.py  evaluate.py  cola_fetch.py  evaluate_real.py  lo
                 batch_tally.py  ocr_eval2.py  vendor_models.py  container_smoke.py
 docs/           APPROACH.md  REQUIREMENTS_TRACE.md  LIMITS.md  SECURITY.md  DECISIONS.md  DEPLOY.md
                 REGULATIONS.md (+ regs/ XML)  EVAL.md  LOADTEST.md  OCR_EVAL.md  BAKEOFF.md  reviews/
-samples/        bundled demo labels + sample CSV (fictional brands only)
+app/static/samples/  bundled demo labels + the demo batch CSV (fictional brands only)
 ```
 
 ## Commands
