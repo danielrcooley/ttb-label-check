@@ -84,8 +84,8 @@
                 <fieldset class="usa-fieldset margin-top-2">
                   <legend class="usa-legend">Beverage type</legend>
                   <div class="radio-row">
-                    <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-spirits" type="radio" name="beverage_type" value="spirits" checked><label class="usa-radio__label" for="bt-spirits">Distilled spirits</label></div>
                     <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-wine" type="radio" name="beverage_type" value="wine"><label class="usa-radio__label" for="bt-wine">Wine</label></div>
+                    <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-spirits" type="radio" name="beverage_type" value="spirits" checked><label class="usa-radio__label" for="bt-spirits">Distilled spirits</label></div>
                     <div class="usa-radio"><input class="usa-radio__input usa-radio__input--tile" id="bt-malt" type="radio" name="beverage_type" value="malt"><label class="usa-radio__label" for="bt-malt">Beer / malt beverage</label></div>
                   </div>
                 </fieldset>
@@ -206,7 +206,6 @@
         <div class="submit-row margin-top-4">
           <button type="button" class="usa-button usa-button--big" id="batch-start" disabled>Start</button>
           <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-cancel" hidden>Pause</button>
-          <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-export" hidden>Export results (CSV)</button>
           <span id="batch-status" class="status-line" role="status" aria-live="polite"></span>
           <p id="batch-live" class="usa-sr-only" aria-live="polite"></p>
         </div>
@@ -235,8 +234,11 @@
             <p class="usa-hint">Choose the application each image belongs to, or leave it out.</p>
             <ul id="unpaired-list" class="add-list-reset file-list"></ul>
           </section>
+          <div class="submit-row margin-top-3">
+            <button type="button" class="usa-button usa-button--outline usa-button--big" id="batch-export" hidden>Export results (CSV)</button>
+          </div>
         </div>
-        <p class="usa-hint margin-top-4">Refreshing or closing this page clears the batch. Export before you leave.</p>
+        <p class="usa-hint margin-top-2">Refreshing or closing this page clears the batch. Export before you leave.</p>
       </div>
     </section>
 
